@@ -20,6 +20,7 @@ interface Env {
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
+  passThroughOnException(): void;
 }
 
 const IMAGE_ROUTE = /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png))$/i;
