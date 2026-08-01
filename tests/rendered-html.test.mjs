@@ -4,23 +4,41 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("is a neutral image-placeholder portfolio", async () => {
-  const [page, layout, readme, wrangler] = await Promise.all([
+test("is a mobile-first semantic portfolio with minimal hydration", async () => {
+  const [page, layout, controller, picture, worker, wrangler, headers] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
-    readFile(new URL("README.md", root), "utf8"),
+    readFile(new URL("components/PortfolioController.tsx", root), "utf8"),
+    readFile(new URL("components/ProjectPicture.tsx", root), "utf8"),
+    readFile(new URL("worker/index.ts", root), "utf8"),
     readFile(new URL("wrangler.jsonc", root), "utf8"),
+    readFile(new URL("public/_headers", root), "utf8"),
   ]);
 
-  assert.match(page, /ImagePlaceholder/);
-  assert.match(page, /number="01"/);
-  assert.match(page, /\["19", "Media title 06"/);
-  assert.doesNotMatch(page, /<img\b|<iframe\b|https?:\/\/|mailto:/i);
-  assert.doesNotMatch(page, /Daniel|Dungyov|CleverTap|Workboard|Furever/i);
-  assert.doesNotMatch(page, /50%|60%|1,500|10,000|40k/i);
-  assert.match(page, /const scenes: SceneDefinition\[\]/);
-  assert.match(page, /className="progress-rail"/);
-  assert.match(layout, /Immersive Editable Portfolio/);
-  assert.match(readme, /Cloudflare Workers/);
-  assert.match(wrangler, /2026-05-22/);
+  assert.doesNotMatch(page, /^"use client"/);
+  assert.doesNotMatch(page, /makeStars\(210\)|className="cosmic-star"/);
+  assert.match(page, /PortfolioController/);
+  assert.match(page, /QuantitativeValue/);
+  assert.match(page, /itemType="https:\/\/schema\.org\/ItemList"/);
+  assert.match(page, /data-media-marquee/);
+  assert.equal((page.match(/media-marquee__track/g) ?? []).length, 1);
+
+  assert.match(controller, /^"use client"/);
+  assert.match(controller, /addEventListener\("wheel"/);
+  assert.match(controller, /dataset\.state/);
+
+  assert.match(picture, /<picture/);
+  assert.match(picture, /image\/avif/);
+  assert.match(picture, /image\/webp/);
+  assert.match(picture, /decoding="async"/);
+
+  assert.match(worker, /env\.IMAGES/);
+  assert.match(worker, /env\.ASSETS/);
+  assert.match(wrangler, /"binding": "IMAGES"/);
+  assert.match(wrangler, /"enabled": true/);
+  assert.match(headers, /immutable/);
+
+  assert.doesNotMatch(layout, /Immersive Editable Portfolio/);
+  assert.match(layout, /application\/ld\+json/);
+  assert.match(layout, /<html lang="en">/);
 });
