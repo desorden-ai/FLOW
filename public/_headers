@@ -1,0 +1,13 @@
+/_next/static/*
+  Cache-Control: public, max-age=31556952, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31556952, immutable
+
+/media/*
+  Cache-Control: public, max-age=31556952, immutable
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
