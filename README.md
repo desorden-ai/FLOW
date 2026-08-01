@@ -1,6 +1,6 @@
 # Plantilla de portfolio editable
 
-Portfolio monocromo y responsive preparado para editar, publicar en GitHub y desplegar en Cloudflare Workers.
+Portfolio monocromo, inmersivo y responsive preparado para editar, publicar en GitHub y desplegar en Cloudflare Workers. La navegación funciona como una secuencia de escenas a pantalla completa con transiciones de profundidad, mediante rueda, gesto vertical, flechas y controles visibles.
 
 La plantilla no contiene nombres reales, logotipos, fotografías, evidencias, métricas verificables ni enlaces externos. Cada espacio visual se muestra como un cuadrado blanco numerado del `00` al `19`.
 
@@ -35,6 +35,15 @@ npm run deploy       # Compilar y desplegar en Cloudflare
 - Diseño y responsive: `app/globals.css`.
 - Título y descripción: `app/layout.tsx`.
 - Guía de marcadores visuales: `EDITAR.md`.
+
+La lista `scenes` define el orden de las 15 escenas. La lista `navigation` agrupa esas escenas en las 10 secciones mostradas en el pie de página. Los marcadores de imagen se mantienen separados de las animaciones para poder sustituirlos sin alterar la navegación.
+
+## Controles
+
+- Rueda del ratón o deslizamiento vertical para avanzar y retroceder.
+- Flechas arriba/abajo, `Page Up`, `Page Down`, `Inicio` y `Fin`.
+- Barra de progreso derecha para saltar directamente a una escena.
+- Menú inferior para ir a cada sección principal.
 
 ## GitHub
 
