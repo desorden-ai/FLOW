@@ -18,7 +18,9 @@ test("is a neutral image-placeholder portfolio", async () => {
   assert.doesNotMatch(page, /<img\b|<iframe\b|https?:\/\/|mailto:/i);
   assert.doesNotMatch(page, /Daniel|Dungyov|CleverTap|Workboard|Furever/i);
   assert.doesNotMatch(page, /50%|60%|1,500|10,000|40k/i);
-  assert.match(layout, /Editable Portfolio Template/);
+  assert.match(page, /const scenes: SceneDefinition\[\]/);
+  assert.match(page, /className="progress-rail"/);
+  assert.match(layout, /Immersive Editable Portfolio/);
   assert.match(readme, /Cloudflare Workers/);
-  assert.match(wrangler, /2026-08-01/);
+  assert.match(wrangler, /2026-05-22/);
 });
