@@ -89,7 +89,6 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
       data-label={label}
       data-state={index === 0 ? "current" : "future"}
       data-distance={Math.min(index, 3)}
-      aria-hidden={index !== 0}
     >
       {children}
     </section>
