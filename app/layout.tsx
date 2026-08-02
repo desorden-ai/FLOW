@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { SocialProofEnhancer } from "../components/SocialProofEnhancer";
 import "./globals.css";
 import "./desorden-fixes.css";
+import "./social-proof-instagram.css";
 
 const entityJsonLd = {
   "@context": "https://schema.org",
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         {children}
+        <SocialProofEnhancer />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entityJsonLd).replace(/</g, "\\u003c") }} />
       </body>
     </html>
