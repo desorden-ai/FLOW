@@ -23,7 +23,7 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
-const IMAGE_ROUTE = /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png))$/i;
+const IMAGE_ROUTE = /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp))$/i;
 const OUTPUT_MIME = { avif: "image/avif", webp: "image/webp", jpeg: "image/jpeg" } as const;
 
 async function serveOptimizedImage(request: Request, env: Env): Promise<Response | null> {
@@ -36,7 +36,8 @@ async function serveOptimizedImage(request: Request, env: Env): Promise<Response
 
   const [, widthToken, formatTokenRaw, assetPath] = match;
   const formatToken = formatTokenRaw.toLowerCase() as keyof typeof OUTPUT_MIME;
-  const sourceUrl = new URL(`/media/${assetPath}`, request.url);
+  const normalizedAssetPath = assetPath.replace(/^media\//i, "");
+  const sourceUrl = new URL(`/media/${normalizedAssetPath}`, request.url);
   const sourceResponse = await env.ASSETS.fetch(new Request(sourceUrl, { method: "GET" }));
 
   if (!sourceResponse.ok || !sourceResponse.body) return sourceResponse;
