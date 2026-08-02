@@ -3,31 +3,36 @@
 :root {
   --desorden-title-font: "Anton", "Arial Narrow", Impact, sans-serif;
   --desorden-section-title-size: clamp(2rem, 7.5vw, 3.5rem);
+  --desorden-orange: #f69504;
 }
 
-/* Fondo limpio: elimina las partículas y las nebulosas blancas. */
-.cosmos {
+/* Fondo negro uniforme: sin marquesinas, partículas ni destellos decorativos. */
+html,
+body,
+.site-shell,
+.cosmos,
+.scene-intro,
+.intro-layout {
   background: #000 !important;
 }
 
+.cosmos {
+  inset: 0 !important;
+}
+
 .cosmos::before,
-.cosmos::after {
+.cosmos::after,
+.orbit-copy,
+.decorative-spark,
+.media-marquee {
   display: none !important;
   content: none !important;
   background: none !important;
   animation: none !important;
+  opacity: 0 !important;
 }
 
-/* Marquesinas de fondo ampliadas exactamente un 40 %. */
-.orbit-copy {
-  font-size: clamp(39px, 6.72vw, 102px) !important;
-}
-
-.media-marquee__track {
-  font-size: clamp(76px, 16.8vw, 266px) !important;
-}
-
-/* Tipografía y escala unificadas para los títulos de todos los bloques. */
+/* Escala tipográfica coherente para el resto de escenas. */
 .scene h1,
 .scene h2 {
   font-family: var(--desorden-title-font) !important;
@@ -39,50 +44,107 @@
   overflow-wrap: anywhere;
 }
 
-.outline-word,
-.display-name,
 .contact-name,
 .media-title {
   font-family: var(--desorden-title-font) !important;
   font-weight: 400 !important;
 }
 
-/* La portada permanece visible y no queda anulada por la máscara oscura. */
-.hero-picture,
-.hero-picture img {
+/* Portada. */
+.scene-intro {
+  overflow: hidden !important;
+}
+
+.intro-layout {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  isolation: isolate;
+}
+
+.hero-picture {
+  position: absolute !important;
+  z-index: 0 !important;
+  display: block !important;
   opacity: 1 !important;
   visibility: visible !important;
+  pointer-events: none;
 }
 
 .hero-picture img {
   display: block !important;
-  object-fit: cover !important;
-  object-position: 46% center !important;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: center top !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: brightness(1.08) contrast(1.06) !important;
+  image-rendering: auto;
 }
 
 .intro-layout::after {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.98) 0%,
-    rgba(0, 0, 0, 0.86) 32%,
-    rgba(0, 0, 0, 0.28) 66%,
-    rgba(0, 0, 0, 0.04) 100%
-  ) !important;
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      0deg,
+      #000 0%,
+      rgba(0, 0, 0, 0.98) 11%,
+      rgba(0, 0, 0, 0.72) 24%,
+      rgba(0, 0, 0, 0.18) 41%,
+      rgba(0, 0, 0, 0) 58%
+    ) !important;
 }
 
 .intro-heading {
-  max-width: 100%;
+  position: absolute !important;
+  z-index: 2 !important;
+  max-width: none !important;
+}
+
+.outline-word,
+.display-name {
+  font-family: var(--desorden-title-font) !important;
+  font-weight: 400 !important;
+  text-transform: uppercase;
+}
+
+.outline-word {
+  color: #f5f5f5 !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
 }
 
 .display-name {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: normal;
+  color: var(--desorden-orange) !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  text-shadow: none !important;
+}
+
+.intro-heading .micro-label {
+  color: var(--desorden-orange) !important;
+}
+
+.hero-services {
+  list-style: none;
 }
 
 .hero-services li {
+  color: #f5f5f5 !important;
   text-wrap: pretty;
   overflow-wrap: anywhere;
+}
+
+.hero-services li::first-letter {
+  color: var(--desorden-orange);
 }
 
 @media (max-width: 760px) {
@@ -91,72 +153,88 @@
   }
 
   .scene-intro {
-    padding: 54px 16px 58px !important;
+    padding: 0 !important;
   }
 
   .intro-layout {
-    min-height: calc(100svh - 112px) !important;
+    min-height: 100svh !important;
   }
 
+  /* Posición y escala inspiradas en la segunda referencia. */
   .hero-picture {
-    inset: 0 -16px 0 12% !important;
-  }
-
-  .hero-picture img {
-    width: 100% !important;
-    height: 100% !important;
-    object-position: 47% center !important;
-  }
-
-  .intro-layout::after {
-    background:
-      linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.98) 0%,
-        rgba(0, 0, 0, 0.86) 35%,
-        rgba(0, 0, 0, 0.25) 70%,
-        rgba(0, 0, 0, 0.02) 100%
-      ),
-      linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, transparent 48%) !important;
+    top: 6svh !important;
+    right: -24vw !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: 98vw !important;
+    height: auto !important;
+    inset-inline-start: auto !important;
   }
 
   .intro-heading {
-    left: 0 !important;
-    bottom: 18px !important;
-    width: calc(100% - 8px) !important;
+    left: 22px !important;
+    right: 18px !important;
+    bottom: 68px !important;
+    width: auto !important;
   }
 
   .outline-word {
-    font-size: clamp(1.9rem, 8vw, 2.35rem) !important;
-    line-height: 0.92 !important;
+    margin: 0 0 8px 2px !important;
+    font-size: clamp(1.45rem, 6.3vw, 1.9rem) !important;
+    line-height: 1 !important;
+    letter-spacing: 0.18em !important;
   }
 
   .display-name {
-    font-size: clamp(3.05rem, 14vw, 4.2rem) !important;
-    line-height: 0.88 !important;
-    letter-spacing: -0.015em !important;
+    margin: 0 !important;
+    font-size: clamp(5.8rem, 27vw, 8.2rem) !important;
+    line-height: 0.78 !important;
+    letter-spacing: -0.025em !important;
   }
 
   .intro-heading .micro-label {
-    margin: 8px 0 11px !important;
-    font-size: 8px !important;
-    line-height: 1.35 !important;
-    letter-spacing: 0.24em !important;
-    white-space: normal;
+    margin: 14px 0 17px 2px !important;
+    font-size: clamp(0.58rem, 2.45vw, 0.7rem) !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.19em !important;
+    white-space: normal !important;
   }
 
   .hero-services {
-    gap: 0.38rem !important;
-    margin-top: 0.65rem !important;
-    padding-right: 0.4rem !important;
+    display: grid !important;
+    gap: 0.48rem !important;
+    margin-top: 0 !important;
+    padding: 0 0.2rem 0 0 !important;
   }
 
   .hero-services li {
-    font-size: clamp(0.78rem, 3.25vw, 0.94rem) !important;
+    font-size: clamp(0.82rem, 3.45vw, 0.98rem) !important;
     line-height: 1.24 !important;
   }
+}
 
-  .orbit-copy {
-    font-size: 45px !important;
+@media (min-width: 761px) {
+  .hero-picture {
+    top: 4vh !important;
+    right: 2vw !important;
+    width: min(48vw, 660px) !important;
+    height: auto !important;
+  }
+
+  .intro-heading {
+    left: 7vw !important;
+    bottom: 9vh !important;
+    width: min(620px, 56vw) !important;
+  }
+
+  .outline-word {
+    font-size: clamp(2rem, 3vw, 3.2rem) !important;
+    letter-spacing: 0.15em !important;
+  }
+
+  .display-name {
+    font-size: clamp(6rem, 11vw, 10rem) !important;
+    line-height: 0.78 !important;
+    letter-spacing: -0.025em !important;
   }
 }
