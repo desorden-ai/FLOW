@@ -1,5 +1,5 @@
-name: Execute DESORDEN update
-run-name: Apply DESORDEN changes and deploy
+name: Cleanup DESORDEN deployment files
+run-name: Remove temporary DESORDEN deployment files
 
 on:
   push:
@@ -12,135 +12,42 @@ permissions:
   statuses: write
 
 jobs:
-  apply-and-deploy:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
 
     steps:
-      - name: Mark update pending
-        uses: actions/github-script@v8
-        with:
-          script: |
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: "pending",
-              context: "desorden/apply",
-              description: "Applying DESORDEN visual and social proof update",
-              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            });
-
       - name: Check out repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Reconstruct optimized media
-        id: media
-        run: |
-          cat .desorden-assets/chunk-* | base64 --decode > /tmp/desorden-assets.zip
-          mkdir -p public/media
-          unzip -q -o /tmp/desorden-assets.zip -d public/media
-          test -s public/media/hero/portada-chico-bn.webp
-          test -s public/media/social-proof/rosalia.webp
-          test -s public/media/social-proof/rozalen.webp
-          test -s public/media/social-proof/leire.webp
-
-      - name: Apply React and CSS changes
-        id: apply
-        run: |
-          python3 -m py_compile scripts/apply-desorden-update.py
-          python3 scripts/apply-desorden-update.py
-
-      - name: Install dependencies
-        id: install
-        run: npm ci
-
-      - name: Test
-        id: test
-        run: npm test
-
-      - name: Build
-        id: build
-        run: npm run build
-
-      - name: Commit integrated changes
-        id: commit
+      - name: Remove temporary deployment files
         run: |
           git config user.name "DESORDEN Deploy Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add app/page.tsx app/globals.css tests/rendered-html.test.mjs \
-            public/media/hero/portada-chico-bn.webp \
-            public/media/social-proof/rosalia.webp \
-            public/media/social-proof/rozalen.webp \
-            public/media/social-proof/leire.webp
-          git commit -m "feat: add DESORDEN hero visuals and artist social proof"
+          git rm -f .desorden-update-trigger
+          git rm -f .github/workflows/apply-desorden-update.yml
+          git rm -f .github/workflows/trigger-desorden-update.yml
+          git rm -f scripts/apply-desorden-update.py
+          git rm -f .desorden-assets/chunk-00 .desorden-assets/chunk-01 \
+            .desorden-assets/chunk-02 .desorden-assets/chunk-03 \
+            .desorden-assets/chunk-04 .desorden-assets/chunk-05
+          git commit -m "chore: remove temporary DESORDEN deployment files"
           git push origin HEAD:main
 
-      - name: Verify Cloudflare credentials
-        id: credentials
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-
-      - name: Deploy to Cloudflare Workers
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.92.0"
-          command: deploy
-
-      - name: Publish update result
-        if: always()
+      - name: Mark cleanup successful
         uses: actions/github-script@v8
-        env:
-          MEDIA_OUTCOME: ${{ steps.media.outcome }}
-          APPLY_OUTCOME: ${{ steps.apply.outcome }}
-          INSTALL_OUTCOME: ${{ steps.install.outcome }}
-          TEST_OUTCOME: ${{ steps.test.outcome }}
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-          COMMIT_OUTCOME: ${{ steps.commit.outcome }}
-          CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
-          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         with:
           script: |
             const { execSync } = require("node:child_process");
-            const phases = [
-              ["media", process.env.MEDIA_OUTCOME],
-              ["apply", process.env.APPLY_OUTCOME],
-              ["install", process.env.INSTALL_OUTCOME],
-              ["tests", process.env.TEST_OUTCOME],
-              ["build", process.env.BUILD_OUTCOME],
-              ["commit", process.env.COMMIT_OUTCOME],
-              ["credentials", process.env.CREDENTIALS_OUTCOME],
-              ["deployment", process.env.DEPLOY_OUTCOME],
-            ];
-            const failed = phases.find(([, outcome]) => outcome && outcome !== "success" && outcome !== "skipped");
-            const success = process.env.DEPLOY_OUTCOME === "success";
-            let sha = context.sha;
-            try {
-              sha = execSync("git rev-parse HEAD").toString().trim();
-            } catch {}
+            const sha = execSync("git rev-parse HEAD").toString().trim();
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha,
-              state: success ? "success" : "failure",
-              context: "desorden/apply",
-              description: success
-                ? "DESORDEN changes applied and deployed"
-                : `DESORDEN update failed${failed ? ` during ${failed[0]}` : ""}`,
+              state: "success",
+              context: "repository/cleanup",
+              description: "Temporary DESORDEN deployment files removed",
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
