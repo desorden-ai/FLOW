@@ -8,7 +8,6 @@ const scenes = [
   ["partners", "selected work", "partners"],
   ["experience", "com ho fem", "experience"],
   ["about", "sobre nosaltres", "about"],
-  ["social-proof-scene", "validació social", "social-proof"],
   ["cases", "projectes", "cases"],
   ["media-1", "projectes destacats", "media"],
   ["media-2", "projectes destacats", "media"],
@@ -26,11 +25,10 @@ const navigation = [
   ["selected work", 2],
   ["com ho fem", 3],
   ["sobre nosaltres", 4],
-  ["validació social", 5],
-  ["projectes", 6],
-  ["projectes destacats", 7],
-  ["inversió", 13],
-  ["contacte", 14],
+  ["projectes", 5],
+  ["projectes destacats", 6],
+  ["inversió", 12],
+  ["contacte", 13],
 ] as const;
 
 const experience = [
@@ -41,6 +39,7 @@ const experience = [
   ["Social Media i Ads", "Estratègies verticals d'alta conversió (Meta/TikTok).", "ROI Real"],
   ["Producció Audiovisual", "Vídeo vertical, fotografia i peces de marca amb un acabat prèmium.", "Impacte Visual"],
 ];
+
 const personalNotes = [
   "No som la típica agència de corbata, ni fem powerpoints infinits.",
   "Barregem tecnologia (IA, n8n) amb contingut fresc i plans aeris de pel·lícula.",
@@ -48,12 +47,14 @@ const personalNotes = [
   "Tu centra't en el teu negoci, nosaltres ens mengem la paperassa (AESA, Kit Digital).",
   "Som creadors, geeks de la IA i pilots. Hem vingut a fer soroll.",
 ];
+
 const cases = [
   ["01", "Automatització amb IA i n8n"],
   ["02", "Webs orientades a vendes"],
   ["03", "Producció de dron 4K"],
   ["04", "Kit Digital sense burocràcia"],
 ];
+
 const mediaItems = [
   ["14", "Identitat digital que trenca el patró", "Web · Branding · Catalunya"],
   ["15", "Vols urbans amb cobertura legal", "Dron 4K · AESA · ENAIRE"],
@@ -62,6 +63,7 @@ const mediaItems = [
   ["18", "E-commerce ultraràpid", "UX · Rendiment · Vendes"],
   ["19", "Estratègia DESORDEN", "Tecnologia · Creativitat · Creixement"],
 ];
+
 const logoPositions = [
   [12, 22, -8], [32, 13, 5], [54, 25, -2], [76, 14, 8],
   [18, 51, 4], [42, 43, -6], [68, 51, 3], [86, 44, -5],
@@ -163,48 +165,24 @@ export default function Home() {
           <div className="about-panel"><h2>Sobre nosaltres</h2><ul>{personalNotes.map((note) => <li key={note}>✦ <span>{note}</span></li>)}</ul><p className="about-meta">Catalunya · Operem on calgui</p></div>
         </SceneFrame>
 
-        <SceneFrame index={5} name="social-proof" label="validació social">
-          <section id="social-proof" className="social-proof" aria-labelledby="social-proof-title">
-            <header className="social-proof__heading">
-              <p className="social-proof__eyebrow">SOCIAL PROOF</p>
-              <h2 id="social-proof-title">Validat per referents del sector</h2>
-              <p className="social-proof__description">Peces audiovisuals que trenquen l&apos;scroll i generen interaccions reals.</p>
-            </header>
-            <div className="social-proof__grid">
-              <article className="social-notification" aria-label="Interacció de Rosalía">
-                <img className="social-notification__avatar" src="/media/social-proof/rosalia.webp" alt="Foto de perfil de @rosalia.vt" width="52" height="52" loading="lazy" decoding="async" />
-                <div className="social-notification__content"><strong>@rosalia.vt</strong><p>Ha interactuat amb tu per missatge directe <span>(Partida guanyada 7-6 🎾).</span></p></div>
-              </article>
-              <article className="social-notification" aria-label="Interacció de Rozalén">
-                <img className="social-notification__avatar" src="/media/social-proof/rozalen.webp" alt="Foto de perfil de @rozalenmusic" width="52" height="52" loading="lazy" decoding="async" />
-                <div className="social-notification__content"><strong>@rozalenmusic</strong><p>Ha compartit i comentat el teu reel: <span>“😂😂😂😂😂😂”.</span></p></div>
-              </article>
-              <article className="social-notification" aria-label="Interacció de Leire">
-                <img className="social-notification__avatar" src="/media/social-proof/leire.webp" alt="Foto de perfil de @leiremo_oficial" width="52" height="52" loading="lazy" decoding="async" />
-                <div className="social-notification__content"><strong>@leiremo_oficial</strong><p>Ha reaccionat a la teva publicació <span aria-hidden="true">❤️</span>.</p></div>
-              </article>
-            </div>
-          </section>
-        </SceneFrame>
-
-        <SceneFrame index={6} name="cases" label="projectes">
+        <SceneFrame index={5} name="cases" label="projectes">
           <div className="case-panel"><p className="eyebrow">Projectes</p><div className="case-list">
             {cases.map(([number, title]) => <button type="button" key={number} data-modal-open={title}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
           </div></div>
         </SceneFrame>
 
         {mediaItems.map(([number, title, meta], mediaIndex) => (
-          <SceneFrame index={mediaIndex + 7} name="media" label="projectes destacats" key={number}>
+          <SceneFrame index={mediaIndex + 6} name="media" label="projectes destacats" key={number}>
             <button type="button" className="media-card" data-modal-open={title}><ImagePlaceholder number={number} className="media-placeholder" label={`Imatge destacada: ${title}`} /><span className="media-title">{title}</span><small>{meta} · OBRIR □</small></button>
           </SceneFrame>
         ))}
 
-        <SceneFrame index={13} name="manifesto" label="inversió"><div className="manifesto-copy"><p>Els preus han de ser clars. Sense fum, sense lletra petita.</p><h2>Inverteix en creixement real.</h2><p>Des del Paquet Impuls per arrencar, fins a Domini Absolut per liderar o Desorden Total per trencar les regles. Tot és possible.</p></div></SceneFrame>
-        <SceneFrame index={14} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2>FEM UN CAFÈ?</h2><p className="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name">AGÈNCIA DESORDEN</p><p>Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
+        <SceneFrame index={12} name="manifesto" label="inversió"><div className="manifesto-copy"><p>Els preus han de ser clars. Sense fum, sense lletra petita.</p><h2>Inverteix en creixement real.</h2><p>Des del Paquet Impuls per arrencar, fins a Domini Absolut per liderar o Desorden Total per trencar les regles. Tot és possible.</p></div></SceneFrame>
+        <SceneFrame index={13} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2>FEM UN CAFÈ?</h2><p className="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name">AGÈNCIA DESORDEN</p><p>Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
       </div>
 
       <div className="fixed-ui">
-        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 15</p></header>
+        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 14</p></header>
         <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
         <nav className="section-navigation" aria-label="Seccions de DESORDEN">
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
