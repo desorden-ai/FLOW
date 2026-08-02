@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { PortfolioController } from "../components/PortfolioController";
+import { ProjectPicture } from "../components/ProjectPicture";
 
 const scenes = [
   ["intro", "introducció", "intro"],
@@ -7,7 +8,7 @@ const scenes = [
   ["partners", "selected work", "partners"],
   ["experience", "com ho fem", "experience"],
   ["about", "sobre nosaltres", "about"],
-  ["numbers", "perspectiva", "numbers"],
+  ["social-proof-scene", "validació social", "social-proof"],
   ["cases", "projectes", "cases"],
   ["media-1", "projectes destacats", "media"],
   ["media-2", "projectes destacats", "media"],
@@ -25,19 +26,13 @@ const navigation = [
   ["selected work", 2],
   ["com ho fem", 3],
   ["sobre nosaltres", 4],
-  ["perspectiva", 5],
+  ["validació social", 5],
   ["projectes", 6],
   ["projectes destacats", 7],
   ["inversió", 13],
   ["contacte", 14],
 ] as const;
 
-const roles = [
-  "IA i Automatització",
-  "Producció de Drons",
-  "Disseny Web orientat a vendes",
-  "Tramitació d'Ajuts (Kit Digital)",
-];
 const experience = [
   ["Disseny Web & Branding", "Identitats trencadores i plataformes e-commerce ultraràpides.", "Escalable"],
   ["Producció Dron 4K", "Vol urbà (RD 517/2024). AESA, ENAIRE i permisos, ho gestionem nosaltres.", "Risc Legal Zero"],
@@ -52,14 +47,6 @@ const personalNotes = [
   "El mercat està saturat de clons. Nosaltres busquem l'impacte radical.",
   "Tu centra't en el teu negoci, nosaltres ens mengem la paperassa (AESA, Kit Digital).",
   "Som creadors, geeks de la IA i pilots. Hem vingut a fer soroll.",
-];
-const stats: ReadonlyArray<{ label: string; displayValue: string; value: number | null; unitText: string }> = [
-  { label: "Legalitat i compliment en vols urbans (CTR)", displayValue: "100%", value: 100, unitText: "percent" },
-  { label: "En ajuts del Kit Digital gestionats", displayValue: "3.000€ - 12.000€", value: 3000, unitText: "EUR to 12000 EUR" },
-  { label: "Minuts perduts en burocràcia per part teva", displayValue: "0", value: 0, unitText: "minutes" },
-  { label: "Assistents virtuals d'IA actius", displayValue: "24/7", value: 24, unitText: "hours per day" },
-  { label: "Resolució de gravació aèria cinematogràfica", displayValue: "4K/8K", value: 4, unitText: "K to 8K resolution" },
-  { label: "Partner únic per coordinar tecnologia, web i audiovisual", displayValue: "1", value: 1, unitText: "partner" },
 ];
 const cases = [
   ["01", "Automatització amb IA i n8n"],
@@ -103,8 +90,8 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
 function CosmicField() {
   return (
     <div className="cosmos" aria-hidden="true">
-      <div className="orbit-copy orbit-copy-a">DESORDEN ✦ DESORDEN ✦ DESORDEN ✦</div>
-      <div className="orbit-copy orbit-copy-b">AGÈNCIA ✦ AGÈNCIA ✦ AGÈNCIA ✦</div>
+      <div className="orbit-copy orbit-copy-a">DESCOBRIR • ORDENAR • DENOTAR •</div>
+      <div className="orbit-copy orbit-copy-b">DESCOBRIR • ORDENAR • DENOTAR •</div>
       <span className="decorative-spark spark-one">✦</span>
       <span className="decorative-spark spark-two">✦</span>
       <span className="decorative-spark spark-three">✦</span>
@@ -113,18 +100,6 @@ function CosmicField() {
 }
 
 export default function Home() {
-  const verifiedStats = stats.filter((stat): stat is { label: string; displayValue: string; value: number; unitText: string } => typeof stat.value === "number");
-  const numbersJsonLd = verifiedStats.length > 0 ? {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "Resultats i dades de l'agència DESORDEN",
-    itemListElement: verifiedStats.map((stat, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item: { "@type": "QuantitativeValue", name: stat.label, value: stat.value, unitText: stat.unitText },
-    })),
-  } : null;
-
   return (
     <PortfolioController sceneCount={scenes.length}>
       <CosmicField />
@@ -142,9 +117,21 @@ export default function Home() {
               <p className="outline-word">EL TEU</p>
               <p className="display-name">PARTNER</p>
               <p className="micro-label">( TECNOLÒGIC I CREATIU )</p>
-              <ul className="roles">{roles.map((role) => <li key={role}>✦ {role}</li>)}</ul>
+              <ul className="hero-services" aria-label="Proposta de valor de DESORDEN">
+                <li>✦ Contingut visual per a xarxes socials</li>
+                <li>✦ Vídeo amb IA per visibilitzar marques i comerços</li>
+                <li>✦ Creació d&apos;una identitat visual coherent</li>
+              </ul>
             </header>
-            <ImagePlaceholder number="01" className="hero-placeholder" label="Retrat principal de l'agència DESORDEN" />
+            <ProjectPicture
+              file="media/hero/portada-chico-bn.webp"
+              alt="Perfil en blanc i negre del creador i director de DESORDEN"
+              width={768}
+              height={1028}
+              className="hero-picture"
+              sizes="(max-width: 760px) 82vw, 460px"
+              eager
+            />
           </div>
         </SceneFrame>
 
@@ -176,19 +163,28 @@ export default function Home() {
           <div className="about-panel"><h2>Sobre nosaltres</h2><ul>{personalNotes.map((note) => <li key={note}>✦ <span>{note}</span></li>)}</ul><p className="about-meta">Catalunya · Operem on calgui</p></div>
         </SceneFrame>
 
-        <SceneFrame index={5} name="numbers" label="perspectiva">
-          <section className="numbers-stage" aria-labelledby="numbers-title" itemScope itemType="https://schema.org/ItemList">
-            <header className="numbers-heading"><p className="eyebrow">Perspective in numbers</p><h2 id="numbers-title">Per què escollir-nos en números</h2></header>
-            {stats.map((stat, index) => (
-              <div className={`floating-stat stat-${index + 1}`} key={stat.label} itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
-                <meta itemProp="position" content={String(index + 1)} />
-                {stat.value === null ? <b aria-label="Valor verificat pendent">—</b> : <data itemProp="value" value={String(stat.value)}>{stat.displayValue}</data>}
-                <span itemProp="name">{stat.label}</span>
-                <meta itemProp="unitText" content={stat.unitText} />
-              </div>
-            ))}
+        <SceneFrame index={5} name="social-proof" label="validació social">
+          <section id="social-proof" className="social-proof" aria-labelledby="social-proof-title">
+            <header className="social-proof__heading">
+              <p className="social-proof__eyebrow">SOCIAL PROOF</p>
+              <h2 id="social-proof-title">Validat per referents del sector</h2>
+              <p className="social-proof__description">Peces audiovisuals que trenquen l&apos;scroll i generen interaccions reals.</p>
+            </header>
+            <div className="social-proof__grid">
+              <article className="social-notification" aria-label="Interacció de Rosalía">
+                <img className="social-notification__avatar" src="/media/social-proof/rosalia.webp" alt="Foto de perfil de @rosalia.vt" width="52" height="52" loading="lazy" decoding="async" />
+                <div className="social-notification__content"><strong>@rosalia.vt</strong><p>Ha interactuat amb tu per missatge directe <span>(Partida guanyada 7-6 🎾).</span></p></div>
+              </article>
+              <article className="social-notification" aria-label="Interacció de Rozalén">
+                <img className="social-notification__avatar" src="/media/social-proof/rozalen.webp" alt="Foto de perfil de @rozalenmusic" width="52" height="52" loading="lazy" decoding="async" />
+                <div className="social-notification__content"><strong>@rozalenmusic</strong><p>Ha compartit i comentat el teu reel: <span>“😂😂😂😂😂😂”.</span></p></div>
+              </article>
+              <article className="social-notification" aria-label="Interacció de Leire">
+                <img className="social-notification__avatar" src="/media/social-proof/leire.webp" alt="Foto de perfil de @leiremo_oficial" width="52" height="52" loading="lazy" decoding="async" />
+                <div className="social-notification__content"><strong>@leiremo_oficial</strong><p>Ha reaccionat a la teva publicació <span aria-hidden="true">❤️</span>.</p></div>
+              </article>
+            </div>
           </section>
-          {numbersJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(numbersJsonLd).replace(/</g, "\\u003c") }} /> : null}
         </SceneFrame>
 
         <SceneFrame index={6} name="cases" label="projectes">

@@ -18,8 +18,10 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.doesNotMatch(page, /^"use client"/);
   assert.doesNotMatch(page, /makeStars\(210\)|className="cosmic-star"/);
   assert.match(page, /PortfolioController/);
-  assert.match(page, /QuantitativeValue/);
-  assert.match(page, /itemType="https:\/\/schema\.org\/ItemList"/);
+  assert.match(page, /id="social-proof"/);
+  assert.equal((page.match(/className="social-notification"/g) ?? []).length, 3);
+  assert.match(page, /\/media\/social-proof\/rosalia\.webp/);
+  assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
   assert.match(page, /data-media-marquee/);
   assert.equal((page.match(/media-marquee__track/g) ?? []).length, 1);
 
