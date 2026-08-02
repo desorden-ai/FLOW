@@ -48,17 +48,20 @@ jobs:
           from pathlib import Path
           import base64
           import os
-          import re
           import subprocess
 
           source = Path('.github/workflows/apply-desorden-update.yml').read_text(encoding='utf-8')
           names = ('APPLY_SCRIPT_B64', 'HERO_B64', 'ROSALIA_B64', 'ROZALEN_B64', 'LEIRE_B64')
           values = {}
           for name in names:
-              match = re.search(rf'^\s+{name}: "([A-Za-z0-9+/=]+)"$', source, re.MULTILINE)
-              if not match:
+              prefix = f'{name}:'
+              line = next((item.strip() for item in source.splitlines() if item.strip().startswith(prefix)), None)
+              if line is None:
                   raise SystemExit(f'Missing encoded resource: {name}')
-              values[name] = match.group(1)
+              value = line.split(':', 1)[1].strip().strip('"').strip("'")
+              if not value:
+                  raise SystemExit(f'Empty encoded resource: {name}')
+              values[name] = value
 
           script = Path('/tmp/apply_desorden.py')
           script.write_bytes(base64.b64decode(values.pop('APPLY_SCRIPT_B64')))
