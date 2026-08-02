@@ -23,12 +23,24 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
-const IMAGE_ROUTE = /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp))$/i;
-const OUTPUT_MIME = { avif: "image/avif", webp: "image/webp", jpeg: "image/jpeg" } as const;
+const IMAGE_ROUTE =
+  /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp))$/i;
+const OUTPUT_MIME = {
+  avif: "image/avif",
+  webp: "image/webp",
+  jpeg: "image/jpeg",
+} as const;
+const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82 } as const;
 
 async function serveOptimizedImage(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/_image/")) return null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed.", {
+      status: 405,
+      headers: { Allow: "GET, HEAD" },
+    });
+  }
   if (url.search) return new Response("Image query parameters are not supported.", { status: 400 });
 
   const match = IMAGE_ROUTE.exec(url.pathname);
@@ -38,21 +50,74 @@ async function serveOptimizedImage(request: Request, env: Env): Promise<Response
   const formatToken = formatTokenRaw.toLowerCase() as keyof typeof OUTPUT_MIME;
   const normalizedAssetPath = assetPath.replace(/^media\//i, "");
   const sourceUrl = new URL(`/media/${normalizedAssetPath}`, request.url);
-  const sourceResponse = await env.ASSETS.fetch(new Request(sourceUrl, { method: "GET" }));
+  const sourceResponse = await env.ASSETS.fetch(
+    new Request(sourceUrl, {
+      method: "GET",
+      headers: { Accept: "image/avif,image/webp,image/*,*/*;q=0.8" },
+    }),
+  );
 
-  if (!sourceResponse.ok || !sourceResponse.body) return sourceResponse;
+  if (!sourceResponse.ok) return sourceResponse;
 
-  const transformed = (
-    await env.IMAGES.input(sourceResponse.body)
-      .transform({ width: Number(widthToken) })
-      .output({ format: OUTPUT_MIME[formatToken], quality: formatToken === "jpeg" ? 82 : 76 })
-  ).response();
+  const sourceType = sourceResponse.headers.get("Content-Type") ?? "";
+  if (!sourceType.toLowerCase().startsWith("image/")) {
+    return Response.json(
+      { error: "invalid_image_source", source: sourceUrl.pathname, contentType: sourceType },
+      { status: 502 },
+    );
+  }
 
-  const headers = new Headers(transformed.headers);
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
-  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  const sourceBytes = await sourceResponse.arrayBuffer();
+  if (sourceBytes.byteLength === 0) {
+    return Response.json(
+      { error: "empty_image_source", source: sourceUrl.pathname },
+      { status: 502 },
+    );
+  }
 
-  return new Response(transformed.body, { status: transformed.status, headers });
+  const sourceStream = new Response(sourceBytes).body;
+  if (!sourceStream) {
+    return Response.json(
+      { error: "unreadable_image_source", source: sourceUrl.pathname },
+      { status: 502 },
+    );
+  }
+
+  try {
+    const transformed = (
+      await env.IMAGES.input(sourceStream)
+        .transform({ width: Number(widthToken) })
+        .output({ format: OUTPUT_MIME[formatToken], quality: OUTPUT_QUALITY[formatToken] })
+    ).response();
+
+    const headers = new Headers(transformed.headers);
+    headers.set("Content-Type", OUTPUT_MIME[formatToken]);
+    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    headers.set("Cross-Origin-Resource-Policy", "same-origin");
+    headers.set("X-Content-Type-Options", "nosniff");
+
+    return new Response(request.method === "HEAD" ? null : transformed.body, {
+      status: transformed.status,
+      statusText: transformed.statusText,
+      headers,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown image transformation error";
+    console.error(
+      JSON.stringify({
+        event: "image_transform_failed",
+        path: url.pathname,
+        source: sourceUrl.pathname,
+        sourceType,
+        sourceBytes: sourceBytes.byteLength,
+        message,
+      }),
+    );
+    return Response.json(
+      { error: "image_transform_failed", message },
+      { status: 502 },
+    );
+  }
 }
 
 export default {
@@ -62,11 +127,13 @@ export default {
       if (optimizedImage) return optimizedImage;
       return handler.fetch(request, env, ctx);
     } catch (error) {
-      console.error(JSON.stringify({
-        event: "request_failed",
-        url: request.url,
-        error: error instanceof Error ? error.message : "Unknown error",
-      }));
+      console.error(
+        JSON.stringify({
+          event: "request_failed",
+          url: request.url,
+          error: error instanceof Error ? error.message : "Unknown error",
+        }),
+      );
       return new Response("Internal server error.", { status: 500 });
     }
   },
