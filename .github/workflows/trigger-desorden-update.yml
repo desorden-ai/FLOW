@@ -41,9 +41,17 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Extract and apply prepared update
+      - name: Reconstruct media and apply prepared update
         id: apply
         run: |
+          cat .desorden-assets/chunk-* | base64 --decode > /tmp/desorden-assets.zip
+          mkdir -p public/media
+          unzip -q -o /tmp/desorden-assets.zip -d public/media
+          test -s public/media/hero/portada-chico-bn.webp
+          test -s public/media/social-proof/rosalia.webp
+          test -s public/media/social-proof/rozalen.webp
+          test -s public/media/social-proof/leire.webp
+
           python3 - <<'PY'
           from pathlib import Path
           import base64
@@ -51,23 +59,29 @@ jobs:
           import subprocess
 
           source = Path('.github/workflows/apply-desorden-update.yml').read_text(encoding='utf-8')
-          names = ('APPLY_SCRIPT_B64', 'HERO_B64', 'ROSALIA_B64', 'ROZALEN_B64', 'LEIRE_B64')
-          values = {}
-          for name in names:
-              prefix = f'{name}:'
-              line = next((item.strip() for item in source.splitlines() if item.strip().startswith(prefix)), None)
-              if line is None:
-                  raise SystemExit(f'Missing encoded resource: {name}')
-              value = line.split(':', 1)[1].strip().strip('"').strip("'")
-              if not value:
-                  raise SystemExit(f'Empty encoded resource: {name}')
-              values[name] = value
+          prefix = 'APPLY_SCRIPT_B64:'
+          line = next((item.strip() for item in source.splitlines() if item.strip().startswith(prefix)), None)
+          if line is None:
+              raise SystemExit('Missing encoded patch script')
+          encoded_script = line.split(':', 1)[1].strip().strip('"').strip("'")
 
           script = Path('/tmp/apply_desorden.py')
-          script.write_bytes(base64.b64decode(values.pop('APPLY_SCRIPT_B64')))
+          script.write_bytes(base64.b64decode(encoded_script))
+
+          files = {
+              'HERO_B64': Path('public/media/hero/portada-chico-bn.webp'),
+              'ROSALIA_B64': Path('public/media/social-proof/rosalia.webp'),
+              'ROZALEN_B64': Path('public/media/social-proof/rozalen.webp'),
+              'LEIRE_B64': Path('public/media/social-proof/leire.webp'),
+          }
           env = os.environ.copy()
-          env.update(values)
+          env.update({name: base64.b64encode(path.read_bytes()).decode('ascii') for name, path in files.items()})
           subprocess.run(['python3', str(script)], check=True, env=env)
+
+          page = Path('app/page.tsx')
+          content = page.read_text(encoding='utf-8')
+          content = content.replace('width={1147}', 'width={768}', 1).replace('height={1536}', 'height={1028}', 1)
+          page.write_text(content, encoding='utf-8')
           PY
 
       - name: Install dependencies
