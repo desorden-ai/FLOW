@@ -24,10 +24,65 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
     const marquee = root.querySelector<HTMLElement>("[data-media-marquee]");
     const modal = root.querySelector<HTMLElement>("[data-modal]");
     const modalTitle = root.querySelector<HTMLElement>("[data-modal-title]");
+    const socialProofSection = root.querySelector<HTMLElement>(".social-proof");
+    const socialProofGrid = root.querySelector<HTMLElement>(".social-proof__grid");
 
     let active = 0;
     let wheelLocked = false;
     let touchStart: number | null = null;
+    let socialProofObserver: IntersectionObserver | null = null;
+
+    const createVerifiedBadge = () => {
+      const namespace = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(namespace, "svg");
+      svg.setAttribute("class", "verified-badge");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "Compte verificat");
+      svg.setAttribute("focusable", "false");
+
+      const title = document.createElementNS(namespace, "title");
+      title.textContent = "Compte verificat";
+
+      const badge = document.createElementNS(namespace, "path");
+      badge.setAttribute("fill", "currentColor");
+      badge.setAttribute(
+        "d",
+        "M12 1.5 14.1 3l2.55-.2.9 2.4 2.35 1.05-.3 2.55 1.65 2.2-1.65 2.05.3 2.6-2.4.88-.98 2.42-2.6-.34L12 20.5l-2.05-1.64-2.6.34-.88-2.47-2.42-1.03.34-2.61L2.75 11l1.64-2.05-.34-2.6 2.47-.88 1.03-2.42 2.61.34L12 1.5Z",
+      );
+
+      const check = document.createElementNS(namespace, "path");
+      check.setAttribute("fill", "#fff");
+      check.setAttribute("d", "m9.85 15.45-3.1-3.1 1.45-1.45 1.65 1.65 5.95-5.95 1.45 1.45-7.4 7.4Z");
+
+      svg.append(title, badge, check);
+      return svg;
+    };
+
+    root.querySelectorAll<HTMLElement>(".social-notification__content strong").forEach((username) => {
+      const nextElement = username.nextElementSibling;
+      if (nextElement?.classList.contains("verified-badge")) return;
+      username.insertAdjacentElement("afterend", createVerifiedBadge());
+    });
+
+    if (socialProofSection && socialProofGrid) {
+      if (!("IntersectionObserver" in window)) {
+        socialProofGrid.classList.add("is-visible");
+      } else {
+        socialProofObserver = new IntersectionObserver(
+          ([entry]) => {
+            if (!entry?.isIntersecting) return;
+            socialProofGrid.classList.add("is-visible");
+            socialProofObserver?.unobserve(entry.target);
+          },
+          {
+            threshold: 0.2,
+            rootMargin: "0px 0px -8% 0px",
+          },
+        );
+        socialProofObserver.observe(socialProofSection);
+      }
+    }
 
     const closeMenu = () => {
       if (menu) menu.hidden = true;
@@ -166,6 +221,7 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
       root.removeEventListener("touchend", onTouchEnd);
       root.removeEventListener("click", onClick);
       window.removeEventListener("keydown", onKeyDown);
+      socialProofObserver?.disconnect();
       document.body.classList.remove("modal-open");
     };
   }, [sceneCount]);
