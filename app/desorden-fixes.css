@@ -1,0 +1,162 @@
+@import url("https://fonts.googleapis.com/css2?family=Anton&display=swap");
+
+:root {
+  --desorden-title-font: "Anton", "Arial Narrow", Impact, sans-serif;
+  --desorden-section-title-size: clamp(2rem, 7.5vw, 3.5rem);
+}
+
+/* Fondo limpio: elimina las partículas y las nebulosas blancas. */
+.cosmos {
+  background: #000 !important;
+}
+
+.cosmos::before,
+.cosmos::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  animation: none !important;
+}
+
+/* Marquesinas de fondo ampliadas exactamente un 40 %. */
+.orbit-copy {
+  font-size: clamp(39px, 6.72vw, 102px) !important;
+}
+
+.media-marquee__track {
+  font-size: clamp(76px, 16.8vw, 266px) !important;
+}
+
+/* Tipografía y escala unificadas para los títulos de todos los bloques. */
+.scene h1,
+.scene h2 {
+  font-family: var(--desorden-title-font) !important;
+  font-size: var(--desorden-section-title-size) !important;
+  font-weight: 400 !important;
+  line-height: 0.98 !important;
+  letter-spacing: 0.005em !important;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.outline-word,
+.display-name,
+.contact-name,
+.media-title {
+  font-family: var(--desorden-title-font) !important;
+  font-weight: 400 !important;
+}
+
+/* La portada permanece visible y no queda anulada por la máscara oscura. */
+.hero-picture,
+.hero-picture img {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.hero-picture img {
+  display: block !important;
+  object-fit: cover !important;
+  object-position: 46% center !important;
+}
+
+.intro-layout::after {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.98) 0%,
+    rgba(0, 0, 0, 0.86) 32%,
+    rgba(0, 0, 0, 0.28) 66%,
+    rgba(0, 0, 0, 0.04) 100%
+  ) !important;
+}
+
+.intro-heading {
+  max-width: 100%;
+}
+
+.display-name {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+
+.hero-services li {
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --desorden-section-title-size: clamp(2rem, 9vw, 2.55rem);
+  }
+
+  .scene-intro {
+    padding: 54px 16px 58px !important;
+  }
+
+  .intro-layout {
+    min-height: calc(100svh - 112px) !important;
+  }
+
+  .hero-picture {
+    inset: 0 -16px 0 12% !important;
+  }
+
+  .hero-picture img {
+    width: 100% !important;
+    height: 100% !important;
+    object-position: 47% center !important;
+  }
+
+  .intro-layout::after {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.98) 0%,
+        rgba(0, 0, 0, 0.86) 35%,
+        rgba(0, 0, 0, 0.25) 70%,
+        rgba(0, 0, 0, 0.02) 100%
+      ),
+      linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, transparent 48%) !important;
+  }
+
+  .intro-heading {
+    left: 0 !important;
+    bottom: 18px !important;
+    width: calc(100% - 8px) !important;
+  }
+
+  .outline-word {
+    font-size: clamp(1.9rem, 8vw, 2.35rem) !important;
+    line-height: 0.92 !important;
+  }
+
+  .display-name {
+    font-size: clamp(3.05rem, 14vw, 4.2rem) !important;
+    line-height: 0.88 !important;
+    letter-spacing: -0.015em !important;
+  }
+
+  .intro-heading .micro-label {
+    margin: 8px 0 11px !important;
+    font-size: 8px !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0.24em !important;
+    white-space: normal;
+  }
+
+  .hero-services {
+    gap: 0.38rem !important;
+    margin-top: 0.65rem !important;
+    padding-right: 0.4rem !important;
+  }
+
+  .hero-services li {
+    font-size: clamp(0.78rem, 3.25vw, 0.94rem) !important;
+    line-height: 1.24 !important;
+  }
+
+  .orbit-copy {
+    font-size: 45px !important;
+  }
+}
