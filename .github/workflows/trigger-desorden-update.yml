@@ -16,6 +16,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Mark update pending
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: "pending",
+              context: "desorden/apply",
+              description: "Applying accumulated DESORDEN changes",
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
       - name: Check out repository
         uses: actions/checkout@v6
         with:
@@ -28,6 +42,7 @@ jobs:
           cache: npm
 
       - name: Extract and apply prepared update
+        id: apply
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -53,15 +68,19 @@ jobs:
           PY
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
       - name: Test
+        id: test
         run: npm test
 
       - name: Build
+        id: build
         run: npm run build
 
       - name: Commit integrated changes
+        id: commit
         run: |
           git config user.name "DESORDEN Deploy Bot"
           git config user.email "actions@users.noreply.github.com"
@@ -70,6 +89,7 @@ jobs:
           git push origin HEAD:main
 
       - name: Verify Cloudflare credentials
+        id: credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -86,22 +106,36 @@ jobs:
           wranglerVersion: "4.92.0"
           command: deploy
 
-      - name: Publish deployment status
+      - name: Publish update result
         if: always()
         uses: actions/github-script@v8
         env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          COMMIT_OUTCOME: ${{ steps.commit.outcome }}
+          CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         with:
           script: |
-            const { execSync } = require("node:child_process");
-            const sha = execSync("git rev-parse HEAD").toString().trim();
+            const phases = [
+              ["apply", process.env.APPLY_OUTCOME],
+              ["install", process.env.INSTALL_OUTCOME],
+              ["tests", process.env.TEST_OUTCOME],
+              ["build", process.env.BUILD_OUTCOME],
+              ["commit", process.env.COMMIT_OUTCOME],
+              ["credentials", process.env.CREDENTIALS_OUTCOME],
+              ["deployment", process.env.DEPLOY_OUTCOME],
+            ];
+            const failed = phases.find(([, outcome]) => outcome && outcome !== "success" && outcome !== "skipped");
             const success = process.env.DEPLOY_OUTCOME === "success";
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha,
+              sha: context.sha,
               state: success ? "success" : "failure",
-              context: "cloudflare/deploy",
-              description: success ? "DESORDEN update deployed to Cloudflare" : "DESORDEN deployment failed",
+              context: "desorden/apply",
+              description: success ? "DESORDEN changes applied and deployed" : `DESORDEN update failed${failed ? ` during ${failed[0]}` : ""}`,
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
