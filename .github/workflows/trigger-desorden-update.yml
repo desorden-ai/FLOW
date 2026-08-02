@@ -1,0 +1,20 @@
+name: Trigger DESORDEN update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .desorden-update-trigger
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch update workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run apply-desorden-update.yml --ref main
