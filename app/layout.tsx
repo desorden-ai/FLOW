@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
 import { SocialProofPushNotifications } from "../components/SocialProofPushNotifications";
 import "./globals.css";
 import "./desorden-fixes.css";
 import "./push-notifications.css";
+import "./contact-form.css";
 
 const entityJsonLd = {
   "@context": "https://schema.org",
@@ -29,6 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         {children}
+        <ContactWhatsAppForm />
         <SocialProofPushNotifications heroSelector="#intro" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entityJsonLd).replace(/</g, "\\u003c") }} />
       </body>
