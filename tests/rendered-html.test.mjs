@@ -34,13 +34,15 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(page, /<SceneFrame index=\{8\} name="contact"/);
 
   assert.match(controller, /^"use client"/);
-  assert.match(controller, /addEventListener\("wheel"/);
-  assert.match(controller, /dataset\.state/);
-  assert.match(controller, /const MEDIA_START = 6/);
-  assert.match(controller, /const MEDIA_END = 7/);
-  assert.match(controller, /const LOGO_TUNNEL_INDEX = 2/);
-  assert.match(controller, /desorden:block-3-progress/);
-  assert.match(controller, /LOGO_TUNNEL_STEP/);
+
+  const navigationHook = await readFile(new URL("components/usePortfolioNavigation.ts", root), "utf8");
+  assert.match(navigationHook, /addEventListener\("wheel"/);
+  assert.match(navigationHook, /dataset\.state/);
+  assert.match(navigationHook, /const MEDIA_START = 6/);
+  assert.match(navigationHook, /const MEDIA_END = 7/);
+  assert.match(navigationHook, /const LOGO_TUNNEL_INDEX = 2/);
+  assert.match(navigationHook, /desorden:block-3-progress/);
+  assert.match(navigationHook, /LOGO_TUNNEL_STEP/);
 
   assert.match(logoTunnel, /^"use client"/);
   assert.match(await readFile(new URL("hooks/useLogoTunnelAnimation.ts", root), "utf8"), /requestAnimationFrame/);
