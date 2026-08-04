@@ -5,10 +5,15 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("is a mobile-first semantic portfolio with minimal hydration", async () => {
-  const [page, layout, controller, pushNotifications, pushCss, picture, worker, wrangler, headers] = await Promise.all([
+  const [page, layout, controller, logoTunnel, logoAssets, logoCss, assetFetcher, packageJson, pushNotifications, pushCss, picture, worker, wrangler, headers] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("components/PortfolioController.tsx", root), "utf8"),
+    readFile(new URL("components/LogoTunnel.tsx", root), "utf8"),
+    readFile(new URL("components/logoTunnelAssets.ts", root), "utf8"),
+    readFile(new URL("app/logo-tunnel.css", root), "utf8"),
+    readFile(new URL("scripts/fetch-logo-tunnel-assets.mjs", root), "utf8"),
+    readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("components/SocialProofPushNotifications.tsx", root), "utf8"),
     readFile(new URL("app/push-notifications.css", root), "utf8"),
     readFile(new URL("components/ProjectPicture.tsx", root), "utf8"),
@@ -18,7 +23,8 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   ]);
 
   assert.doesNotMatch(page, /^"use client"/);
-  assert.doesNotMatch(page, /makeStars\(210\)|className="cosmic-star"/);
+  assert.doesNotMatch(page, /ParticleTunnel|CosmicField|logoPositions|className="cosmic-star"/);
+  assert.match(page, /LogoTunnel/);
   assert.match(page, /PortfolioController/);
   assert.doesNotMatch(page, /id="social-proof"|className="social-notification"/);
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
@@ -33,6 +39,25 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(controller, /dataset\.state/);
   assert.match(controller, /const MEDIA_START = 6/);
   assert.match(controller, /const MEDIA_END = 7/);
+  assert.match(controller, /const LOGO_TUNNEL_INDEX = 2/);
+  assert.match(controller, /desorden:block-3-progress/);
+  assert.match(controller, /LOGO_TUNNEL_STEP/);
+
+  assert.match(logoTunnel, /^"use client"/);
+  assert.match(logoTunnel, /requestAnimationFrame/);
+  assert.match(logoTunnel, /translate3d/);
+  assert.match(logoTunnel, /data-logo-3d-item/);
+  assert.match(logoTunnel, /Pugnator, Castell, The Club Padel/);
+  assert.equal((logoAssets.match(/dark_optimized\.webp/g) ?? []).length, 7);
+  assert.match(logoAssets, /VIU Sant Vicenç de Castellet/);
+  assert.match(logoAssets, /Nutrikom/);
+
+  assert.match(logoCss, /mask-image:\s*radial-gradient/);
+  assert.match(logoCss, /will-change:\s*transform, opacity/);
+  assert.match(logoCss, /background:\s*#000000/);
+  assert.match(assetFetcher, /drive\.usercontent\.google\.com/);
+  assert.match(assetFetcher, /EXPECTED_FILES/);
+  assert.match(packageJson, /"prebuild": "node scripts\/fetch-logo-tunnel-assets\.mjs"/);
 
   assert.match(pushNotifications, /^"use client"/);
   assert.equal((pushNotifications.match(/id: "(?:rosalia-like|rozalen-comment)"/g) ?? []).length, 2);
@@ -63,9 +88,10 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(wrangler, /"enabled": true/);
   assert.match(headers, /immutable/);
 
-  assert.doesNotMatch(layout, /Immersive Editable Portfolio/);
+  assert.doesNotMatch(layout, /Immersive Editable Portfolio|particle-tunnel\.css/);
   assert.match(layout, /SocialProofPushNotifications/);
   assert.match(layout, /push-notifications\.css/);
+  assert.match(layout, /logo-tunnel\.css/);
   assert.match(layout, /application\/ld\+json/);
   assert.match(layout, /<html lang="en">/);
 });
