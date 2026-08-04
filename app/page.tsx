@@ -28,46 +28,62 @@ const navigation = [
 
 const experience = [
   ["Disseny Web & Branding", "Identitats trencadores i plataformes e-commerce ultraràpides.", "Escalable"],
-  ["Producció Dron 4K", "Vol urbà (RD 517/2024). AESA, ENAIRE i permisos, ho gestionem nosaltres.", "Risc Legal Zero"],
-  ["IA i Automatització", "Processos repetitius automatitzats amb n8n i personatges virtuals integrats.", "Vanguardia"],
-  ["Gestió d'Ajuts (Kit Digital)", "Digitalitza't a cost ZERO. Gestionem tota la paperassa amb Red.es.", "100% Subvencionat"],
-  ["Social Media i Ads", "Estratègies verticals d'alta conversió (Meta/TikTok).", "ROI Real"],
-  ["Producció Audiovisual", "Vídeo vertical, fotografia i peces de marca amb un acabat prèmium.", "Impacte Visual"],
+  ["Producció Dron 4K", "Vol urbà (RD 517/2024). AESA, ENAIRE i permisos, ho gestionem nosaltres.", "Gestió integral"],
+  ["IA i Automatització", "Processos repetitius automatitzats amb n8n i personatges virtuals integrats.", "Avantguarda"],
+  ["Gestió d'Ajuts (Kit Digital)", "Avaluem l'elegibilitat i gestionem la tramitació amb Red.es.", "Segons convocatòria"],
+  ["Social Media i Ads", "Estratègies verticals d'alta conversió per a Meta i TikTok.", "Mesurable"],
+  ["Producció Audiovisual", "Vídeo vertical, fotografia i peces de marca amb un acabat prèmium.", "Impacte visual"],
 ];
 
 const personalNotes = [
   "No som la típica agència de corbata, ni fem powerpoints infinits.",
   "Barregem tecnologia (IA, n8n) amb contingut fresc i plans aeris de pel·lícula.",
   "El mercat està saturat de clons. Nosaltres busquem l'impacte radical.",
-  "Tu centra't en el teu negoci, nosaltres ens mengem la paperassa (AESA, Kit Digital).",
-  "Som creadors, geeks de la IA i pilots. Hem vingut a fer soroll.",
+  "Tu centra't en el teu negoci; nosaltres gestionem la producció i la documentació necessària.",
+  "Som creadors, especialistes en IA i pilots. Hem vingut a fer soroll.",
 ];
 
 const cases = [
   ["01", "Automatització amb IA i n8n"],
   ["02", "Webs orientades a vendes"],
   ["03", "Producció de dron 4K"],
-  ["04", "Kit Digital sense burocràcia"],
+  ["04", "Gestió de projectes de digitalització"],
 ];
 
 const mediaItems = [
   ["14", "Identitat digital que trenca el patró", "Web · Branding · Catalunya"],
-  ["15", "Vols urbans amb cobertura legal", "Dron 4K · AESA · ENAIRE"],
+  ["15", "Vols urbans amb cobertura documental", "Dron 4K · AESA · ENAIRE"],
 ];
+
+const visuallyHiddenStyle = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 function ImagePlaceholder({ number, className = "", label }: { number: string; className?: string; label?: string }) {
   return <span className={`image-placeholder ${className}`.trim()} aria-label={label ?? `Imatge substituïble ${number}`} role="img">{number}</span>;
 }
 
 function SceneFrame({ index, name, label, children }: { index: number; name: string; label: string; children: ReactNode }) {
+  const isInitialScene = index === 0;
+
   return (
     <section
       id={scenes[index][0]}
       className={`scene scene-${name}`}
       data-scene
       data-label={label}
-      data-state={index === 0 ? "current" : "future"}
+      data-state={isInitialScene ? "current" : "future"}
       data-distance={Math.min(index, 3)}
+      aria-hidden={!isInitialScene}
+      inert={!isInitialScene}
     >
       {children}
     </section>
@@ -77,13 +93,22 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
 export default function Home() {
   return (
     <PortfolioController sceneCount={scenes.length}>
+      <p
+        style={visuallyHiddenStyle}
+        aria-live="polite"
+        aria-atomic="true"
+        data-live-scene-label
+      >
+        introducció
+      </p>
+
       <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
         <p className="media-marquee__track" data-text="PROJECTES ✦ PROJECTES ✦ PROJECTES ✦ ">
           PROJECTES ✦ PROJECTES ✦ PROJECTES ✦
         </p>
       </div>
 
-      <div className="scene-deck" aria-live="polite">
+      <div className="scene-deck">
         <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
             <header className="intro-heading">
@@ -111,8 +136,8 @@ export default function Home() {
         <SceneFrame index={1} name="pitch" label="elevator pitch">
           <header className="center-copy pitch-copy">
             <p className="eyebrow">Elevator pitch</p>
-            <h1 id="entity-title">Passa de coordinar cinc agències alhora. Integrem Intel·ligència Artificial, disseny web i audiovisual prèmium per escalar el teu negoci a Catalunya.</h1>
-            <p>Tot l&apos;arsenal que el teu negoci necessita en un sol lloc. Som Agents Digitalitzadors, Operadors UAS Certificats (AESA) i Partners de n8n.</p>
+            <h1 id="entity-title">Passa de coordinar cinc proveïdors alhora. Integrem intel·ligència artificial, disseny web i audiovisual prèmium per escalar el teu negoci a Catalunya.</h1>
+            <p>Tot l&apos;arsenal que el teu negoci necessita en un sol lloc: estratègia, producció, automatització, web i operacions UAS.</p>
           </header>
         </SceneFrame>
 
@@ -156,7 +181,7 @@ export default function Home() {
       </div>
 
       <div className="modal-backdrop" data-modal role="presentation" hidden>
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1}>
           <button type="button" className="modal-close" data-modal-close aria-label="Tanca">×</button>
           <p className="eyebrow">Detall del servei</p><h2 id="modal-title" data-modal-title>Detall del projecte</h2>
           <p>Descobreix el context, les decisions, la producció i els resultats de cada projecte DESORDEN. Els recursos multimèdia es mantenen optimitzats dins la carpeta local <code>public/media</code>.</p>
