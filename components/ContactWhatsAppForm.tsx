@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useSyncExternalStore, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { WHATSAPP_NUMBER, generateWhatsAppUrl } from "./whatsappMessage";
 
 const WHATSAPP_LABEL = "+34 640 92 57 88";
 const INSTAGRAM_HANDLE = "@desorden.cat";
 const INSTAGRAM_URL = "https://www.instagram.com/desorden.cat/";
+const subscribeToHydration = () => () => undefined;
 
 export function ContactWhatsAppForm() {
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalTarget(document.querySelector<HTMLElement>("#contact"));
-  }, []);
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,11 +23,19 @@ export function ContactWhatsAppForm() {
     const name = String(form.get("name") ?? "").trim();
     const location = String(form.get("location") ?? "").trim();
     const message = String(form.get("message") ?? "").trim();
-
     const url = generateWhatsAppUrl(name, location, message);
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    const opened = window.open(url, "_blank");
+    if (opened) {
+      opened.opener = null;
+    } else {
+      window.location.assign(url);
+    }
   };
 
+  if (!hydrated) return null;
+
+  const portalTarget = document.querySelector<HTMLElement>("#contact");
   if (!portalTarget) return null;
 
   return createPortal(
@@ -40,6 +49,7 @@ export function ContactWhatsAppForm() {
             type="text"
             name="name"
             autoComplete="name"
+            maxLength={80}
             required
             aria-label="Nom"
           />
@@ -51,6 +61,7 @@ export function ContactWhatsAppForm() {
             type="text"
             name="location"
             autoComplete="address-level2"
+            maxLength={120}
             required
             aria-label="Ubicació"
           />
@@ -61,6 +72,7 @@ export function ContactWhatsAppForm() {
           <textarea
             name="message"
             rows={5}
+            maxLength={1200}
             required
             aria-label="Missatge"
           />

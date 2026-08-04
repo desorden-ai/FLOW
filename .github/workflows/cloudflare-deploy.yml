@@ -30,7 +30,7 @@ jobs:
               sha: context.sha,
               state: "pending",
               context: "cloudflare/deploy",
-              description: "Building and deploying FLOW to Cloudflare",
+              description: "Validating and deploying FLOW to Cloudflare",
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
 
@@ -45,6 +45,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit production dependencies
+        id: audit
+        run: npm run audit:prod
+
+      - name: Lint
+        id: lint
+        run: npm run lint
 
       - name: Test
         id: test
@@ -76,6 +84,8 @@ jobs:
         if: always()
         uses: actions/github-script@v8
         env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
           TEST_OUTCOME: ${{ steps.test.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
@@ -84,6 +94,8 @@ jobs:
           script: |
             const success = process.env.DEPLOY_OUTCOME === "success";
             const failedStep = [
+              ["dependency audit", process.env.AUDIT_OUTCOME],
+              ["lint", process.env.LINT_OUTCOME],
               ["tests", process.env.TEST_OUTCOME],
               ["build", process.env.BUILD_OUTCOME],
               ["credentials", process.env.CREDENTIALS_OUTCOME],
@@ -97,7 +109,7 @@ jobs:
               state: success ? "success" : "failure",
               context: "cloudflare/deploy",
               description: success
-                ? "FLOW deployed successfully to Cloudflare"
+                ? "FLOW validated and deployed successfully"
                 : `FLOW deployment failed${failedStep ? ` during ${failedStep[0]}` : ""}`,
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
