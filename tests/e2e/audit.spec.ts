@@ -48,18 +48,26 @@ test("traps modal focus, closes with Escape and restores the trigger", async ({ 
   await expect(trigger).toBeFocused();
 });
 
-test("opens a correctly encoded WhatsApp URL", async ({ page, context }) => {
-  await context.route("https://wa.me/**", async (route) => route.abort());
-  await goToScene(page, 8);
+test("opens a correctly encoded WhatsApp URL", async ({ page }) => {
+  await page.evaluate(() => {
+    const state = window as Window & { __flowOpenedUrl?: string };
+    state.__flowOpenedUrl = "";
+    window.open = ((url?: string | URL) => {
+      state.__flowOpenedUrl = String(url ?? "");
+      return { opener: null } as Window;
+    }) as typeof window.open;
+  });
 
+  await goToScene(page, 8);
   await page.getByLabel("Nom").fill("David");
   await page.getByLabel("Ubicació").fill("Sant Vicenç de Castellet");
   await page.getByLabel("Missatge").fill("Prova automatitzada");
-
-  const popupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Contactar per WhatsApp" }).click();
-  const popup = await popupPromise;
-  const openedUrl = popup.url();
+
+  const openedUrl = await page.evaluate(() => {
+    const state = window as Window & { __flowOpenedUrl?: string };
+    return state.__flowOpenedUrl ?? "";
+  });
 
   expect(openedUrl).toContain("https://wa.me/34640925788?text=");
   expect(decodeURIComponent(openedUrl)).toContain("Nom: David");
