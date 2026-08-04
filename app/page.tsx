@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ParticleTunnel } from "../components/ParticleTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
 
@@ -79,22 +80,10 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
   );
 }
 
-function CosmicField() {
-  return (
-    <div className="cosmos" aria-hidden="true">
-      <div className="orbit-copy orbit-copy-a">DESCOBRIR • ORDENAR • DENOTAR •</div>
-      <div className="orbit-copy orbit-copy-b">DESCOBRIR • ORDENAR • DENOTAR •</div>
-      <span className="decorative-spark spark-one">✦</span>
-      <span className="decorative-spark spark-two">✦</span>
-      <span className="decorative-spark spark-three">✦</span>
-    </div>
-  );
-}
-
 export default function Home() {
   return (
     <PortfolioController sceneCount={scenes.length}>
-      <CosmicField />
+      <ParticleTunnel />
 
       <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
         <p className="media-marquee__track" data-text="PROJECTES ✦ PROJECTES ✦ PROJECTES ✦ ">
