@@ -43,7 +43,7 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(controller, /LOGO_TUNNEL_STEP/);
 
   assert.match(logoTunnel, /^"use client"/);
-  assert.match(logoTunnel, /requestAnimationFrame/);
+  assert.match(await readFile(new URL("hooks/useLogoTunnelAnimation.ts", root), "utf8"), /requestAnimationFrame/);
   assert.match(logoTunnel, /translate3d/);
   assert.match(logoTunnel, /data-logo-3d-item/);
   assert.match(logoTunnel, /Pugnator, Castell, The Club Padel/);
