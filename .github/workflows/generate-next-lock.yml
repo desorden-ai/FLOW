@@ -1,0 +1,27 @@
+name: Generate Next lockfile
+
+on:
+  push:
+    branches:
+      - audit/fases-1-3-20260804
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install next@16.3.0 --save-exact --package-lock-only
+      - run: npm audit --omit=dev --audit-level=high
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-16-3-lockfiles
+          path: |
+            package.json
+            package-lock.json
