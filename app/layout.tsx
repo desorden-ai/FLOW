@@ -32,6 +32,10 @@ export const metadata: Metadata = {
     template: "%s — DESORDEN",
   },
   description: SITE_DESCRIPTION,
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
   alternates: {
     canonical: "/",
   },
