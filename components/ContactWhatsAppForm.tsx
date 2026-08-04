@@ -12,7 +12,8 @@ export function ContactWhatsAppForm() {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    setPortalTarget(document.querySelector<HTMLElement>("#contact"));
+    const target = document.querySelector<HTMLElement>("#contact");
+    if (target) setPortalTarget(target);
   }, []);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -22,9 +23,14 @@ export function ContactWhatsAppForm() {
     const name = String(form.get("name") ?? "").trim();
     const location = String(form.get("location") ?? "").trim();
     const message = String(form.get("message") ?? "").trim();
-
     const url = generateWhatsAppUrl(name, location, message);
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    const opened = window.open(url, "_blank");
+    if (opened) {
+      opened.opener = null;
+    } else {
+      window.location.assign(url);
+    }
   };
 
   if (!portalTarget) return null;
@@ -40,6 +46,7 @@ export function ContactWhatsAppForm() {
             type="text"
             name="name"
             autoComplete="name"
+            maxLength={80}
             required
             aria-label="Nom"
           />
@@ -51,6 +58,7 @@ export function ContactWhatsAppForm() {
             type="text"
             name="location"
             autoComplete="address-level2"
+            maxLength={120}
             required
             aria-label="Ubicació"
           />
@@ -61,6 +69,7 @@ export function ContactWhatsAppForm() {
           <textarea
             name="message"
             rows={5}
+            maxLength={1200}
             required
             aria-label="Missatge"
           />
