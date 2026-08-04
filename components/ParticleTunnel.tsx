@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const PARTICLE_COUNT = 109;
+const PARTICLE_COUNT = 55;
 const BASE_SIZE = 0.6;
 const SPEED_FACTOR = 1.2;
 const MIN_Z = -3000;
