@@ -5,14 +5,13 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("is a mobile-first semantic portfolio with minimal hydration", async () => {
-  const [page, layout, controller, logoTunnel, logoAssets, logoCss, assetFetcher, packageJson, pushNotifications, pushCss, picture, worker, wrangler, headers] = await Promise.all([
+  const [page, layout, controller, logoTunnel, logoAssets, logoCss, packageJson, pushNotifications, pushCss, picture, worker, wrangler, headers] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("components/PortfolioController.tsx", root), "utf8"),
     readFile(new URL("components/LogoTunnel.tsx", root), "utf8"),
     readFile(new URL("components/logoTunnelAssets.ts", root), "utf8"),
     readFile(new URL("app/logo-tunnel.css", root), "utf8"),
-    readFile(new URL("scripts/fetch-logo-tunnel-assets.mjs", root), "utf8"),
     readFile(new URL("package.json", root), "utf8"),
     readFile(new URL("components/SocialProofPushNotifications.tsx", root), "utf8"),
     readFile(new URL("app/push-notifications.css", root), "utf8"),
@@ -55,9 +54,7 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(logoCss, /mask-image:\s*radial-gradient/);
   assert.match(logoCss, /will-change:\s*transform, opacity/);
   assert.match(logoCss, /background:\s*#000000/);
-  assert.match(assetFetcher, /drive\.usercontent\.google\.com/);
-  assert.match(assetFetcher, /EXPECTED_FILES/);
-  assert.match(packageJson, /"prebuild": "node scripts\/fetch-logo-tunnel-assets\.mjs"/);
+  assert.doesNotMatch(packageJson, /fetch-logo-tunnel-assets|"prebuild"/);
 
   assert.match(pushNotifications, /^"use client"/);
   assert.equal((pushNotifications.match(/id: "(?:rosalia-like|rozalen-comment)"/g) ?? []).length, 2);
