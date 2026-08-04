@@ -79,10 +79,17 @@ export function SocialProofPushNotifications({ heroSelector = "#intro" }: { hero
     };
 
     if (!hero) {
+      let ticking = false;
       const onScroll = () => {
-        if (window.scrollY >= window.innerHeight * 0.6) {
-          trigger();
-          window.removeEventListener("scroll", onScroll);
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            if (window.scrollY >= window.innerHeight * 0.6) {
+              trigger();
+              window.removeEventListener("scroll", onScroll);
+            }
+            ticking = false;
+          });
+          ticking = true;
         }
       };
 
@@ -126,10 +133,17 @@ export function SocialProofPushNotifications({ heroSelector = "#intro" }: { hero
 
     intersectionObserver?.observe(hero);
 
+    let ticking = false;
     const onScroll = () => {
-      if (heroHasPassed()) {
-        trigger();
-        window.removeEventListener("scroll", onScroll);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (heroHasPassed()) {
+            trigger();
+            window.removeEventListener("scroll", onScroll);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
