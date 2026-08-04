@@ -150,7 +150,7 @@ body,
 @media (max-width: 760px) {
   :root {
     --desorden-section-title-size: clamp(2rem, 9vw, 2.55rem);
-  }
+}
 
   .scene-intro {
     padding: 0 !important;
@@ -211,8 +211,6 @@ body,
     font-size: clamp(0.82rem, 3.45vw, 0.98rem) !important;
     line-height: 1.24 !important;
   }
-
-
 }
 
 @media (min-width: 761px) {
@@ -239,8 +237,4 @@ body,
     line-height: 0.78 !important;
     letter-spacing: -0.025em !important;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-
 }
