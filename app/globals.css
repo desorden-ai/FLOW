@@ -118,3 +118,11 @@ html,body,.site-shell,.cosmos{background:#000}.orbit-copy{font-size:clamp(28px,4
 @media(max-width:760px){.orbit-copy{font-size:32px}.scene-intro{padding:64px 18px 66px}.intro-layout{display:block;width:100%;min-height:calc(100svh - 130px)}.hero-picture{position:absolute;inset:0 -18px 0 20%;width:auto;max-width:none}.hero-picture img{width:100%;height:100%;object-position:42% center}.intro-layout::after{background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.9) 39%,rgba(0,0,0,.38) 72%,rgba(0,0,0,.08) 100%),linear-gradient(0deg,rgba(0,0,0,.95) 0%,transparent 54%)}.intro-heading{position:absolute;left:6px;bottom:20px;width:min(82vw,440px);margin:0}.outline-word{font-size:clamp(27px,7vw,38px)}.display-name{font-size:clamp(58px,18vw,86px)}.intro-heading .micro-label{margin:10px 0 14px}.hero-services{gap:.55rem;margin-top:1rem}.hero-services li{font-size:clamp(.9rem,3.7vw,1.08rem)}.social-proof{gap:1.5rem;padding:5rem 2.4rem 4.5rem 1.25rem}.social-proof__heading h2{font-size:clamp(2.5rem,11vw,4rem)}.social-proof__description{font-size:1rem;margin-top:1rem}}
 @media(prefers-reduced-motion:reduce){.social-notification{transition:none}}
 /* DESORDEN VISUAL UPDATE — END */
+
+@media(max-width:760px) {
+  .social-notification {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(18, 18, 18, 0.98);
+  }
+}
