@@ -15,13 +15,19 @@ interface ImagesBinding {
 
 interface Env {
   ASSETS: Fetcher;
-  IMAGES: ImagesBinding;
+  IMAGES?: ImagesBinding;
 }
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
 }
+
+type SourceImage = {
+  bytes: ArrayBuffer;
+  sourceType: string;
+  sourceUrlPathname: string;
+};
 
 const IMAGE_ROUTE =
   /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg|png)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp|gif|avif))$/i;
@@ -39,8 +45,8 @@ const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "form-action 'self' https://wa.me https://api.whatsapp.com",
   "img-src 'self' data:",
-  "font-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "script-src 'self' 'unsafe-inline'",
   "connect-src 'self'",
   "object-src 'none'",
@@ -74,7 +80,7 @@ async function fetchSourceImage(
   env: Env,
   requestUrl: string,
   assetPath: string,
-): Promise<Response | { stream: ReadableStream; sourceType: string; byteLength: number; sourceUrlPathname: string }> {
+): Promise<Response | SourceImage> {
   const normalizedAssetPath = assetPath.replace(/^media\//i, "");
   const sourceUrl = new URL(`/media/${normalizedAssetPath}`, requestUrl);
   const sourceResponse = await env.ASSETS.fetch(
@@ -94,28 +100,34 @@ async function fetchSourceImage(
     );
   }
 
-  const sourceBytes = await sourceResponse.arrayBuffer();
-  if (sourceBytes.byteLength === 0) {
+  const bytes = await sourceResponse.arrayBuffer();
+  if (bytes.byteLength === 0) {
     return Response.json(
       { error: "empty_image_source", source: sourceUrl.pathname },
       { status: 502 },
     );
   }
 
-  const sourceStream = new Response(sourceBytes).body;
-  if (!sourceStream) {
-    return Response.json(
-      { error: "unreadable_image_source", source: sourceUrl.pathname },
-      { status: 502 },
-    );
-  }
-
   return {
-    stream: sourceStream,
+    bytes,
     sourceType,
-    byteLength: sourceBytes.byteLength,
     sourceUrlPathname: sourceUrl.pathname,
   };
+}
+
+function sourceFallbackResponse(requestMethod: string, source: SourceImage): Response {
+  const headers = new Headers({
+    "Cache-Control": "no-store",
+    "Content-Type": source.sourceType,
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Image-Transform": "source-fallback",
+  });
+
+  return new Response(requestMethod === "HEAD" ? null : source.bytes.slice(0), {
+    status: 200,
+    headers,
+  });
 }
 
 async function transformAndCacheImage(
@@ -123,15 +135,18 @@ async function transformAndCacheImage(
   ctx: ExecutionContext,
   cacheKey: Request,
   requestMethod: string,
-  sourceStream: ReadableStream,
+  source: SourceImage,
   widthToken: string,
   formatToken: keyof typeof OUTPUT_MIME,
   urlPathname: string,
-  sourceUrlPathname: string,
-  sourceType: string,
-  sourceBytesLength: number,
 ): Promise<Response> {
   const cache = caches.default;
+  const sourceStream = new Response(source.bytes.slice(0)).body;
+
+  if (!env.IMAGES || !sourceStream) {
+    return sourceFallbackResponse(requestMethod, source);
+  }
+
   try {
     const transformed = (
       await env.IMAGES.input(sourceStream)
@@ -169,13 +184,13 @@ async function transformAndCacheImage(
       JSON.stringify({
         event: "image_transform_failed",
         path: urlPathname,
-        source: sourceUrlPathname,
-        sourceType,
-        sourceBytes: sourceBytesLength,
+        source: source.sourceUrlPathname,
+        sourceType: source.sourceType,
+        sourceBytes: source.bytes.byteLength,
         message,
       }),
     );
-    return Response.json({ error: "image_transform_failed" }, { status: 502 });
+    return sourceFallbackResponse(requestMethod, source);
   }
 }
 
@@ -224,17 +239,14 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
     ctx,
     cacheKey,
     request.method,
-    fetchResult.stream,
+    fetchResult,
     widthToken,
     formatToken,
     url.pathname,
-    fetchResult.sourceUrlPathname,
-    fetchResult.sourceType,
-    fetchResult.byteLength,
   );
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const optimizedImage = await serveOptimizedImage(request, env, ctx);
@@ -252,3 +264,5 @@ export default {
     }
   },
 };
+
+export default worker;
