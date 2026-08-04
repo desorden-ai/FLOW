@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 const MEDIA_START = 6;
-const MEDIA_END = 11;
+const MEDIA_END = 7;
 const WHEEL_LOCK_MS = 560;
 
 export function PortfolioController({ children, sceneCount }: { children: ReactNode; sceneCount: number }) {
