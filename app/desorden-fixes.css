@@ -150,7 +150,7 @@ body,
 @media (max-width: 760px) {
   :root {
     --desorden-section-title-size: clamp(2rem, 9vw, 2.55rem);
-}
+  }
 
   .scene-intro {
     padding: 0 !important;
@@ -167,6 +167,7 @@ body,
     bottom: auto !important;
     left: auto !important;
     width: 98vw !important;
+    max-width: none !important;
     height: auto !important;
     inset-inline-start: auto !important;
   }
@@ -176,6 +177,7 @@ body,
     right: 18px !important;
     bottom: 68px !important;
     width: auto !important;
+    margin: 0 !important;
   }
 
   .outline-word {
