@@ -4,6 +4,13 @@ import { useRef } from "react";
 import { LOGO_TUNNEL_ASSETS } from "./logoTunnelAssets";
 import { useLogoTunnelAnimation } from "../hooks/useLogoTunnelAnimation";
 
+const IMAGE_WIDTHS = [480, 768] as const;
+
+function optimizedLogoUrl(src: string, width: (typeof IMAGE_WIDTHS)[number]) {
+  const normalized = src.replace(/^\/+/, "");
+  return `/_image/${width}/webp/${normalized}`;
+}
+
 export function LogoTunnel() {
   const sectionRef = useRef<HTMLElement | null>(null);
 
@@ -28,10 +35,12 @@ export function LogoTunnel() {
         className="logo-tunnel-sticky"
         aria-label="Clients i projectes seleccionats de DESORDEN"
       >
-        {LOGO_TUNNEL_ASSETS.map((logo) => (
+        {LOGO_TUNNEL_ASSETS.map((logo, index) => (
           <img
             key={logo.name}
-            src={logo.src}
+            src={optimizedLogoUrl(logo.src, 480)}
+            srcSet={IMAGE_WIDTHS.map((width) => `${optimizedLogoUrl(logo.src, width)} ${width}w`).join(", ")}
+            sizes="(max-width: 760px) 46vw, 260px"
             className="logo-3d-item"
             data-logo-3d-item
             data-z={logo.initialZ}
@@ -45,7 +54,8 @@ export function LogoTunnel() {
             height={logo.height}
             alt={logo.alt}
             decoding="async"
-            loading="eager"
+            loading={index < 2 ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "auto" : "low"}
           />
         ))}
       </div>
