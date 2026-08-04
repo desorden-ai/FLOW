@@ -1,26 +1,34 @@
-name: Generate Next lockfile
+name: Apply Next security update
 
 on:
   pull_request:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  lockfile:
+  update-dependency:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm install next@16.3.0 --save-exact --package-lock-only
       - run: npm audit --omit=dev --audit-level=high
-      - uses: actions/upload-artifact@v4
-        with:
-          name: next-16-3-lockfiles
-          path: |
-            package.json
-            package-lock.json
+      - name: Commit audited lockfile and remove temporary workflow
+        run: |
+          rm .github/workflows/generate-next-lock.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json .github/workflows/generate-next-lock.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "security(deps): upgrade Next.js to 16.3.0"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
