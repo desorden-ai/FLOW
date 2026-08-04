@@ -11,11 +11,6 @@ const scenes = [
   ["cases", "projectes", "cases"],
   ["media-1", "projectes destacats", "media"],
   ["media-2", "projectes destacats", "media"],
-  ["media-3", "projectes destacats", "media"],
-  ["media-4", "projectes destacats", "media"],
-  ["media-5", "projectes destacats", "media"],
-  ["media-6", "projectes destacats", "media"],
-  ["manifesto", "inversió", "manifesto"],
   ["contact", "contacte", "contact"],
 ] as const;
 
@@ -27,8 +22,7 @@ const navigation = [
   ["sobre nosaltres", 4],
   ["projectes", 5],
   ["projectes destacats", 6],
-  ["inversió", 12],
-  ["contacte", 13],
+  ["contacte", 8],
 ] as const;
 
 const experience = [
@@ -58,10 +52,6 @@ const cases = [
 const mediaItems = [
   ["14", "Identitat digital que trenca el patró", "Web · Branding · Catalunya"],
   ["15", "Vols urbans amb cobertura legal", "Dron 4K · AESA · ENAIRE"],
-  ["16", "Automatitzacions que treballen 24/7", "IA · n8n · Negoci"],
-  ["17", "Contingut vertical d'alta conversió", "Reels · TikTok · Meta"],
-  ["18", "E-commerce ultraràpid", "UX · Rendiment · Vendes"],
-  ["19", "Estratègia DESORDEN", "Tecnologia · Creativitat · Creixement"],
 ];
 
 const logoPositions = [
@@ -177,12 +167,11 @@ export default function Home() {
           </SceneFrame>
         ))}
 
-        <SceneFrame index={12} name="manifesto" label="inversió"><div className="manifesto-copy"><p>Els preus han de ser clars. Sense fum, sense lletra petita.</p><h2>Inverteix en creixement real.</h2><p>Des del Paquet Impuls per arrencar, fins a Domini Absolut per liderar o Desorden Total per trencar les regles. Tot és possible.</p></div></SceneFrame>
-        <SceneFrame index={13} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2>FEM UN CAFÈ?</h2><p className="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name">AGÈNCIA DESORDEN</p><p>Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
+        <SceneFrame index={8} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2>FEM UN CAFÈ?</h2><p className="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name">AGÈNCIA DESORDEN</p><p>Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
       </div>
 
       <div className="fixed-ui">
-        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 14</p></header>
+        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 09</p></header>
         <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
         <nav className="section-navigation" aria-label="Seccions de DESORDEN">
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
