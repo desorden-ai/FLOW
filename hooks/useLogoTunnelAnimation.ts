@@ -3,6 +3,9 @@ import { clampFinite, finiteOr, interpolateProgress } from "./logoTunnelMath";
 
 const INTRO_END = 0.15;
 const TOTAL_Z_TRAVEL = 12_000;
+const FLOW_X_PX = 18;
+const FLOW_Y_PX = 12;
+const FLOW_ROTATION_DEG = 2.4;
 
 type Block3ProgressDetail = {
   progress?: number;
@@ -15,9 +18,11 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
     const root = section?.closest<HTMLElement>(".site-shell");
     const intro = section?.querySelector<HTMLElement>("[data-logo-tunnel-intro]");
     const logos = section
-      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]")).map((logo) => ({
+      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]")).map((logo, index) => ({
           element: logo,
           initialZ: finiteOr(Number(logo.dataset.z), 0),
+          flowDirection: index % 2 === 0 ? 1 : -1,
+          flowPhase: index * 1.17,
         }))
       : [];
 
@@ -51,9 +56,16 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
       const logoProgress = clampFinite((safeProgress - INTRO_END) / (1 - INTRO_END), 0, 1, 0);
       const currentZAdvance = logoProgress * TOTAL_Z_TRAVEL;
 
-      logos.forEach(({ element: logo, initialZ }) => {
+      logos.forEach(({ element: logo, initialZ, flowDirection, flowPhase }) => {
         const newZ = initialZ + currentZAdvance;
-        logo.style.transform = `translate(-50%, -50%) translate3d(0, 0, ${newZ}px)`;
+        const visiblePathProgress = clampFinite((newZ + 3000) / 3000, 0, 1, 0);
+        const motionEnvelope = Math.sin(visiblePathProgress * Math.PI);
+        const travelPhase = logoProgress * Math.PI * 1.75 + flowPhase;
+        const offsetX = Math.sin(travelPhase) * FLOW_X_PX * motionEnvelope * flowDirection;
+        const offsetY = Math.cos(travelPhase * 0.78) * FLOW_Y_PX * motionEnvelope;
+        const rotation = Math.sin(travelPhase * 0.62) * FLOW_ROTATION_DEG * motionEnvelope;
+
+        logo.style.transform = `translate(-50%, -50%) translate3d(${offsetX}px, ${offsetY}px, ${newZ}px) rotateZ(${rotation}deg)`;
 
         let opacity = 0;
         if (logosEnabled && newZ > -3000 && newZ <= 0) {
