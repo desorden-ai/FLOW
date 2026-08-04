@@ -1,0 +1,88 @@
+name: Browser quality audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install pinned audit tools
+        run: |
+          npm install --no-save --package-lock=false \
+            @playwright/test@1.54.2 \
+            @axe-core/playwright@4.10.2 \
+            lighthouse@12.8.2
+          npx playwright install --with-deps chromium
+
+      - name: Validate source
+        run: |
+          npm run audit:prod
+          npm run lint
+          npm test
+          npm run build
+          npm run deploy:dry
+
+      - name: Start production preview
+        run: |
+          PORT=3000 npm run preview > /tmp/flow-preview.log 2>&1 &
+          echo $! > /tmp/flow-preview.pid
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/flow-preview.log
+          exit 1
+
+      - name: Run Android and accessibility tests
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: npx playwright test
+
+      - name: Run mobile Lighthouse audit
+        run: |
+          npx lighthouse http://127.0.0.1:3000/ \
+            --quiet \
+            --chrome-flags="--headless --no-sandbox" \
+            --only-categories=performance,accessibility,best-practices,seo \
+            --output=html \
+            --output=json \
+            --output-path=./lighthouse-report
+
+      - name: Upload browser audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-browser-audit-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            playwright-report/
+            test-results/
+            lighthouse-report.html
+            lighthouse-report.json
+            /tmp/flow-preview.log
