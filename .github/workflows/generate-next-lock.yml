@@ -1,9 +1,8 @@
 name: Generate Next lockfile
 
 on:
-  push:
-    branches:
-      - audit/fases-1-3-20260804
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
