@@ -79,8 +79,8 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(picture, /image\/webp/);
   assert.match(picture, /decoding="async"/);
 
-  assert.match(worker, /env\.IMAGES/);
-  assert.match(worker, /env\.ASSETS/);
+  assert.match(await readFile(new URL("worker/image.ts", root), "utf8"), /env\.IMAGES/);
+  assert.match(await readFile(new URL("worker/image.ts", root), "utf8"), /env\.ASSETS/);
   assert.match(wrangler, /"binding": "IMAGES"/);
   assert.match(wrangler, /"enabled": true/);
   assert.match(headers, /immutable/);
