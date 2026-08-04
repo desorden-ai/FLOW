@@ -81,6 +81,17 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
       if (scrollCue) scrollCue.hidden = active !== 0;
       if (marquee) marquee.hidden = active < MEDIA_START || active > MEDIA_END;
 
+      root.dispatchEvent(
+        new CustomEvent("desorden:scene-progress", {
+          detail: {
+            active,
+            progress,
+            virtualScroll: active * window.innerHeight,
+            isContact: active === sceneCount - 1,
+          },
+        }),
+      );
+
       closeMenu();
     };
 
