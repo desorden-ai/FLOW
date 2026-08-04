@@ -46,9 +46,9 @@ jobs:
             lighthouse@12.8.2
           npx playwright install --with-deps chromium
 
-      - name: Start production preview
+      - name: Start production Worker preview
         run: |
-          PORT=3000 npm run preview > /tmp/flow-preview.log 2>&1 &
+          npx wrangler dev --local --ip 127.0.0.1 --port 3000 > /tmp/flow-preview.log 2>&1 &
           echo $! > /tmp/flow-preview.pid
           for attempt in {1..60}; do
             if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
