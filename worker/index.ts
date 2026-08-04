@@ -33,35 +33,13 @@ const OUTPUT_MIME = {
 } as const;
 const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82, png: 100 } as const;
 
-async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> {
-  const url = new URL(request.url);
-  if (!url.pathname.startsWith("/_image/")) return null;
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return new Response("Method not allowed.", {
-      status: 405,
-      headers: { Allow: "GET, HEAD" },
-    });
-  }
-  if (url.search) return new Response("Image query parameters are not supported.", { status: 400 });
-
-  const match = IMAGE_ROUTE.exec(url.pathname);
-  if (!match) return new Response("Invalid image request.", { status: 400 });
-
-  const cache = caches.default;
-  const cacheKey = new Request(request.url, { method: "GET" });
-  let cachedResponse = await cache.match(cacheKey);
-
-  if (cachedResponse) {
-    if (request.method === "HEAD") {
-      return new Response(null, { headers: cachedResponse.headers });
-    }
-    return cachedResponse;
-  }
-
-  const [, widthToken, formatTokenRaw, assetPath] = match;
-  const formatToken = formatTokenRaw.toLowerCase() as keyof typeof OUTPUT_MIME;
+async function fetchSourceImage(
+  env: Env,
+  requestUrl: string,
+  assetPath: string,
+): Promise<Response | { stream: ReadableStream; sourceType: string; byteLength: number; sourceUrlPathname: string }> {
   const normalizedAssetPath = assetPath.replace(/^media\//i, "");
-  const sourceUrl = new URL(`/media/${normalizedAssetPath}`, request.url);
+  const sourceUrl = new URL(`/media/${normalizedAssetPath}`, requestUrl);
   const sourceResponse = await env.ASSETS.fetch(
     new Request(sourceUrl, {
       method: "GET",
@@ -95,6 +73,28 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
     );
   }
 
+  return {
+    stream: sourceStream,
+    sourceType,
+    byteLength: sourceBytes.byteLength,
+    sourceUrlPathname: sourceUrl.pathname,
+  };
+}
+
+async function transformAndCacheImage(
+  env: Env,
+  ctx: ExecutionContext,
+  cacheKey: Request,
+  requestMethod: string,
+  sourceStream: ReadableStream,
+  widthToken: string,
+  formatToken: keyof typeof OUTPUT_MIME,
+  urlPathname: string,
+  sourceUrlPathname: string,
+  sourceType: string,
+  sourceBytesLength: number,
+): Promise<Response> {
+  const cache = caches.default;
   try {
     const transformed = (
       await env.IMAGES.input(sourceStream)
@@ -114,38 +114,87 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
       headers,
     });
 
-    // clone the response before caching
     const responseToReturn = responseToCache.clone();
-
     ctx.waitUntil(cache.put(cacheKey, responseToCache));
 
-    if (request.method === "HEAD") {
-        return new Response(null, {
-            status: responseToReturn.status,
-            statusText: responseToReturn.statusText,
-            headers: responseToReturn.headers
-        });
+    if (requestMethod === "HEAD") {
+      return new Response(null, {
+        status: responseToReturn.status,
+        statusText: responseToReturn.statusText,
+        headers: responseToReturn.headers,
+      });
     }
 
     return responseToReturn;
-
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown image transformation error";
     console.error(
       JSON.stringify({
         event: "image_transform_failed",
-        path: url.pathname,
-        source: sourceUrl.pathname,
+        path: urlPathname,
+        source: sourceUrlPathname,
         sourceType,
-        sourceBytes: sourceBytes.byteLength,
+        sourceBytes: sourceBytesLength,
         message,
       }),
     );
-    return Response.json(
-      { error: "image_transform_failed", message },
-      { status: 502 },
-    );
+    return Response.json({ error: "image_transform_failed", message }, { status: 502 });
   }
+}
+
+function validateImageRequest(request: Request, url: URL): Response | RegExpExecArray {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed.", {
+      status: 405,
+      headers: { Allow: "GET, HEAD" },
+    });
+  }
+  if (url.search) return new Response("Image query parameters are not supported.", { status: 400 });
+
+  const match = IMAGE_ROUTE.exec(url.pathname);
+  if (!match) return new Response("Invalid image request.", { status: 400 });
+
+  return match;
+}
+
+async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/_image/")) return null;
+
+  const validationResult = validateImageRequest(request, url);
+  if (validationResult instanceof Response) return validationResult;
+  const match = validationResult;
+
+  const cache = caches.default;
+  const cacheKey = new Request(request.url, { method: "GET" });
+  const cachedResponse = await cache.match(cacheKey);
+
+  if (cachedResponse) {
+    if (request.method === "HEAD") {
+      return new Response(null, { headers: cachedResponse.headers });
+    }
+    return cachedResponse;
+  }
+
+  const [, widthToken, formatTokenRaw, assetPath] = match;
+  const formatToken = formatTokenRaw.toLowerCase() as keyof typeof OUTPUT_MIME;
+
+  const fetchResult = await fetchSourceImage(env, request.url, assetPath);
+  if (fetchResult instanceof Response) return fetchResult;
+
+  return transformAndCacheImage(
+    env,
+    ctx,
+    cacheKey,
+    request.method,
+    fetchResult.stream,
+    widthToken,
+    formatToken,
+    url.pathname,
+    fetchResult.sourceUrlPathname,
+    fetchResult.sourceType,
+    fetchResult.byteLength,
+  );
 }
 
 export default {
