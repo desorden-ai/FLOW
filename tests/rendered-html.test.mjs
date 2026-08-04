@@ -24,13 +24,15 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
   assert.match(page, /data-media-marquee/);
   assert.equal((page.match(/media-marquee__track/g) ?? []).length, 1);
-  assert.match(page, /01 \/ 14/);
+  assert.match(page, /01 \/ 09/);
+  assert.doesNotMatch(page, /media-3|media-4|media-5|media-6|name="manifesto"|label="inversió"/);
+  assert.match(page, /<SceneFrame index=\{8\} name="contact"/);
 
   assert.match(controller, /^"use client"/);
   assert.match(controller, /addEventListener\("wheel"/);
   assert.match(controller, /dataset\.state/);
   assert.match(controller, /const MEDIA_START = 6/);
-  assert.match(controller, /const MEDIA_END = 11/);
+  assert.match(controller, /const MEDIA_END = 7/);
 
   assert.match(pushNotifications, /^"use client"/);
   assert.equal((pushNotifications.match(/id: "(?:rosalia-like|rozalen-comment)"/g) ?? []).length, 2);
