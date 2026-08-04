@@ -36,6 +36,7 @@ export function LogoTunnel() {
         aria-label="Clients i projectes seleccionats de DESORDEN"
       >
         {LOGO_TUNNEL_ASSETS.map((logo, index) => (
+           /* eslint-disable-next-line @next/next/no-img-element -- Required for Cloudflare Image Optimization */
           <img
             key={logo.name}
             src={optimizedLogoUrl(logo.src, 480)}
