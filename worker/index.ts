@@ -49,7 +49,7 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
 
   const cache = caches.default;
   const cacheKey = new Request(request.url, { method: "GET" });
-  let cachedResponse = await cache.match(cacheKey);
+  const cachedResponse = await cache.match(cacheKey);
 
   if (cachedResponse) {
     if (request.method === "HEAD") {
@@ -148,7 +148,7 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
   }
 }
 
-export default {
+const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const optimizedImage = await serveOptimizedImage(request, env, ctx);
@@ -166,3 +166,4 @@ export default {
     }
   },
 };
+export default worker;
