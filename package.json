@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "prebuild": "node scripts/fetch-logo-tunnel-assets.mjs",
     "build": "vinext build",
     "preview": "vinext start",
     "deploy": "npm run build && wrangler deploy",
