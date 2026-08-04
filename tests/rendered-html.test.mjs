@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("is a mobile-first semantic portfolio with minimal hydration", async () => {
-  const [page, layout, controller, logoTunnel, logoAssets, logoCss, packageJson, pushNotifications, pushCss, picture, worker, wrangler, headers] = await Promise.all([
+  const [page, layout, controller, logoTunnel, logoAssets, logoCss, packageJson, pushNotifications, pushCss, picture, workerImage, wrangler, headers] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("components/PortfolioController.tsx", root), "utf8"),
@@ -16,7 +16,7 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
     readFile(new URL("components/SocialProofPushNotifications.tsx", root), "utf8"),
     readFile(new URL("app/push-notifications.css", root), "utf8"),
     readFile(new URL("components/ProjectPicture.tsx", root), "utf8"),
-    readFile(new URL("worker/index.ts", root), "utf8"),
+    readFile(new URL("worker/image.ts", root), "utf8"),
     readFile(new URL("wrangler.jsonc", root), "utf8"),
     readFile(new URL("public/_headers", root), "utf8"),
   ]);
@@ -79,8 +79,8 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(picture, /image\/webp/);
   assert.match(picture, /decoding="async"/);
 
-  assert.match(worker, /env\.IMAGES/);
-  assert.match(worker, /env\.ASSETS/);
+  assert.match(workerImage, /env\.IMAGES/);
+  assert.match(workerImage, /env\.ASSETS/);
   assert.match(wrangler, /"binding": "IMAGES"/);
   assert.match(wrangler, /"enabled": true/);
   assert.match(headers, /immutable/);
