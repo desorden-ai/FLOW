@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { WHATSAPP_NUMBER, generateWhatsAppUrl } from "./whatsappMessage";
 
-const WHATSAPP_NUMBER = "34640925788";
 const WHATSAPP_LABEL = "+34 640 92 57 88";
 const INSTAGRAM_HANDLE = "@desorden.cat";
 const INSTAGRAM_URL = "https://www.instagram.com/desorden.cat/";
@@ -23,16 +23,7 @@ export function ContactWhatsAppForm() {
     const location = String(form.get("location") ?? "").trim();
     const message = String(form.get("message") ?? "").trim();
 
-    const whatsappMessage = [
-      "Hola DESORDEN,",
-      name ? `Nom: ${name}` : "",
-      location ? `Ubicació: ${location}` : "",
-      message ? `Missatge: ${message}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
+    const url = generateWhatsAppUrl(name, location, message);
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
