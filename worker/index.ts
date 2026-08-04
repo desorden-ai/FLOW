@@ -32,6 +32,43 @@ const OUTPUT_MIME = {
   png: "image/png",
 } as const;
 const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82, png: 100 } as const;
+const MEDIA_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=2592000";
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self' https://wa.me https://api.whatsapp.com",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline'",
+  "connect-src 'self'",
+  "object-src 'none'",
+].join("; ");
+
+function applySecurityHeaders(request: Request, response: Response): Response {
+  const headers = new Headers(response.headers);
+  const hostname = new URL(request.url).hostname;
+
+  headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+
+  if (hostname.endsWith(".workers.dev")) {
+    headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+
+  const hasNoBody = request.method === "HEAD" || [101, 204, 205, 304].includes(response.status);
+  return new Response(hasNoBody ? null : response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 async function fetchSourceImage(
   env: Env,
@@ -104,7 +141,7 @@ async function transformAndCacheImage(
 
     const headers = new Headers(transformed.headers);
     headers.set("Content-Type", OUTPUT_MIME[formatToken]);
-    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    headers.set("Cache-Control", MEDIA_CACHE_CONTROL);
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
     headers.set("X-Content-Type-Options", "nosniff");
 
@@ -138,7 +175,7 @@ async function transformAndCacheImage(
         message,
       }),
     );
-    return Response.json({ error: "image_transform_failed", message }, { status: 502 });
+    return Response.json({ error: "image_transform_failed" }, { status: 502 });
   }
 }
 
@@ -201,8 +238,8 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const optimizedImage = await serveOptimizedImage(request, env, ctx);
-      if (optimizedImage) return optimizedImage;
-      return handler.fetch(request, env, ctx);
+      const response = optimizedImage ?? await handler.fetch(request, env, ctx);
+      return applySecurityHeaders(request, response);
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -211,7 +248,7 @@ export default {
           error: error instanceof Error ? error.message : "Unknown error",
         }),
       );
-      return new Response("Internal server error.", { status: 500 });
+      return applySecurityHeaders(request, new Response("Internal server error.", { status: 500 }));
     }
   },
 };
