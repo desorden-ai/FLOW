@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useVisibilityTrigger } from "../hooks/useVisibilityTrigger";
 
 type ToastPhase = "entering" | "visible" | "leaving";
 
@@ -58,89 +59,13 @@ function VerifiedBadge() {
 
 export function SocialProofPushNotifications({ heroSelector = "#intro" }: { heroSelector?: string }) {
   const [mounted, setMounted] = useState(false);
-  const [started, setStarted] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [phase, setPhase] = useState<ToastPhase>("entering");
-  const startedRef = useRef(false);
+  const started = useVisibilityTrigger(heroSelector);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (startedRef.current) return;
-
-    const hero = document.querySelector<HTMLElement>(heroSelector);
-
-    const trigger = () => {
-      if (startedRef.current) return;
-      startedRef.current = true;
-      setStarted(true);
-    };
-
-    if (!hero) {
-      const onScroll = () => {
-        if (window.scrollY >= window.innerHeight * 0.6) {
-          trigger();
-          window.removeEventListener("scroll", onScroll);
-        }
-      };
-
-      window.addEventListener("scroll", onScroll, { passive: true });
-      onScroll();
-      return () => window.removeEventListener("scroll", onScroll);
-    }
-
-    const heroHasPassed = () => {
-      const state = hero.dataset.state;
-      const rect = hero.getBoundingClientRect();
-      return state === "past" || rect.bottom <= 0;
-    };
-
-    if (heroHasPassed()) trigger();
-
-    const stateObserver = new MutationObserver(() => {
-      if (heroHasPassed()) {
-        trigger();
-        stateObserver.disconnect();
-      }
-    });
-
-    stateObserver.observe(hero, {
-      attributes: true,
-      attributeFilter: ["data-state"],
-    });
-
-    const intersectionObserver = "IntersectionObserver" in window
-      ? new IntersectionObserver(
-          ([entry]) => {
-            if (!entry) return;
-            if (!entry.isIntersecting && entry.boundingClientRect.bottom <= 0) {
-              trigger();
-              intersectionObserver.disconnect();
-            }
-          },
-          { threshold: [0, 0.05] },
-        )
-      : null;
-
-    intersectionObserver?.observe(hero);
-
-    const onScroll = () => {
-      if (heroHasPassed()) {
-        trigger();
-        window.removeEventListener("scroll", onScroll);
-      }
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    return () => {
-      stateObserver.disconnect();
-      intersectionObserver?.disconnect();
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [heroSelector]);
 
   useEffect(() => {
     if (!started) return;

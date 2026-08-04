@@ -59,8 +59,7 @@ test("is a mobile-first semantic portfolio with minimal hydration", async () => 
   assert.match(pushNotifications, /^"use client"/);
   assert.equal((pushNotifications.match(/id: "(?:rosalia-like|rozalen-comment)"/g) ?? []).length, 2);
   assert.match(pushNotifications, /createPortal/);
-  assert.match(pushNotifications, /MutationObserver/);
-  assert.match(pushNotifications, /IntersectionObserver/);
+  assert.match(pushNotifications, /useVisibilityTrigger/);
   assert.match(pushNotifications, /VISIBLE_DURATION_MS = 4_000/);
   assert.match(pushNotifications, /PAUSE_BETWEEN_TOASTS_MS = 1_000/);
   assert.match(pushNotifications, /href: "#"/);
