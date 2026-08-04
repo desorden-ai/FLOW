@@ -1,40 +1,66 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
-import { SocialProofPushNotifications } from "../components/SocialProofPushNotifications";
 import "./globals.css";
 import "./desorden-fixes.css";
-import "./push-notifications.css";
 import "./contact-form.css";
 import "./logo-tunnel.css";
 
+const SITE_URL = "https://www.desorden.cat";
+const SITE_DESCRIPTION =
+  "Estudi creatiu de Catalunya especialitzat en contingut audiovisual, intel·ligència artificial, desenvolupament web i producció amb dron.";
+
 const entityJsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "Editable Portfolio Template",
-  description: "A mobile-first portfolio template prepared for Cloudflare Workers and semantic search.",
+  "@type": "ProfessionalService",
+  name: "DESORDEN",
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  email: "hola@desorden.cat",
+  telephone: "+34640925788",
+  areaServed: {
+    "@type": "AdministrativeArea",
+    name: "Catalunya",
+  },
+  sameAs: ["https://www.instagram.com/desorden.cat/"],
 };
 
 export const metadata: Metadata = {
-  title: { default: "Editable Portfolio Template", template: "%s — Editable Portfolio" },
-  description: "A mobile-first immersive portfolio template optimized for Cloudflare Workers, accessibility and semantic search.",
-  robots: { index: true, follow: true },
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "DESORDEN — Contingut, IA, web i dron",
+    template: "%s — DESORDEN",
+  },
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   openGraph: {
     type: "website",
-    title: "Editable Portfolio Template",
-    description: "Mobile-first immersive portfolio template for product, design and strategy professionals.",
-    siteName: "Editable Portfolio Template",
+    url: "/",
+    locale: "ca_ES",
+    title: "DESORDEN — Contingut, IA, web i dron",
+    description: SITE_DESCRIPTION,
+    siteName: "DESORDEN",
   },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="ca">
       <body>
         {children}
         <ContactWhatsAppForm />
-        <SocialProofPushNotifications heroSelector="#intro" />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entityJsonLd).replace(/</g, "\\u003c") }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(entityJsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
       </body>
     </html>
   );
