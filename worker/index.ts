@@ -49,7 +49,7 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
 
   const cache = caches.default;
   const cacheKey = new Request(request.url, { method: "GET" });
-  let cachedResponse = await cache.match(cacheKey);
+  const cachedResponse = await cache.match(cacheKey);
 
   if (cachedResponse) {
     if (request.method === "HEAD") {
@@ -142,7 +142,7 @@ async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionCon
       }),
     );
     return Response.json(
-      { error: "image_transform_failed", message },
+      { error: "image_transform_failed" },
       { status: 502 },
     );
   }
