@@ -6,6 +6,7 @@ import "./globals.css";
 import "./desorden-fixes.css";
 import "./push-notifications.css";
 import "./contact-form.css";
+import "./particle-tunnel.css";
 
 const entityJsonLd = {
   "@context": "https://schema.org",
