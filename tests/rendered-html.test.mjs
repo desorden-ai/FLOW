@@ -49,7 +49,8 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
-  assert.doesNotMatch(page, /aria-live="polite"[^]*className="scene-deck"/);
+  assert.match(page, /<div className="scene-deck">/);
+  assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
   assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat/);
 
   assert.match(layout, /<html lang="ca">/);
