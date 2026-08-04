@@ -173,7 +173,7 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
       const currentY = event.changedTouches[0]?.clientY ?? touchStart;
       const delta = touchStart - currentY;
 
-      if (Math.abs(delta) > 42) {
+      if (Math.abs(delta) > 25) {
         advance(delta > 0 ? 1 : -1, active === LOGO_TUNNEL_INDEX ? 1.15 : 1);
       }
 
@@ -249,5 +249,5 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
     };
   }, [sceneCount]);
 
-  return <div ref={rootRef} className="site-shell">{children}</div>;
+  return <main ref={rootRef} className="site-shell">{children}</main>;
 }

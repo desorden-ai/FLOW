@@ -24,15 +24,16 @@ interface ExecutionContext {
 }
 
 const IMAGE_ROUTE =
-  /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp))$/i;
+  /^\/_image\/(480|768|1024|1440)\/(avif|webp|jpeg|png)\/([a-z0-9/_-]+\.(?:jpg|jpeg|png|webp|gif|avif))$/i;
 const OUTPUT_MIME = {
   avif: "image/avif",
   webp: "image/webp",
   jpeg: "image/jpeg",
+  png: "image/png",
 } as const;
-const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82 } as const;
+const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82, png: 100 } as const;
 
-async function serveOptimizedImage(request: Request, env: Env): Promise<Response | null> {
+async function serveOptimizedImage(request: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/_image/")) return null;
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -45,6 +46,17 @@ async function serveOptimizedImage(request: Request, env: Env): Promise<Response
 
   const match = IMAGE_ROUTE.exec(url.pathname);
   if (!match) return new Response("Invalid image request.", { status: 400 });
+
+  const cache = caches.default;
+  const cacheKey = new Request(request.url, { method: "GET" });
+  let cachedResponse = await cache.match(cacheKey);
+
+  if (cachedResponse) {
+    if (request.method === "HEAD") {
+      return new Response(null, { headers: cachedResponse.headers });
+    }
+    return cachedResponse;
+  }
 
   const [, widthToken, formatTokenRaw, assetPath] = match;
   const formatToken = formatTokenRaw.toLowerCase() as keyof typeof OUTPUT_MIME;
@@ -96,11 +108,27 @@ async function serveOptimizedImage(request: Request, env: Env): Promise<Response
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
     headers.set("X-Content-Type-Options", "nosniff");
 
-    return new Response(request.method === "HEAD" ? null : transformed.body, {
+    const responseToCache = new Response(transformed.body, {
       status: transformed.status,
       statusText: transformed.statusText,
       headers,
     });
+
+    // clone the response before caching
+    const responseToReturn = responseToCache.clone();
+
+    ctx.waitUntil(cache.put(cacheKey, responseToCache));
+
+    if (request.method === "HEAD") {
+        return new Response(null, {
+            status: responseToReturn.status,
+            statusText: responseToReturn.statusText,
+            headers: responseToReturn.headers
+        });
+    }
+
+    return responseToReturn;
+
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown image transformation error";
     console.error(
@@ -123,7 +151,7 @@ async function serveOptimizedImage(request: Request, env: Env): Promise<Response
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      const optimizedImage = await serveOptimizedImage(request, env);
+      const optimizedImage = await serveOptimizedImage(request, env, ctx);
       if (optimizedImage) return optimizedImage;
       return handler.fetch(request, env, ctx);
     } catch (error) {
