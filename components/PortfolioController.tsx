@@ -4,7 +4,14 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 const MEDIA_START = 6;
 const MEDIA_END = 7;
+const LOGO_TUNNEL_INDEX = 2;
+const LOGO_TUNNEL_STEP = 0.14;
 const WHEEL_LOCK_MS = 560;
+const TUNNEL_WHEEL_LOCK_MS = 170;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
 
 export function PortfolioController({ children, sceneCount }: { children: ReactNode; sceneCount: number }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -26,6 +33,7 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
     const modalTitle = root.querySelector<HTMLElement>("[data-modal-title]");
 
     let active = 0;
+    let logoTunnelProgress = 0;
     let wheelLocked = false;
     let touchStart: number | null = null;
 
@@ -49,9 +57,45 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
       modal.querySelector<HTMLButtonElement>("[data-modal-close]")?.focus();
     };
 
+    const emitLogoTunnelProgress = () => {
+      root.style.setProperty("--block-3-progress", String(logoTunnelProgress));
+      root.dispatchEvent(
+        new CustomEvent("desorden:block-3-progress", {
+          detail: {
+            progress: logoTunnelProgress,
+            active: active === LOGO_TUNNEL_INDEX,
+          },
+        }),
+      );
+    };
+
+    const updateProgressUI = () => {
+      const visualIndex = active === LOGO_TUNNEL_INDEX
+        ? active + logoTunnelProgress
+        : active;
+      const progress = sceneCount > 1 ? visualIndex / (sceneCount - 1) : 0;
+
+      root.style.setProperty("--progress", String(progress));
+      if (progressBar) {
+        progressBar.style.top = `calc(${progress * 100}% - ${progress * 76}px)`;
+      }
+    };
+
+    const setLogoTunnelProgress = (next: number) => {
+      logoTunnelProgress = clamp(next, 0, 1);
+      updateProgressUI();
+      emitLogoTunnelProgress();
+    };
+
     const updateScene = (next: number) => {
-      active = Math.max(0, Math.min(sceneCount - 1, next));
-      const progress = sceneCount > 1 ? active / (sceneCount - 1) : 0;
+      const previousActive = active;
+      const nextActive = clamp(next, 0, sceneCount - 1);
+
+      if (nextActive === LOGO_TUNNEL_INDEX && previousActive !== LOGO_TUNNEL_INDEX) {
+        logoTunnelProgress = previousActive > LOGO_TUNNEL_INDEX ? 1 : 0;
+      }
+
+      active = nextActive;
       const activeScene = scenes[active];
       const label = activeScene?.dataset.label ?? "section";
 
@@ -69,7 +113,6 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
         else button.removeAttribute("aria-current");
       });
 
-      root.style.setProperty("--progress", String(progress));
       root.style.setProperty("--orbit-a-x", `${active * -7.5}vw`);
       root.style.setProperty("--orbit-b-x", `${active * 5.2}vw`);
       root.style.setProperty("--nebula-a-x", `${active * 1.8}vw`);
@@ -77,32 +120,48 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
 
       if (activeLabel) activeLabel.textContent = label;
       if (counter) counter.textContent = `${String(active + 1).padStart(2, "0")} / ${String(sceneCount).padStart(2, "0")}`;
-      if (progressBar) progressBar.style.top = `calc(${progress * 100}% - ${progress * 76}px)`;
       if (scrollCue) scrollCue.hidden = active !== 0;
       if (marquee) marquee.hidden = active < MEDIA_START || active > MEDIA_END;
 
-      root.dispatchEvent(
-        new CustomEvent("desorden:scene-progress", {
-          detail: {
-            active,
-            progress,
-            virtualScroll: active * window.innerHeight,
-            isContact: active === sceneCount - 1,
-          },
-        }),
-      );
-
+      updateProgressUI();
+      emitLogoTunnelProgress();
       closeMenu();
+    };
+
+    const advance = (direction: 1 | -1, intensity = 1) => {
+      if (active === LOGO_TUNNEL_INDEX) {
+        const atStart = logoTunnelProgress <= 0.001;
+        const atEnd = logoTunnelProgress >= 0.999;
+
+        if (direction > 0 && !atEnd) {
+          setLogoTunnelProgress(logoTunnelProgress + LOGO_TUNNEL_STEP * intensity);
+          return;
+        }
+
+        if (direction < 0 && !atStart) {
+          setLogoTunnelProgress(logoTunnelProgress - LOGO_TUNNEL_STEP * intensity);
+          return;
+        }
+      }
+
+      updateScene(active + direction);
     };
 
     const onWheel = (event: WheelEvent) => {
       if (!modal?.hidden || wheelLocked || Math.abs(event.deltaY) < 12) return;
       event.preventDefault();
+
+      const direction: 1 | -1 = event.deltaY > 0 ? 1 : -1;
+      const intensity = active === LOGO_TUNNEL_INDEX
+        ? clamp(Math.abs(event.deltaY) / 150, 0.8, 1.5)
+        : 1;
+
       wheelLocked = true;
-      updateScene(active + (event.deltaY > 0 ? 1 : -1));
+      advance(direction, intensity);
+
       window.setTimeout(() => {
         wheelLocked = false;
-      }, WHEEL_LOCK_MS);
+      }, active === LOGO_TUNNEL_INDEX ? TUNNEL_WHEEL_LOCK_MS : WHEEL_LOCK_MS);
     };
 
     const onTouchStart = (event: TouchEvent) => {
@@ -113,7 +172,11 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
       if (touchStart === null || !modal?.hidden) return;
       const currentY = event.changedTouches[0]?.clientY ?? touchStart;
       const delta = touchStart - currentY;
-      if (Math.abs(delta) > 42) updateScene(active + (delta > 0 ? 1 : -1));
+
+      if (Math.abs(delta) > 42) {
+        advance(delta > 0 ? 1 : -1, active === LOGO_TUNNEL_INDEX ? 1.15 : 1);
+      }
+
       touchStart = null;
     };
 
@@ -123,13 +186,15 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
         closeMenu();
         return;
       }
+
       if (!modal?.hidden) return;
+
       if (["ArrowDown", "PageDown", " "].includes(event.key)) {
         event.preventDefault();
-        updateScene(active + 1);
+        advance(1, active === LOGO_TUNNEL_INDEX ? 1.15 : 1);
       } else if (["ArrowUp", "PageUp"].includes(event.key)) {
         event.preventDefault();
-        updateScene(active - 1);
+        advance(-1, active === LOGO_TUNNEL_INDEX ? 1.15 : 1);
       } else if (event.key === "Home") {
         event.preventDefault();
         updateScene(0);
@@ -148,6 +213,7 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
         updateScene(Number(goButton.dataset.go));
         return;
       }
+
       if (target.closest("[data-menu-toggle]")) {
         const shouldOpen = menu?.hidden ?? true;
         if (menu) menu.hidden = !shouldOpen;
@@ -155,10 +221,12 @@ export function PortfolioController({ children, sceneCount }: { children: ReactN
         menuToggle?.querySelector("i")?.classList.toggle("open", shouldOpen);
         return;
       }
+
       if (modalButton) {
         openModal(modalButton.dataset.modalOpen ?? "Project detail");
         return;
       }
+
       if (target.closest("[data-modal-close]") || target.matches("[data-modal]")) {
         closeModal();
       }
