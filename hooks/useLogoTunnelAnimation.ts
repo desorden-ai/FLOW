@@ -1,17 +1,13 @@
-import { useEffect, RefObject } from "react";
+import { useEffect, type RefObject } from "react";
+import { clampFinite, finiteOr, interpolateProgress } from "./logoTunnelMath";
 
 const INTRO_END = 0.15;
 const TOTAL_Z_TRAVEL = 12_000;
-const EASING = 0.09;
 
 type Block3ProgressDetail = {
-  progress: number;
-  active: boolean;
+  progress?: number;
+  active?: boolean;
 };
-
-function clamp(value: number, min = 0, max = 1) {
-  return Math.max(min, Math.min(max, value));
-}
 
 export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -19,68 +15,76 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
     const root = section?.closest<HTMLElement>(".site-shell");
     const intro = section?.querySelector<HTMLElement>("[data-logo-tunnel-intro]");
     const logos = section
-      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]")).map(logo => ({
+      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]")).map((logo) => ({
           element: logo,
-          initialZ: Number(logo.dataset.z ?? 0)
+          initialZ: finiteOr(Number(logo.dataset.z), 0),
         }))
       : [];
 
     if (!section || !root || !intro || logos.length === 0) return;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let currentProgress = 0;
-    let targetProgress = 0;
+    const parentScene = section.closest<HTMLElement>("[data-scene]");
+    const initialProgress = clampFinite(
+      Number.parseFloat(root.style.getPropertyValue("--block-3-progress")),
+      0,
+      1,
+      0,
+    );
+
+    let currentProgress = initialProgress;
+    let targetProgress = initialProgress;
     let frameId = 0;
-    let active = false;
+    let active = parentScene?.dataset.state === "current";
     let pageVisible = !document.hidden;
+    let previousTimestamp: number | null = null;
 
     const render = (progress: number) => {
-      const safeProgress = clamp(progress);
-      const introOpacity = clamp(1 - safeProgress / INTRO_END);
+      const safeProgress = clampFinite(progress, 0, 1, 0);
+      const introOpacity = clampFinite(1 - safeProgress / INTRO_END, 0, 1, 0);
       const introShift = safeProgress * -100;
 
       intro.style.opacity = String(introOpacity);
       intro.style.transform = `translate3d(-50%, ${introShift}px, 0)`;
 
       const logosEnabled = safeProgress > INTRO_END;
-      const logoProgress = clamp((safeProgress - INTRO_END) / (1 - INTRO_END));
+      const logoProgress = clampFinite((safeProgress - INTRO_END) / (1 - INTRO_END), 0, 1, 0);
       const currentZAdvance = logoProgress * TOTAL_Z_TRAVEL;
 
       logos.forEach(({ element: logo, initialZ }) => {
         const newZ = initialZ + currentZAdvance;
-
         logo.style.transform = `translate(-50%, -50%) translate3d(0, 0, ${newZ}px)`;
 
         let opacity = 0;
         if (logosEnabled && newZ > -3000 && newZ <= 0) {
-          if (newZ < -1500) {
-            opacity = (newZ + 3000) / 1500;
-          } else if (newZ <= -800) {
-            opacity = 1;
-          } else {
-            opacity = Math.abs(newZ) / 800;
-          }
+          if (newZ < -1500) opacity = (newZ + 3000) / 1500;
+          else if (newZ <= -800) opacity = 1;
+          else opacity = Math.abs(newZ) / 800;
         }
 
-        logo.style.opacity = String(clamp(opacity));
+        logo.style.opacity = String(clampFinite(opacity, 0, 1, 0));
       });
     };
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       frameId = 0;
+      if (!active || !pageVisible) {
+        previousTimestamp = null;
+        return;
+      }
 
-      if (!active || !pageVisible) return;
-
-      const delta = targetProgress - currentProgress;
-      currentProgress += delta * EASING;
+      const deltaMs = previousTimestamp === null ? 1000 / 60 : timestamp - previousTimestamp;
+      previousTimestamp = timestamp;
+      currentProgress = interpolateProgress(currentProgress, targetProgress, deltaMs);
       render(currentProgress);
 
-      if (Math.abs(delta) > 0.001 && !reducedMotion.matches) {
+      if (Math.abs(targetProgress - currentProgress) > 0.001 && !reducedMotion.matches) {
         frameId = window.requestAnimationFrame(animate);
         return;
       }
 
       currentProgress = targetProgress;
+      previousTimestamp = null;
       render(currentProgress);
     };
 
@@ -89,6 +93,7 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
 
       if (reducedMotion.matches) {
         currentProgress = targetProgress;
+        previousTimestamp = null;
         render(currentProgress);
         return;
       }
@@ -100,14 +105,15 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
       const detail = (event as CustomEvent<Block3ProgressDetail>).detail;
       if (!detail) return;
 
-      active = detail.active;
-      targetProgress = clamp(detail.progress);
+      active = detail.active === true;
+      targetProgress = clampFinite(Number(detail.progress), 0, 1, currentProgress);
       section.dataset.tunnelActive = String(active);
       section.style.setProperty("--logo-tunnel-progress", String(targetProgress));
 
       if (!active) {
         if (frameId) window.cancelAnimationFrame(frameId);
         frameId = 0;
+        previousTimestamp = null;
         currentProgress = targetProgress;
         render(currentProgress);
         return;
@@ -122,6 +128,7 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
       if (!pageVisible && frameId) {
         window.cancelAnimationFrame(frameId);
         frameId = 0;
+        previousTimestamp = null;
       } else if (pageVisible) {
         startAnimation();
       }
@@ -130,6 +137,7 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
     const handleReducedMotion = () => {
       if (frameId) window.cancelAnimationFrame(frameId);
       frameId = 0;
+      previousTimestamp = null;
       currentProgress = targetProgress;
       render(currentProgress);
     };
@@ -137,7 +145,7 @@ export function useLogoTunnelAnimation(sectionRef: RefObject<HTMLElement | null>
     root.addEventListener("desorden:block-3-progress", handleProgress);
     document.addEventListener("visibilitychange", handleVisibility);
     reducedMotion.addEventListener("change", handleReducedMotion);
-    render(0);
+    render(initialProgress);
 
     return () => {
       root.removeEventListener("desorden:block-3-progress", handleProgress);
