@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ParticleTunnel } from "../components/ParticleTunnel";
+import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
 
@@ -55,12 +55,6 @@ const mediaItems = [
   ["15", "Vols urbans amb cobertura legal", "Dron 4K · AESA · ENAIRE"],
 ];
 
-const logoPositions = [
-  [12, 22, -8], [32, 13, 5], [54, 25, -2], [76, 14, 8],
-  [18, 51, 4], [42, 43, -6], [68, 51, 3], [86, 44, -5],
-  [9, 76, 7], [35, 72, -3], [61, 78, 6], [82, 69, -7],
-];
-
 function ImagePlaceholder({ number, className = "", label }: { number: string; className?: string; label?: string }) {
   return <span className={`image-placeholder ${className}`.trim()} aria-label={label ?? `Imatge substituïble ${number}`} role="img">{number}</span>;
 }
@@ -83,8 +77,6 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
 export default function Home() {
   return (
     <PortfolioController sceneCount={scenes.length}>
-      <ParticleTunnel />
-
       <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
         <p className="media-marquee__track" data-text="PROJECTES ✦ PROJECTES ✦ PROJECTES ✦ ">
           PROJECTES ✦ PROJECTES ✦ PROJECTES ✦
@@ -125,13 +117,7 @@ export default function Home() {
         </SceneFrame>
 
         <SceneFrame index={2} name="partners" label="selected work">
-          <div className="partners-copy"><p className="eyebrow">Selected work</p><h2>Imatges aèries espectaculars i desenvolupament web ultraràpid. Aquests són els projectes amb què hem trencat el mercat.</h2></div>
-          <div className="logo-constellation" aria-label="Projectes seleccionats de DESORDEN">
-            {logoPositions.map(([x, y, rotation], index) => {
-              const number = String(index + 2).padStart(2, "0");
-              return <span key={number} className="logo-position" style={{ left: `${x}%`, top: `${y}%`, transform: `rotate(${rotation}deg)` }}><ImagePlaceholder className="logo-placeholder" number={number} label={`Imatge del projecte ${number} de DESORDEN`} /></span>;
-            })}
-          </div>
+          <LogoTunnel />
         </SceneFrame>
 
         <SceneFrame index={3} name="experience" label="com ho fem">
