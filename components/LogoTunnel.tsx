@@ -24,7 +24,10 @@ export function LogoTunnel() {
     const root = section?.closest<HTMLElement>(".site-shell");
     const intro = section?.querySelector<HTMLElement>("[data-logo-tunnel-intro]");
     const logos = section
-      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]"))
+      ? Array.from(section.querySelectorAll<HTMLImageElement>("[data-logo-3d-item]")).map(logo => ({
+          element: logo,
+          initialZ: Number(logo.dataset.z ?? 0)
+        }))
       : [];
 
     if (!section || !root || !intro || logos.length === 0) return;
@@ -48,8 +51,7 @@ export function LogoTunnel() {
       const logoProgress = clamp((safeProgress - INTRO_END) / (1 - INTRO_END));
       const currentZAdvance = logoProgress * TOTAL_Z_TRAVEL;
 
-      logos.forEach((logo) => {
-        const initialZ = Number(logo.dataset.z ?? 0);
+      logos.forEach(({ element: logo, initialZ }) => {
         const newZ = initialZ + currentZAdvance;
 
         logo.style.transform = `translate(-50%, -50%) translate3d(0, 0, ${newZ}px)`;
