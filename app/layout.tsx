@@ -32,10 +32,6 @@ export const metadata: Metadata = {
     template: "%s — DESORDEN",
   },
   description: SITE_DESCRIPTION,
-  icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: "/icon.svg",
-  },
   alternates: {
     canonical: "/",
   },
@@ -56,6 +52,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ca">
+      <head>
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+      </head>
       <body>
         {children}
         <ContactWhatsAppForm />
