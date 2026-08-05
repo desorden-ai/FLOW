@@ -111,7 +111,7 @@ export function ContactWhatsAppForm() {
           type="button"
           className="contact-chatbot__trigger"
           aria-expanded={chatOpen}
-          aria-label={chatOpen ? "Amagar missatge de contacte" : "Obrir missatge de contacte"}
+          aria-label={chatOpen ? "Amagar assistent de contacte" : "Obrir assistent de contacte"}
           onClick={() => setChatOpen((current) => !current)}
         >
           {chatOpen ? "×" : "✦"}
