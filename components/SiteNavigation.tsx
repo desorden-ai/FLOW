@@ -4,8 +4,8 @@ import { useState } from "react";
 
 const navigationItems = [
   ["Inici", "/"],
-  ["IA i Automatització", "/#ia-automatitzacio"],
-  ["Disseny Web", "/#disseny-web"],
+  ["IA i Automatització", "/ia-automatitzacio"],
+  ["Disseny Web", "/disseny-web"],
   ["Drons", "/drons"],
   ["Ajuts", "/ajuts"],
   ["Preus", "/preus"],
