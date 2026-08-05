@@ -109,21 +109,36 @@ export default function Home() {
       </div>
 
       <div className="scene-deck">
-        <SceneFrame index={0} name="intro" label="introducció">
+        <SceneFrame index={0} name="intro" label="introducción">
           <div className="intro-layout">
             <header className="intro-heading">
-              <p className="outline-word">EL TEU</p>
-              <p className="display-name">PARTNER</p>
-              <p className="micro-label">( TECNOLÒGIC I CREATIU )</p>
-              <ul className="hero-services" aria-label="Proposta de valor de DESORDEN">
-                <li>✦ Contingut visual per a xarxes socials</li>
-                <li>✦ Vídeo amb IA per visibilitzar marques i comerços</li>
-                <li>✦ Creació d&apos;una identitat visual coherent</li>
+              <p className="micro-label">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
+              <h1 className="hero-title">
+                <span className="outline-word">CREAMOS</span>
+                <span className="display-name">DESORDEN</span>
+              </h1>
+              <p className="hero-subtitle">
+                Tu partner tecnológico y productora audiovisual vertical (9:16). Plataformas web ultrarrápidas, experiencias con IA y contenido de impacto.
+              </p>
+              <ul className="hero-services" aria-label="Propuesta de valor de DESORDEN">
+                <li>◆ <strong>Web &amp; Branding:</strong> Identidades audaces y desarrollo a medida</li>
+                <li>◆ <strong>Audiovisual 9:16 &amp; Dron 4K:</strong> Producción vertical de alta conversión</li>
+                <li>◆ <strong>Automatización e IA:</strong> Flujos inteligentes y escalabilidad</li>
               </ul>
+              <div className="hero-actions">
+                <a
+                  href="https://wa.me/34640925788?text=Hola%20DESORDEN,%20quiero%20impulsar%20mi%20proyecto"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cta-button-gold"
+                >
+                  HABLAR CON UN EXPERTO ◆
+                </a>
+              </div>
             </header>
             <ProjectPicture
               file="media/hero/portada-chico-bn.webp"
-              alt="Perfil en blanc i negre del creador i director de DESORDEN"
+              alt="Perfil en blanco y negro del equipo creativo de DESORDEN"
               width={768}
               height={1028}
               className="hero-picture"

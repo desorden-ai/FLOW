@@ -103,13 +103,16 @@ picture{display:block}picture img{display:block;width:100%;height:auto}
 @media(prefers-reduced-motion:reduce){.scene,.orbit-copy,.progress-rail i{transition-duration:.01ms!important}.cosmos::before,.cosmos::after,.media-marquee__track,.grain,.decorative-spark,.scroll-cue i:after{animation:none!important}}
 
 /* DESORDEN VISUAL UPDATE — START */
-:root{--desorden-orange:#f69504;--desorden-black:#000;--desorden-white:#f5f5f5;--desorden-muted:#a3a3a3;--paper:#000;--paper-soft:#090909;--ink:#f5f5f5;--dim:rgba(245,245,245,.52);--line:rgba(245,245,245,.18)}
-html,body,.site-shell,.cosmos{background:#000}.orbit-copy{font-size:clamp(28px,4.8vw,73px);-webkit-text-stroke:1px rgba(246,149,4,.24);opacity:.75}.decorative-spark{color:rgba(246,149,4,.78)}
+:root{--desorden-orange:#E3A008;--desorden-amber:#E3A008;--desorden-black:#0a0a0a;--desorden-white:#f5f5f5;--desorden-muted:#a3a3a3;--paper:#0a0a0a;--paper-soft:#121212;--ink:#f5f5f5;--dim:rgba(245,245,245,.52);--line:rgba(245,245,245,.18)}
+html,body,.site-shell,.cosmos{background:#0a0a0a}.orbit-copy{font-size:clamp(28px,4.8vw,73px);-webkit-text-stroke:1px rgba(227,160,8,.24);opacity:.75}.decorative-spark{color:rgba(227,160,8,.78)}
 .display-name{color:var(--desorden-orange);font-size:clamp(68px,10vw,150px)}.outline-word{-webkit-text-stroke-color:rgba(245,245,245,.92)}.micro-label,.eyebrow{color:var(--desorden-orange)}
 .progress-rail{background:rgba(245,245,245,.22)}.progress-rail i{background:var(--desorden-orange)}.section-toggle b,.section-navigation li button.active,.fixed-ui header>p{color:var(--desorden-orange)}
 .pitch-copy h1{font-size:clamp(36px,4.6vw,72px)}.partners-copy h2{font-size:clamp(30px,3.5vw,54px)}.experience-panel h2,.about-panel h2,.manifesto-copy h2,.contact-copy h2{color:var(--desorden-orange)}.experience-panel h2,.about-panel h2{font-size:clamp(40px,5vw,72px)}
-.intro-layout{position:relative;min-height:min(76vh,820px)}.intro-heading{position:relative;z-index:3}.hero-picture{position:relative;z-index:1;display:block;width:100%;max-width:460px;justify-self:end;overflow:hidden;background:#000}.hero-picture img{width:100%;height:min(72vh,790px);object-fit:cover;object-position:42% center;filter:contrast(1.08) brightness(.9)}
-.intro-layout::after{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.98) 0%,rgba(0,0,0,.9) 35%,rgba(0,0,0,.36) 67%,transparent 100%)}
-.hero-services{position:relative;z-index:4;display:grid;gap:.75rem;margin:1.5rem 0 0;padding:0;list-style:none}.hero-services li{color:var(--desorden-white);font-size:clamp(1rem,3.8vw,1.35rem);font-weight:500;line-height:1.3}.hero-services li::first-letter{color:var(--desorden-orange)}
+.intro-layout{position:relative;min-height:min(76vh,820px)}.intro-heading{position:relative;z-index:3}.hero-picture{position:relative;z-index:1;display:block;width:100%;max-width:460px;justify-self:end;overflow:hidden;background:#0a0a0a}.hero-picture img{width:100%;height:min(72vh,790px);object-fit:cover;object-position:42% center;filter:grayscale(100%) contrast(1.25) brightness(.92)}
+.intro-layout::after{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(10,10,10,.98) 0%,rgba(10,10,10,.9) 35%,rgba(10,10,10,.36) 67%,transparent 100%)}
+.hero-subtitle{color:var(--desorden-muted);font-size:clamp(0.95rem,2.2vw,1.15rem);max-width:540px;margin-top:12px;line-height:1.5}
+.hero-services{position:relative;z-index:4;display:grid;gap:.75rem;margin:1.25rem 0 0;padding:0;list-style:none}.hero-services li{color:var(--desorden-white);font-size:clamp(.95rem,2.5vw,1.1rem);font-weight:400;line-height:1.4}.hero-services li strong{color:var(--desorden-orange);font-weight:600}
+.cta-button-gold{display:inline-flex;align-items:center;gap:8px;background-color:#E3A008;color:#0a0a0a;font-family:'Anton',sans-serif;font-size:1.1rem;letter-spacing:.05em;padding:14px 28px;border-radius:4px;text-decoration:none;font-weight:bold;transition:transform .2s ease,box-shadow .2s ease,background-color .2s ease;margin-top:20px;position:relative;z-index:5}
+.cta-button-gold:hover{background-color:#f5b316;transform:translateY(-2px);box-shadow:0 8px 24px rgba(227,160,8,.35)}
 /* DESORDEN VISUAL UPDATE — END */
 
