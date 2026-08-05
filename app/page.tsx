@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
+import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
 
 const scenes = [
   ["intro", "introducció", "intro"],
@@ -93,6 +94,7 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
 export default function Home() {
   return (
     <PortfolioController sceneCount={scenes.length}>
+      <VisualLayoutEditor />
       <p
         style={visuallyHiddenStyle}
         aria-live="polite"
