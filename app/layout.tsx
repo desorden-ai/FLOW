@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
 import { SiteNavigation } from "../components/SiteNavigation";
+import { SocialProofPushNotifications } from "../components/SocialProofPushNotifications";
 import "./globals.css";
 import "./desorden-fixes.css";
 import "./contact-form.css";
 import "./logo-tunnel.css";
-import "./social-proof-cards.css";
+import "./push-notifications.css";
 import "./video-layout-restore.css";
 import "./commercial-pages.css";
 import "./commercial-a11y-fixes.css";
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <SiteNavigation />
         {children}
         <ContactWhatsAppForm />
+        <SocialProofPushNotifications heroSelector="#intro" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
