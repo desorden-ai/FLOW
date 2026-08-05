@@ -18,7 +18,7 @@
   "kv_namespaces": [
     {
       "binding": "EDITOR_KV",
-      "id": "placeholder_for_production_id"
+      "id": "00000000000000000000000000000000"
     }
   ],
   "observability": {
