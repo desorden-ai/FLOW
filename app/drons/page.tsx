@@ -54,7 +54,7 @@ export default function DronePage() {
             />
           ))}
         </div>
-        <p className="commercial-legal-note">Les operacions UAS s'estudien cas per cas d'acord amb la normativa aplicable, inclòs el Reial decret 517/2024 i la regulació europea vigent.</p>
+        <p className="commercial-legal-note">Les operacions UAS s&apos;estudien cas per cas d&apos;acord amb la normativa aplicable, inclòs el Reial decret 517/2024 i la regulació europea vigent.</p>
       </CommercialSection>
 
       <CommercialSection
