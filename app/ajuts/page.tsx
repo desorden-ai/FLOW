@@ -43,7 +43,7 @@ export default function GrantsPage() {
         <GrantCalculator />
         <div className="commercial-status-note">
           <strong>Estat del programa:</strong>
-          <p>Les convocatòries publicades del Kit Digital consten com a tancades. Abans d'iniciar cap tràmit comprovarem si existeix una convocatòria nova, una ampliació o un altre ajut compatible.</p>
+          <p>Les convocatòries publicades del Kit Digital consten com a tancades. Abans d&apos;iniciar cap tràmit comprovarem si existeix una convocatòria nova, una ampliació o un altre ajut compatible.</p>
         </div>
       </CommercialSection>
 
