@@ -6,6 +6,7 @@ import "./desorden-fixes.css";
 import "./contact-form.css";
 import "./logo-tunnel.css";
 import "./social-proof-cards.css";
+import "./video-layout-restore.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =
