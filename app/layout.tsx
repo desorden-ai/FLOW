@@ -54,9 +54,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="ca">
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Anton&family=Cinzel:wght@400;700&family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;800&family=Outfit:wght@400;600;800&family=Roboto:wght@400;500;700&family=Space+Grotesk:wght@400;600;700&family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet" />
       </head>
       <body>
         {children}
