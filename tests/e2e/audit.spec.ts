@@ -25,6 +25,16 @@ test("uses Catalan metadata and keeps keyboard focus inside the active scene", a
   }
 });
 
+test("shows the first social proof notification after leaving the hero", async ({ page }) => {
+  await goToScene(page, 1);
+
+  const notification = page.locator('[data-push-notification="rosalia-like"]');
+  await expect(notification).toBeVisible();
+  await expect(notification).toContainText("@rosalia.vt");
+  await expect(notification).toContainText("li ha agradat el teu reel");
+  await expect(notification.locator(".push-toast")).toHaveClass(/push-toast--visible/);
+});
+
 test("traps modal focus, closes with Escape and restores the trigger", async ({ page }) => {
   await goToScene(page, 5);
 
