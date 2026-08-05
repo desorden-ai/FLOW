@@ -1,11 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
-import { VisualLayoutEditor, CanvasElementEdit } from "../components/VisualLayoutEditor";
+import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
+import {
+  applyEditorDocument,
+  parseStoredEditorDocument,
+} from "../lib/editor-model";
 
 const scenes = [
   ["intro", "introducció", "intro"],
@@ -94,49 +98,39 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
   );
 }
 
-export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean }) {
-  const [publishedData, setPublishedData] = useState<Record<string, CanvasElementEdit> | null>(null);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
+export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean }) {
   useEffect(() => {
-    if (!enableEditor) {
-      // In public view, fetch the published data and apply it
-      fetch("/api/publish")
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.published_data) {
-            try {
-              const editMap = JSON.parse(data.published_data);
-              setPublishedData(editMap);
-              
-              // Apply the published data to the DOM directly
-              Object.entries(editMap).forEach(([selector, edit]: [string, any]) => {
-                const el = document.querySelector(`[data-canvas-selector="${selector}"]`) as HTMLElement;
-                if (el) {
-                  if (edit.deletedAt) {
-                    el.style.display = "none";
-                  } else if (edit.hidden) {
-                    el.style.visibility = "hidden";
-                  } else {
-                    if (edit.html) el.innerHTML = edit.html;
-                    if (edit.styles) {
-                      Object.assign(el.style, edit.styles);
-                    }
-                  }
-                }
-              });
-            } catch (e) {
-              console.error("Error parsing published data", e);
-            }
-          }
-        })
-        .catch(console.error);
-    }
+    if (enableEditor) return;
+
+    const controller = new AbortController();
+
+    void fetch("/api/publish", {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (!isRecord(payload)) return;
+
+        const published = parseStoredEditorDocument(payload.published);
+        if (published) applyEditorDocument(published.data, false);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("Unable to load published editor data", error);
+      });
+
+    return () => controller.abort();
   }, [enableEditor]);
 
   return (
     <PortfolioController sceneCount={scenes.length}>
       {enableEditor && <VisualLayoutEditor />}
-      <div id="global-canvas-layer" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}></div>
       <p
         style={visuallyHiddenStyle}
         aria-live="polite"
@@ -156,12 +150,12 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         <SceneFrame index={0} name="intro" label="introducción">
           <div className="intro-layout">
             <header className="intro-heading">
-              <p className="micro-label" data-canvas-selector="hero-micro-label" title="Haz clic para editar en pantalla">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
+              <p className="micro-label" data-canvas-selector="hero-micro-label" title="Selecciona para editar">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
               <h1 className="hero-title">
-                <span className="outline-word" data-canvas-selector="hero-title-1" title="Haz clic para editar en pantalla">CREAMOS</span>
-                <span className="display-name" data-canvas-selector="hero-title-2" title="Haz clic para editar en pantalla">DESORDEN</span>
+                <span className="outline-word" data-canvas-selector="hero-title-1" title="Selecciona para editar">CREAMOS</span>
+                <span className="display-name" data-canvas-selector="hero-title-2" title="Selecciona para editar">DESORDEN</span>
               </h1>
-              <p className="hero-subtitle" data-canvas-selector="hero-subtitle" title="Haz clic para editar en pantalla">
+              <p className="hero-subtitle" data-canvas-selector="hero-subtitle" title="Selecciona para editar">
                 Tu partner tecnológico y productora audiovisual vertical (9:16). Plataformas web ultrarrápidas, experiencias con IA y contenido de impacto.
               </p>
               <ul className="hero-services" aria-label="Propuesta de valor de DESORDEN">
@@ -188,6 +182,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
               height={1028}
               className="hero-picture"
               sizes="(max-width: 760px) 82vw, 460px"
+              canvasSelector="hero-picture"
               eager
             />
           </div>
@@ -207,17 +202,17 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
 
         <SceneFrame index={3} name="experience" label="com ho fem">
           <div className="experience-panel"><p className="ghost-statement" data-canvas-selector="exp-ghost">COM HO FEM</p><h2 data-canvas-selector="exp-title">Serveis</h2><div className="experience-list">
-            {experience.map(([role, company, period], i) => <div className="experience-row" key={role} data-canvas-selector={`exp-row-${i}`}><div><strong>{role}</strong><span>{company}</span></div><time>{period}</time></div>)}
+            {experience.map(([role, company, period], index) => <div className="experience-row" key={role} data-canvas-selector={`exp-row-${index}`}><div><strong>{role}</strong><span>{company}</span></div><time>{period}</time></div>)}
           </div></div>
         </SceneFrame>
 
         <SceneFrame index={4} name="about" label="sobre nosaltres">
-          <div className="about-panel"><h2 data-canvas-selector="about-title">Sobre nosaltres</h2><ul>{personalNotes.map((note, i) => <li key={note} data-canvas-selector={`about-note-${i}`}>✦ <span>{note}</span></li>)}</ul><p className="about-meta" data-canvas-selector="about-meta">Catalunya · Operem on calgui</p></div>
+          <div className="about-panel"><h2 data-canvas-selector="about-title">Sobre nosaltres</h2><ul>{personalNotes.map((note, index) => <li key={note} data-canvas-selector={`about-note-${index}`}>✦ <span>{note}</span></li>)}</ul><p className="about-meta" data-canvas-selector="about-meta">Catalunya · Operem on calgui</p></div>
         </SceneFrame>
 
         <SceneFrame index={5} name="cases" label="projectes">
           <div className="case-panel"><p className="eyebrow" data-canvas-selector="cases-eyebrow">Projectes</p><div className="case-list">
-            {cases.map(([number, title], i) => <button type="button" key={number} data-modal-open={title} data-canvas-selector={`case-btn-${i}`}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
+            {cases.map(([number, title], index) => <button type="button" key={number} data-modal-open={title} data-canvas-selector={`case-btn-${index}`}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
           </div></div>
         </SceneFrame>
 
