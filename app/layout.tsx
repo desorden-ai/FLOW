@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
+import { SiteNavigation } from "../components/SiteNavigation";
 import "./globals.css";
 import "./desorden-fixes.css";
 import "./contact-form.css";
 import "./logo-tunnel.css";
 import "./social-proof-cards.css";
 import "./video-layout-restore.css";
+import "./commercial-pages.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =
-  "Estudi creatiu de Catalunya especialitzat en contingut audiovisual, intel·ligència artificial, desenvolupament web i producció amb dron.";
+  "Agència creativa i tecnològica de Catalunya especialitzada en intel·ligència artificial, automatització, disseny web, contingut vertical i producció audiovisual amb dron.";
 
 const entityJsonLd = {
   "@context": "https://schema.org",
@@ -30,7 +32,7 @@ const entityJsonLd = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "DESORDEN — Contingut, IA, web i dron",
+    default: "DESORDEN — Agència creativa, IA, web i dron",
     template: "%s — DESORDEN",
   },
   description: SITE_DESCRIPTION,
@@ -45,7 +47,7 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     locale: "ca_ES",
-    title: "DESORDEN — Contingut, IA, web i dron",
+    title: "DESORDEN — Agència creativa, IA, web i dron",
     description: SITE_DESCRIPTION,
     siteName: "DESORDEN",
   },
@@ -58,6 +60,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body>
+        <SiteNavigation />
         {children}
         <ContactWhatsAppForm />
         <script
