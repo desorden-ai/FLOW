@@ -112,18 +112,18 @@ export default function Home() {
         <SceneFrame index={0} name="intro" label="introducción">
           <div className="intro-layout">
             <header className="intro-heading">
-              <p className="micro-label">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
+              <p className="micro-label" contentEditable={true} suppressContentEditableWarning={true} title="Haz clic para editar en pantalla">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
               <h1 className="hero-title">
-                <span className="outline-word">CREAMOS</span>
-                <span className="display-name">DESORDEN</span>
+                <span className="outline-word" contentEditable={true} suppressContentEditableWarning={true} title="Haz clic para editar en pantalla">CREAMOS</span>
+                <span className="display-name" contentEditable={true} suppressContentEditableWarning={true} title="Haz clic para editar en pantalla">DESORDEN</span>
               </h1>
-              <p className="hero-subtitle">
+              <p className="hero-subtitle" contentEditable={true} suppressContentEditableWarning={true} title="Haz clic para editar en pantalla">
                 Tu partner tecnológico y productora audiovisual vertical (9:16). Plataformas web ultrarrápidas, experiencias con IA y contenido de impacto.
               </p>
               <ul className="hero-services" aria-label="Propuesta de valor de DESORDEN">
-                <li>◆ <strong>Web &amp; Branding:</strong> Identidades audaces y desarrollo a medida</li>
-                <li>◆ <strong>Audiovisual 9:16 &amp; Dron 4K:</strong> Producción vertical de alta conversión</li>
-                <li>◆ <strong>Automatización e IA:</strong> Flujos inteligentes y escalabilidad</li>
+                <li contentEditable={true} suppressContentEditableWarning={true}>◆ <strong>Web &amp; Branding:</strong> Identidades audaces y desarrollo a medida</li>
+                <li contentEditable={true} suppressContentEditableWarning={true}>◆ <strong>Audiovisual 9:16 &amp; Dron 4K:</strong> Producción vertical de alta conversión</li>
+                <li contentEditable={true} suppressContentEditableWarning={true}>◆ <strong>Automatización e IA:</strong> Flujos inteligentes y escalabilidad</li>
               </ul>
               <div className="hero-actions">
                 <a
@@ -131,6 +131,8 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="cta-button-gold"
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
                 >
                   HABLAR CON UN EXPERTO ◆
                 </a>
