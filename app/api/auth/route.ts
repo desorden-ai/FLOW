@@ -1,34 +1,52 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import {
+  clearEditorSession,
+  getEditorPassword,
+  isEditorAuthenticated,
+  setEditorSession,
+} from "../../../lib/editor-server";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export async function GET() {
+  return NextResponse.json({ authenticated: await isEditorAuthenticated() });
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { password } = body;
-
-    const validPassword = process.env.EDITOR_PASSWORD || "desorden2024";
-
-    if (password === validPassword) {
-      cookies().set({
-        name: "editor_session",
-        value: "authenticated",
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-      });
-
-      return NextResponse.json({ success: true });
+    const body: unknown = await request.json();
+    if (!isRecord(body) || typeof body.password !== "string" || body.password.length > 256) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
-  } catch (error) {
+    const validPassword = getEditorPassword();
+    if (!validPassword) {
+      return NextResponse.json(
+        { error: "Editor authentication is not configured" },
+        { status: 503 },
+      );
+    }
+
+    if (body.password !== validPassword) {
+      return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+    }
+
+    if (!(await setEditorSession())) {
+      return NextResponse.json(
+        { error: "Editor session is not configured" },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
 
 export async function DELETE() {
-  cookies().delete("editor_session");
+  await clearEditorSession();
   return NextResponse.json({ success: true });
 }
