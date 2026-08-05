@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 type ToastPhase = "entering" | "visible" | "leaving";
@@ -34,6 +34,7 @@ const ENTER_DELAY_MS = 40;
 const VISIBLE_DURATION_MS = 4_000;
 const EXIT_DURATION_MS = 560;
 const PAUSE_BETWEEN_TOASTS_MS = 1_000;
+const subscribeToHydration = () => () => undefined;
 
 function wait(milliseconds: number) {
   return new Promise<void>((resolve) => {
@@ -69,20 +70,30 @@ type SocialProofPushNotificationsProps = {
 export function SocialProofPushNotifications({
   heroSelector = "#intro",
 }: SocialProofPushNotificationsProps) {
-  const [isMounted, setIsMounted] = useState(false);
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const [hasStarted, setHasStarted] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [phase, setPhase] = useState<ToastPhase>("entering");
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (hasStarted) return;
 
     const hero = document.querySelector<HTMLElement>(heroSelector);
-    const triggerSequence = () => setHasStarted(true);
+    let triggered = false;
+
+    const triggerSequence = () => {
+      if (triggered) return;
+      triggered = true;
+      setHasStarted(true);
+    };
+
+    const scheduleTrigger = () => {
+      window.requestAnimationFrame(triggerSequence);
+    };
 
     /*
      * FLOW no desplaza el documento de forma nativa: cambia cada escena entre
@@ -92,7 +103,7 @@ export function SocialProofPushNotifications({
     if (hero?.hasAttribute("data-scene")) {
       const checkSceneState = () => {
         if (hero.dataset.state === "past") {
-          triggerSequence();
+          scheduleTrigger();
         }
       };
 
@@ -113,7 +124,7 @@ export function SocialProofPushNotifications({
     if (!hero) {
       const handleScroll = () => {
         if (window.scrollY >= window.innerHeight * 0.6) {
-          triggerSequence();
+          scheduleTrigger();
           window.removeEventListener("scroll", handleScroll);
         }
       };
@@ -128,7 +139,7 @@ export function SocialProofPushNotifications({
 
     const checkInitialPosition = () => {
       const rect = hero.getBoundingClientRect();
-      if (rect.bottom <= 0) triggerSequence();
+      if (rect.bottom <= 0) scheduleTrigger();
     };
 
     checkInitialPosition();
@@ -138,7 +149,7 @@ export function SocialProofPushNotifications({
         const rect = hero.getBoundingClientRect();
 
         if (rect.bottom <= 0) {
-          triggerSequence();
+          scheduleTrigger();
           window.removeEventListener("scroll", handleScroll);
         }
       };
@@ -158,7 +169,7 @@ export function SocialProofPushNotifications({
           !entry.isIntersecting && entry.boundingClientRect.bottom <= 0;
 
         if (heroHasPassed) {
-          triggerSequence();
+          scheduleTrigger();
           observer.disconnect();
         }
       },
@@ -210,12 +221,17 @@ export function SocialProofPushNotifications({
     };
   }, [hasStarted]);
 
-  if (!isMounted || activeIndex === null) return null;
+  if (!hydrated || activeIndex === null) return null;
 
   const notification = notifications[activeIndex];
 
   return createPortal(
-    <div className="push-toast-layer" aria-live="polite" aria-atomic="true">
+    <div
+      className="push-toast-layer"
+      data-push-notification={notification.id}
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <a
         key={notification.id}
         className={`push-toast push-toast--${phase}`}
