@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function VisualLayoutEditor() {
+  const [isLocalhost, setIsLocalhost] = useState<boolean>(false);
   const [selectedEl, setSelectedEl] = useState<HTMLElement | null>(null);
   const [selectedTag, setSelectedTag] = useState<string>("");
   const [fontSize, setFontSize] = useState<number>(16);
@@ -10,7 +11,7 @@ export function VisualLayoutEditor() {
   const [textColor, setTextColor] = useState<string>("#f5f5f5");
 
   // Background Image State Controls
-  const [bgOpacity, setBgOpacity] = useState<number>(0.38);
+  const [bgOpacity, setBgOpacity] = useState<number>(0.45);
   const [bgScale, setBgScale] = useState<number>(1.0);
   const [bgPosLeft, setBgPosLeft] = useState<number>(50);
   const [bgPosTop, setBgPosTop] = useState<number>(20);
@@ -19,8 +20,22 @@ export function VisualLayoutEditor() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(true);
 
   useEffect(() => {
-    // Restore saved edits, sizes, colors and positions from localStorage if available
-    const savedContent = localStorage.getItem("desorden_studio_edits");
+    // Only run editor on LOCALHOST environment
+    const hostname = window.location.hostname;
+    const isDev = hostname === "localhost" || hostname === "127.0.0.1";
+    setIsLocalhost(isDev);
+
+    if (!isDev) return; // Do not touch public production site!
+
+    // Ensure hero-picture is visible by default
+    const pic = document.querySelector<HTMLElement>(".hero-picture");
+    if (pic) {
+      pic.style.opacity = "0.45";
+      pic.style.display = "block";
+    }
+
+    // Restore saved edits from localStorage if available on localhost
+    const savedContent = localStorage.getItem("desorden_studio_edits_local");
     if (savedContent) {
       try {
         const edits = JSON.parse(savedContent);
@@ -72,7 +87,7 @@ export function VisualLayoutEditor() {
         setTextColor(comp.color || "#f5f5f5");
 
         if (el.classList.contains("hero-picture")) {
-          setBgOpacity(parseFloat(comp.opacity) || 0.38);
+          setBgOpacity(parseFloat(comp.opacity) || 0.45);
         }
       });
 
@@ -108,12 +123,15 @@ export function VisualLayoutEditor() {
     return () => window.removeEventListener("click", handleDeselect);
   }, []);
 
+  if (!isLocalhost) {
+    return null; // Production site remains 100% clean and pristine!
+  }
+
   // Control Handlers
   const handleFontSizeChange = (newSize: number) => {
     setFontSize(newSize);
     if (selectedEl) {
       selectedEl.style.setProperty("font-size", `${newSize}px`, "important");
-      // Apply to all nested text nodes/spans to ensure 100% override
       selectedEl.querySelectorAll<HTMLElement>("*").forEach((child) => {
         child.style.setProperty("font-size", `${newSize}px`, "important");
       });
@@ -149,7 +167,10 @@ export function VisualLayoutEditor() {
   const handleBgOpacityChange = (opacity: number) => {
     setBgOpacity(opacity);
     const pic = document.querySelector<HTMLElement>(".hero-picture");
-    if (pic) pic.style.opacity = `${opacity}`;
+    if (pic) {
+      pic.style.opacity = `${opacity}`;
+      pic.style.display = "block";
+    }
   };
 
   const handleBgScaleChange = (scale: number) => {
@@ -205,9 +226,15 @@ export function VisualLayoutEditor() {
       }
     });
 
-    localStorage.setItem("desorden_studio_edits", JSON.stringify(edits));
-    setStatusMessage("¡Edición completa guardada! Avísame por chat para sincronizar con GitHub.");
+    localStorage.setItem("desorden_studio_edits_local", JSON.stringify(edits));
+    setStatusMessage("¡Guardado local en tu navegador!");
     setTimeout(() => setStatusMessage(""), 4000);
+  };
+
+  const handleResetLocal = () => {
+    localStorage.removeItem("desorden_studio_edits_local");
+    localStorage.removeItem("desorden_studio_edits");
+    window.location.reload();
   };
 
   return (
@@ -244,7 +271,7 @@ export function VisualLayoutEditor() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ color: "#E3A008", fontWeight: "bold" }}>🛠️ ESTUDIO DESORDEN</span>
+          <span style={{ color: "#E3A008", fontWeight: "bold" }}>🛠️ ESTUDIO LOCAL (DEV)</span>
           {selectedTag && (
             <span style={{ background: "#E3A008", color: "#0a0a0a", fontSize: "10px", padding: "2px 6px", borderRadius: "3px", fontWeight: "bold" }}>
               {selectedTag.split(" ")[0]}
@@ -253,6 +280,14 @@ export function VisualLayoutEditor() {
         </div>
 
         <div style={{ display: "flex", gap: "6px" }}>
+          <button
+            type="button"
+            onClick={handleResetLocal}
+            title="Restablecer vista original"
+            style={{ background: "#333", border: "none", color: "#ccc", padding: "2px 6px", borderRadius: "3px", cursor: "pointer", fontSize: "10px" }}
+          >
+            🔄 Restablecer
+          </button>
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -424,7 +459,7 @@ export function VisualLayoutEditor() {
                 boxShadow: "0 4px 14px rgba(227,160,8,0.4)",
               }}
             >
-              💾 GUARDAR TODO
+              💾 GUARDAR LOCAL
             </button>
           </div>
         </div>
