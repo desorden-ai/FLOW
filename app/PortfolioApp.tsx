@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
+import { SocialProofCards } from "../components/SocialProofCards";
 import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
 import {
   applyEditorDocument,
@@ -20,6 +21,7 @@ const scenes = [
   ["cases", "projectes", "cases"],
   ["media-1", "projectes destacats", "media"],
   ["media-2", "projectes destacats", "media"],
+  ["social-proof-scene", "validació social", "social-proof"],
   ["contact", "contacte", "contact"],
 ] as const;
 
@@ -31,7 +33,8 @@ const navigation = [
   ["sobre nosaltres", 4],
   ["projectes", 5],
   ["projectes destacats", 6],
-  ["contacte", 8],
+  ["validació social", 8],
+  ["contacte", 9],
 ] as const;
 
 const experience = [
@@ -147,37 +150,21 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       </div>
 
       <div className="scene-deck">
-        <SceneFrame index={0} name="intro" label="introducción">
+        <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
             <header className="intro-heading">
-              <p className="micro-label" data-canvas-selector="hero-micro-label" title="Selecciona para editar">( ESTUDIO CREATIVO · DESARROLLO WEB · IA · DRON )</p>
-              <h1 className="hero-title">
-                <span className="outline-word" data-canvas-selector="hero-title-1" title="Selecciona para editar">CREAMOS</span>
-                <span className="display-name" data-canvas-selector="hero-title-2" title="Selecciona para editar">DESORDEN</span>
-              </h1>
-              <p className="hero-subtitle" data-canvas-selector="hero-subtitle" title="Selecciona para editar">
-                Tu partner tecnológico y productora audiovisual vertical (9:16). Plataformas web ultrarrápidas, experiencias con IA y contenido de impacto.
-              </p>
-              <ul className="hero-services" aria-label="Propuesta de valor de DESORDEN">
-                <li data-canvas-selector="hero-service-1">◆ <strong>Web &amp; Branding:</strong> Identidades audaces y desarrollo a medida</li>
-                <li data-canvas-selector="hero-service-2">◆ <strong>Audiovisual 9:16 &amp; Dron 4K:</strong> Producción vertical de alta conversión</li>
-                <li data-canvas-selector="hero-service-3">◆ <strong>Automatización e IA:</strong> Flujos inteligentes y escalabilidad</li>
+              <p className="outline-word" data-canvas-selector="hero-title-1" title="Selecciona para editar">EL TEU</p>
+              <p className="display-name" data-canvas-selector="hero-title-2" title="Selecciona para editar">PARTNER</p>
+              <p className="micro-label" data-canvas-selector="hero-micro-label" title="Selecciona para editar">( TECNOLÒGIC I CREATIU )</p>
+              <ul className="hero-services" aria-label="Proposta de valor de DESORDEN">
+                <li data-canvas-selector="hero-service-1">✦ Contingut visual per a xarxes socials</li>
+                <li data-canvas-selector="hero-service-2">✦ Vídeo amb IA per visibilitzar marques i comerços</li>
+                <li data-canvas-selector="hero-service-3">✦ Creació d&apos;una identitat visual coherent</li>
               </ul>
-              <div className="hero-actions">
-                <a
-                  href="https://wa.me/34640925788?text=Hola%20DESORDEN,%20quiero%20impulsar%20mi%20proyecto"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="cta-button-gold"
-                  data-canvas-selector="hero-cta"
-                >
-                  HABLAR CON UN EXPERTO ◆
-                </a>
-              </div>
             </header>
             <ProjectPicture
               file="media/hero/portada-chico-bn.webp"
-              alt="Perfil en blanco y negro del equipo creativo de DESORDEN"
+              alt="Perfil en blanc i negre del creador i director de DESORDEN"
               width={768}
               height={1028}
               className="hero-picture"
@@ -222,17 +209,21 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
           </SceneFrame>
         ))}
 
-        <SceneFrame index={8} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2><p className="contact-email" data-canvas-selector="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place" data-canvas-selector="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name" data-canvas-selector="contact-name">AGÈNCIA DESORDEN</p><p data-canvas-selector="contact-desc">Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
+        <SceneFrame index={8} name="social-proof" label="validació social">
+          <SocialProofCards />
+        </SceneFrame>
+
+        <SceneFrame index={9} name="contact" label="contacte"><div className="contact-mark" aria-hidden="true"><i /><i /><i /></div><div className="contact-copy"><h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2><p className="contact-email" data-canvas-selector="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p><p className="contact-place" data-canvas-selector="contact-place">CATALUNYA · ESPANYA</p><p className="contact-name" data-canvas-selector="contact-name">AGÈNCIA DESORDEN</p><p data-canvas-selector="contact-desc">Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p></div></SceneFrame>
       </div>
 
       <div className="fixed-ui">
-        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 09</p></header>
+        <header><button type="button" className="brand" data-go="0" aria-label="Torna a la introducció"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 10</p></header>
         <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
         <nav className="section-navigation" aria-label="Seccions de DESORDEN">
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
           <button type="button" className="section-toggle" data-menu-toggle aria-expanded="false"><span>Secció</span><b data-active-label>introducció</b><i /></button>
         </nav>
-        <div className="scroll-cue" data-scroll-cue><span>Desplaça&apos;t per explorar</span><i /></div>
+        <div className="scroll-cue" data-scroll-cue><span>Desplaça&apos; t per explorar</span><i /></div>
       </div>
 
       <div className="modal-backdrop" data-modal role="presentation" hidden>
