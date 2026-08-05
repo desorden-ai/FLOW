@@ -1,0 +1,8 @@
+.home-authority {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.home-authority span {
+  flex: 0 1 auto;
+}
