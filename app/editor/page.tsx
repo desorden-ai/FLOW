@@ -2,8 +2,10 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { EditorPositionControls } from "../../components/EditorPositionControls";
 import { PortfolioApp } from "../PortfolioApp";
 import "./editor.css";
+import "./position-controls.css";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -102,5 +104,10 @@ export default function EditorPage() {
     return <LoginScreen onLogin={() => setAuthenticated(true)} />;
   }
 
-  return <PortfolioApp enableEditor />;
+  return (
+    <>
+      <PortfolioApp enableEditor />
+      <EditorPositionControls />
+    </>
+  );
 }

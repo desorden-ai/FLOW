@@ -1,0 +1,131 @@
+.editor-position-controls {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 14px;
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.editor-position-controls__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-position-controls__heading > strong,
+.editor-size-control strong {
+  color: #f59e0b;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.editor-position-controls__heading label {
+  display: grid;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.editor-position-controls__heading select {
+  min-width: 82px;
+  min-height: 44px;
+  border: 1px solid #3b3b3b;
+  border-radius: 9px;
+  background: #191919;
+  color: #fff;
+  padding: 0 10px;
+  font-size: 16px;
+}
+
+.editor-direction-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(3, 54px);
+  justify-content: center;
+  gap: 6px;
+}
+
+.editor-direction-pad button,
+.editor-direction-pad output {
+  display: grid;
+  place-items: center;
+  min-width: 54px;
+  min-height: 54px;
+  border-radius: 12px;
+}
+
+.editor-direction-pad button {
+  border: 1px solid rgba(245, 158, 11, 0.58);
+  background: #171717;
+  color: #f59e0b;
+  font-size: 24px;
+  font-weight: 900;
+  touch-action: manipulation;
+}
+
+.editor-direction-pad button:active {
+  transform: scale(0.94);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.editor-direction-pad output {
+  border: 1px solid #333;
+  background: #101010;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.editor-size-control {
+  display: grid;
+  gap: 9px;
+}
+
+.editor-size-control > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-size-control output {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.editor-size-control input[type="range"] {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  accent-color: #f59e0b;
+}
+
+.editor-size-reset {
+  min-height: 48px;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  border-radius: 10px;
+  background: transparent;
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 360px) {
+  .editor-direction-pad {
+    grid-template-columns: repeat(3, 50px);
+    grid-template-rows: repeat(3, 50px);
+  }
+
+  .editor-direction-pad button,
+  .editor-direction-pad output {
+    min-width: 50px;
+    min-height: 50px;
+  }
+}
