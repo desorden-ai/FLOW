@@ -1,55 +1,111 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import {
+  EDITOR_DOCUMENT_ID,
+  parseStoredEditorDocument,
+  type StoredEditorDocument,
+} from "../../../lib/editor-model";
+import { getEditorKV, isEditorAuthenticated } from "../../../lib/editor-server";
 
-function getKV() {
-  return (process.env.EDITOR_KV || (globalThis as any).EDITOR_KV) as any;
+const DRAFT_KEY = `editor:${EDITOR_DOCUMENT_ID}:draft`;
+const PUBLISHED_KEY = `editor:${EDITOR_DOCUMENT_ID}:published`;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  return origin === null || origin === new URL(request.url).origin;
+}
+
+function emptyPublishedDocument(): StoredEditorDocument {
+  return {
+    documentId: EDITOR_DOCUMENT_ID,
+    version: 0,
+    data: {},
+    updatedAt: new Date(0).toISOString(),
+    publishedAt: new Date(0).toISOString(),
+  };
 }
 
 export async function GET() {
+  const kv = getEditorKV();
+  if (!kv) {
+    return NextResponse.json({ published: emptyPublishedDocument() });
+  }
+
   try {
-    const kv = getKV();
-    if (!kv) {
-      return NextResponse.json({ published_data: "{}" });
-    }
-    const data = await kv.get("published_data");
-    return NextResponse.json({ published_data: data || "{}" });
-  } catch (error) {
-    return NextResponse.json({ published_data: "{}" });
+    const stored = await kv.get(PUBLISHED_KEY);
+    const published = parseStoredEditorDocument(stored) ?? emptyPublishedDocument();
+    return NextResponse.json({ published });
+  } catch {
+    return NextResponse.json({ published: emptyPublishedDocument() });
   }
 }
 
 export async function POST(request: Request) {
+  if (!(await isEditorAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+
+  const kv = getEditorKV();
+  if (!kv) {
+    return NextResponse.json({ error: "EDITOR_KV is not configured" }, { status: 503 });
+  }
+
   try {
-    const session = cookies().get("editor_session");
-    if (!session || session.value !== "authenticated") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const body: unknown = await request.json();
+    if (!isRecord(body)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const kv = getKV();
-    if (!kv) {
-      return NextResponse.json({ error: "KV namespace not configured" }, { status: 500 });
+    if (body.documentId !== EDITOR_DOCUMENT_ID) {
+      return NextResponse.json({ error: "Invalid document" }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { version } = body;
-
-    // Get current draft
-    const draftData = await kv.get("draft_data");
-    
-    if (draftData) {
-      // Move draft to published
-      await kv.put("published_data", draftData);
-      
-      // Optionally, clear draft or keep it
-      // await kv.delete("draft_data");
+    if (
+      typeof body.version !== "number" ||
+      !Number.isSafeInteger(body.version) ||
+      body.version < 1
+    ) {
+      return NextResponse.json({ error: "Invalid version" }, { status: 400 });
     }
+
+    const storedDraft = await kv.get(DRAFT_KEY);
+    const draft = parseStoredEditorDocument(storedDraft);
+    if (!draft) {
+      return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+    }
+
+    if (body.version !== draft.version) {
+      return NextResponse.json(
+        {
+          error: "VERSION_CONFLICT",
+          currentVersion: draft.version,
+        },
+        { status: 409 },
+      );
+    }
+
+    const publishedAt = new Date().toISOString();
+    const published: StoredEditorDocument = {
+      ...draft,
+      publishedAt,
+      updatedAt: publishedAt,
+    };
+
+    await kv.put(PUBLISHED_KEY, JSON.stringify(published));
 
     return NextResponse.json({
       published: true,
-      version: version,
+      version: published.version,
+      publishedAt,
     });
-  } catch (error) {
-    console.error(error);
+  } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
