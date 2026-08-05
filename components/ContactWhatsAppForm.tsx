@@ -35,7 +35,7 @@ export function ContactWhatsAppForm() {
     }
   };
 
-  if (!hydrated) return null;
+  if (!hydrated || window.location.pathname.startsWith("/editor")) return null;
 
   const portalTarget = document.querySelector<HTMLElement>("#contact");
   const chatbotUrl = generateWhatsAppUrl("", "", "Vull informació sobre els serveis de DESORDEN.");
