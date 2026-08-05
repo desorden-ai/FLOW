@@ -8,8 +8,13 @@ export function VisualLayoutEditor() {
   const [fontSize, setFontSize] = useState<number>(16);
   const [fontFamily, setFontFamily] = useState<string>("inherit");
   const [textColor, setTextColor] = useState<string>("#f5f5f5");
+
+  // Background Image State Controls
   const [bgOpacity, setBgOpacity] = useState<number>(0.38);
+  const [bgScale, setBgScale] = useState<number>(1.0);
+  const [bgPosLeft, setBgPosLeft] = useState<number>(50);
   const [bgPosTop, setBgPosTop] = useState<number>(20);
+
   const [statusMessage, setStatusMessage] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(true);
 
@@ -23,7 +28,12 @@ export function VisualLayoutEditor() {
           const el = document.querySelector<HTMLElement>(selector);
           if (el) {
             if (data.text !== undefined && el.tagName !== "IMG") el.textContent = data.text;
-            if (data.fontSize) el.style.fontSize = data.fontSize;
+            if (data.fontSize) {
+              el.style.setProperty("font-size", data.fontSize, "important");
+              el.querySelectorAll<HTMLElement>("*").forEach((child) => {
+                child.style.setProperty("font-size", data.fontSize, "important");
+              });
+            }
             if (data.fontFamily) el.style.fontFamily = data.fontFamily;
             if (data.color) el.style.color = data.color;
             if (data.top) el.style.top = data.top;
@@ -39,7 +49,7 @@ export function VisualLayoutEditor() {
 
     // Enable 2D position dragging & selection on all blocks
     const elements = document.querySelectorAll<HTMLElement>(
-      ".intro-heading > *, .hero-picture, .intro-layout > *, .hero-services li, .cta-button-gold"
+      ".intro-heading > *, .hero-picture, .intro-layout > *, .hero-services li, .cta-button-gold, .display-name, .outline-word, .micro-label, .hero-subtitle"
     );
 
     elements.forEach((el) => {
@@ -102,7 +112,11 @@ export function VisualLayoutEditor() {
   const handleFontSizeChange = (newSize: number) => {
     setFontSize(newSize);
     if (selectedEl) {
-      selectedEl.style.fontSize = `${newSize}px`;
+      selectedEl.style.setProperty("font-size", `${newSize}px`, "important");
+      // Apply to all nested text nodes/spans to ensure 100% override
+      selectedEl.querySelectorAll<HTMLElement>("*").forEach((child) => {
+        child.style.setProperty("font-size", `${newSize}px`, "important");
+      });
     }
   };
 
@@ -117,6 +131,9 @@ export function VisualLayoutEditor() {
     setTextColor(color);
     if (selectedEl) {
       selectedEl.style.color = color;
+      selectedEl.querySelectorAll<HTMLElement>("*").forEach((child) => {
+        child.style.color = color;
+      });
     }
   };
 
@@ -128,16 +145,27 @@ export function VisualLayoutEditor() {
     selectedEl.style.top = `${currentTop + dy}px`;
   };
 
+  // Background Image Control Handlers
   const handleBgOpacityChange = (opacity: number) => {
     setBgOpacity(opacity);
     const pic = document.querySelector<HTMLElement>(".hero-picture");
     if (pic) pic.style.opacity = `${opacity}`;
   };
 
-  const handleBgPosChange = (posPercent: number) => {
-    setBgPosTop(posPercent);
+  const handleBgScaleChange = (scale: number) => {
+    setBgScale(scale);
     const img = document.querySelector<HTMLElement>(".hero-picture img");
-    if (img) img.style.objectPosition = `center ${posPercent}%`;
+    if (img) {
+      img.style.transform = `scale(${scale})`;
+      img.style.transformOrigin = "center center";
+    }
+  };
+
+  const handleBgPosChange = (xPercent: number, yPercent: number) => {
+    setBgPosLeft(xPercent);
+    setBgPosTop(yPercent);
+    const img = document.querySelector<HTMLElement>(".hero-picture img");
+    if (img) img.style.objectPosition = `${xPercent}% ${yPercent}%`;
   };
 
   const handleDeleteSelected = () => {
@@ -265,7 +293,7 @@ export function VisualLayoutEditor() {
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", marginLeft: "auto" }}>
                   <label style={{ color: "#a3a3a3" }}>Tamaño:</label>
                   <button type="button" onClick={() => handleFontSizeChange(Math.max(8, fontSize - 2))} style={btnStyle}>-</button>
-                  <span style={{ width: "24px", textAlign: "center", fontWeight: "bold" }}>{Math.round(fontSize)}</span>
+                  <span style={{ width: "28px", textAlign: "center", fontWeight: "bold" }}>{Math.round(fontSize)}px</span>
                   <button type="button" onClick={() => handleFontSizeChange(fontSize + 2)} style={btnStyle}>+</button>
                 </div>
               </div>
@@ -316,10 +344,24 @@ export function VisualLayoutEditor() {
             </div>
           )}
 
-          {/* Background Image Controls */}
+          {/* Background Image Controls (Zoom, Position & Opacity) */}
           <div style={{ borderTop: "1px dashed rgba(245,245,245,0.15)", paddingTop: "8px", marginTop: "2px" }}>
-            <div style={{ fontWeight: "bold", color: "#E3A008", marginBottom: "6px" }}>🖼️ Imagen B/N de Fondo:</div>
+            <div style={{ fontWeight: "bold", color: "#E3A008", marginBottom: "6px" }}>🖼️ Ajustar Imagen B/N de Fondo:</div>
+            
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <div>
+                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Zoom / Tamaño ({Math.round(bgScale * 100)}%):</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.05"
+                  value={bgScale}
+                  onChange={(e) => handleBgScaleChange(parseFloat(e.target.value))}
+                  style={{ width: "100%" }}
+                />
+              </div>
+
               <div>
                 <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Opacidad ({Math.round(bgOpacity * 100)}%):</label>
                 <input
@@ -332,16 +374,31 @@ export function VisualLayoutEditor() {
                   style={{ width: "100%" }}
                 />
               </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "6px" }}>
+              <div>
+                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Posición X ({bgPosLeft}%):</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={bgPosLeft}
+                  onChange={(e) => handleBgPosChange(parseInt(e.target.value, 10), bgPosTop)}
+                  style={{ width: "100%" }}
+                />
+              </div>
 
               <div>
-                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Encuadre Vertical ({bgPosTop}%):</label>
+                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Posición Y ({bgPosTop}%):</label>
                 <input
                   type="range"
                   min="0"
                   max="100"
                   step="5"
                   value={bgPosTop}
-                  onChange={(e) => handleBgPosChange(parseInt(e.target.value, 10))}
+                  onChange={(e) => handleBgPosChange(bgPosLeft, parseInt(e.target.value, 10))}
                   style={{ width: "100%" }}
                 />
               </div>
