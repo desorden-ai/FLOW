@@ -58,7 +58,7 @@ test("opens a correctly encoded WhatsApp URL", async ({ page }) => {
     }) as typeof window.open;
   });
 
-  await goToScene(page, 9);
+  await goToScene(page, 8);
   await page.getByLabel("Nom").fill("David");
   await page.getByLabel("Ubicació").fill("Sant Vicenç de Castellet");
   await page.getByLabel("Missatge").fill("Prova automatitzada");
@@ -75,7 +75,7 @@ test("opens a correctly encoded WhatsApp URL", async ({ page }) => {
 });
 
 test("has no serious or critical accessibility violations in key scenes", async ({ page }) => {
-  for (const sceneIndex of [0, 2, 5, 8, 9]) {
+  for (const sceneIndex of [0, 2, 5, 8]) {
     await goToScene(page, sceneIndex);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
