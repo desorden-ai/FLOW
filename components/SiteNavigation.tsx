@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navigationItems = [
   ["Inici", "/"],
@@ -22,9 +23,9 @@ export function SiteNavigation() {
 
   return (
     <header className="site-nav" data-open={open ? "true" : "false"}>
-      <a className="site-nav__brand" href="/" onClick={closeMenu} aria-label="DESORDEN, pàgina d'inici">
+      <Link className="site-nav__brand" href="/" onClick={closeMenu} aria-label="DESORDEN, pàgina d'inici">
         <span>DES</span><span>OR</span><span>DEN</span>
-      </a>
+      </Link>
 
       <button
         type="button"
@@ -39,13 +40,13 @@ export function SiteNavigation() {
 
       <nav id="main-navigation" className="site-nav__links" aria-label="Navegació principal">
         {navigationItems.map(([label, href]) => (
-          <a href={href} key={href} onClick={closeMenu}>{label}</a>
+          <Link href={href} key={href} onClick={closeMenu}>{label}</Link>
         ))}
       </nav>
 
       <div className="site-nav__actions">
         <a className="site-nav__phone" href="tel:+34640925788">Truca&apos;ns</a>
-        <a className="site-nav__audit" href="/#contact" onClick={closeMenu}>Sol·licitar auditoria</a>
+        <Link className="site-nav__audit" href="/#contact" onClick={closeMenu}>Sol·licitar auditoria</Link>
       </div>
     </header>
   );
