@@ -5,7 +5,6 @@ import { useEffect } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
-import { SocialProofCards } from "../components/SocialProofCards";
 import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
 import {
   applyEditorDocument,
@@ -21,7 +20,6 @@ const scenes = [
   ["cases", "casos d'èxit", "cases"],
   ["media-1", "projectes destacats", "media"],
   ["media-2", "projectes destacats", "media"],
-  ["social-proof-scene", "validació social", "social-proof"],
   ["contact", "contacte", "contact"],
 ] as const;
 
@@ -33,8 +31,7 @@ const navigation = [
   ["sobre nosaltres", 4],
   ["casos d'èxit", 5],
   ["projectes", 6],
-  ["validació social", 8],
-  ["contacte", 9],
+  ["contacte", 8],
 ] as const;
 
 const services = [
@@ -177,7 +174,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
                 Passa de coordinar cinc agències alhora. Integrem intel·ligència artificial, disseny web orientat a vendes i producció audiovisual prèmium per dominar el teu sector.
               </p>
               <div className="home-hero-actions">
-                <button type="button" className="home-button home-button--primary" data-go={9} data-canvas-selector="hero-cta-primary">Vull una auditoria gratuïta</button>
+                <button type="button" className="home-button home-button--primary" data-go={8} data-canvas-selector="hero-cta-primary">Vull una auditoria gratuïta</button>
                 <button type="button" className="home-button home-button--secondary" data-go={5} data-canvas-selector="hero-cta-secondary">Veure casos d&apos;èxit</button>
               </div>
               <div className="home-authority" aria-label="Credencials i capacitats">
@@ -253,11 +250,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
           </SceneFrame>
         ))}
 
-        <SceneFrame index={8} name="social-proof" label="validació social">
-          <SocialProofCards />
-        </SceneFrame>
-
-        <SceneFrame index={9} name="contact" label="contacte">
+        <SceneFrame index={8} name="contact" label="contacte">
           <div className="contact-mark" aria-hidden="true"><i /><i /><i /></div>
           <div className="contact-copy">
             <h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2>
@@ -270,7 +263,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       </div>
 
       <div className="fixed-ui">
-        <header><button type="button" className="brand" data-go="0" aria-label="Torna a l'inici"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 10</p></header>
+        <header><button type="button" className="brand" data-go="0" aria-label="Torna a l'inici"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 09</p></header>
         <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
         <nav className="section-navigation" aria-label="Seccions de DESORDEN">
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
