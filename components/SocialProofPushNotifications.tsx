@@ -84,6 +84,32 @@ export function SocialProofPushNotifications({
     const hero = document.querySelector<HTMLElement>(heroSelector);
     const triggerSequence = () => setHasStarted(true);
 
+    /*
+     * FLOW no desplaza el documento de forma nativa: cambia cada escena entre
+     * current, past y future. Observamos ese estado para iniciar la secuencia
+     * exactamente al abandonar la portada.
+     */
+    if (hero?.hasAttribute("data-scene")) {
+      const checkSceneState = () => {
+        if (hero.dataset.state === "past") {
+          triggerSequence();
+        }
+      };
+
+      checkSceneState();
+
+      const sceneObserver = new MutationObserver(checkSceneState);
+      sceneObserver.observe(hero, {
+        attributes: true,
+        attributeFilter: ["data-state"],
+      });
+
+      return () => sceneObserver.disconnect();
+    }
+
+    /*
+     * Fallback para páginas con scroll convencional.
+     */
     if (!hero) {
       const handleScroll = () => {
         if (window.scrollY >= window.innerHeight * 0.6) {
