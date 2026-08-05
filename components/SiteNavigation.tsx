@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
 const navigationItems = [
   ["Inici", "/"],
@@ -12,7 +13,10 @@ const navigationItems = [
 ] as const;
 
 export function SiteNavigation() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  if (pathname.startsWith("/editor")) return null;
 
   const closeMenu = () => setOpen(false);
 
