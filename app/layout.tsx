@@ -5,6 +5,7 @@ import "./globals.css";
 import "./desorden-fixes.css";
 import "./contact-form.css";
 import "./logo-tunnel.css";
+import "./social-proof-cards.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =
