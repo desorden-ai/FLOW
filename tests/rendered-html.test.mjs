@@ -10,6 +10,7 @@ async function source(path) {
 
 test("is a mobile-first semantic portfolio with controlled hydration", async () => {
   const [
+    homePage,
     page,
     layout,
     controller,
@@ -19,6 +20,8 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     logoAnimation,
     logoAssets,
     logoCss,
+    socialProof,
+    socialProofCss,
     packageJson,
     picture,
     worker,
@@ -26,6 +29,7 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     headers,
     deployWorkflow,
   ] = await Promise.all([
+    source("app/page.tsx"),
     source("app/PortfolioApp.tsx"),
     source("app/layout.tsx"),
     source("components/PortfolioController.tsx"),
@@ -35,6 +39,8 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     source("hooks/useLogoTunnelAnimation.ts"),
     source("components/logoTunnelAssets.ts"),
     source("app/logo-tunnel.css"),
+    source("components/SocialProofCards.tsx"),
+    source("app/social-proof-cards.css"),
     source("package.json"),
     source("components/ProjectPicture.tsx"),
     source("worker/index.ts"),
@@ -43,21 +49,38 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     source(".github/workflows/cloudflare-deploy.yml"),
   ]);
 
+  assert.match(homePage, /PortfolioApp/);
+  assert.doesNotMatch(homePage, /ReelToastSequence/);
 
   assert.match(page, /LogoTunnel/);
+  assert.match(page, /SocialProofCards/);
   assert.match(page, /PortfolioController/);
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
+  assert.match(page, />EL TEU</);
+  assert.match(page, />PARTNER</);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
   assert.match(page, /<div className="scene-deck">/);
+  assert.match(page, /01 \/ 10/);
   assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
   assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat/);
 
   assert.match(layout, /<html lang="ca">/);
   assert.match(layout, /DESORDEN — Contingut, IA, web i dron/);
   assert.match(layout, /ProfessionalService/);
+  assert.match(layout, /social-proof-cards\.css/);
+  assert.match(layout, /video-layout-restore\.css/);
   assert.doesNotMatch(layout, /SocialProofPushNotifications|push-notifications\.css/);
   assert.doesNotMatch(layout, /Editable Portfolio Template/);
+
+  assert.match(socialProof, /@rosalia\.vt/);
+  assert.match(socialProof, /@rozalenmusic/);
+  assert.match(socialProof, /@leiremo_oficial/);
+  assert.match(socialProof, /media\/social-proof\/rosalia\.webp/);
+  assert.match(socialProof, /media\/social-proof\/rozalen\.webp/);
+  assert.match(socialProof, /media\/social-proof\/leire\.webp/);
+  assert.match(socialProofCss, /\.scene-social-proof\[data-state="current"\]/);
+  assert.match(socialProofCss, /prefers-reduced-motion/);
 
   assert.match(controller, /^"use client"/);
   assert.match(navigation, /scene\.inert = !isCurrent/);

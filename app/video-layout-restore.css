@@ -1,0 +1,10 @@
+/* Restore the previous video-reference hero after the mobile editor refactor. */
+.intro-heading {
+  display: block !important;
+  height: auto !important;
+  align-items: initial !important;
+  justify-content: initial !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
