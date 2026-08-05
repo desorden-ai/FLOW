@@ -1,70 +1,129 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import {
+  EDITOR_DOCUMENT_ID,
+  parseEditorDocument,
+  parseStoredEditorDocument,
+  type StoredEditorDocument,
+} from "../../../lib/editor-model";
+import { getEditorKV, isEditorAuthenticated } from "../../../lib/editor-server";
 
-function getKV() {
-  return (process.env.EDITOR_KV || (globalThis as any).EDITOR_KV) as any;
+const DRAFT_KEY = `editor:${EDITOR_DOCUMENT_ID}:draft`;
+const MAX_DOCUMENT_BYTES = 200_000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function GET() {
-  try {
-    const kv = getKV();
-    if (!kv) {
-      console.warn("KV namespace not found");
-      return NextResponse.json({ draft_data: "{}" });
-    }
-    const data = await kv.get("draft_data");
-    return NextResponse.json({ draft_data: data || "{}" });
-  } catch (error) {
-    return NextResponse.json({ draft_data: "{}" });
-  }
+function isSameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  return origin === null || origin === new URL(request.url).origin;
+}
+
+function emptyDraft(): StoredEditorDocument {
+  return {
+    documentId: EDITOR_DOCUMENT_ID,
+    version: 0,
+    data: {},
+    updatedAt: new Date(0).toISOString(),
+  };
+}
+
+async function readDraft(): Promise<StoredEditorDocument> {
+  const kv = getEditorKV();
+  if (!kv) return emptyDraft();
+
+  const stored = await kv.get(DRAFT_KEY);
+  return parseStoredEditorDocument(stored) ?? emptyDraft();
 }
 
 export async function HEAD() {
-  const session = cookies().get("editor_session");
-  if (!session || session.value !== "authenticated") {
-    return new NextResponse(null, { status: 401 });
+  return new NextResponse(null, {
+    status: (await isEditorAuthenticated()) ? 200 : 401,
+  });
+}
+
+export async function GET() {
+  if (!(await isEditorAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return new NextResponse(null, { status: 200 });
+
+  const kv = getEditorKV();
+  if (!kv) {
+    return NextResponse.json({ error: "EDITOR_KV is not configured" }, { status: 503 });
+  }
+
+  try {
+    return NextResponse.json({ draft: await readDraft() });
+  } catch {
+    return NextResponse.json({ error: "Unable to read draft" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
+  if (!(await isEditorAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+
+  const kv = getEditorKV();
+  if (!kv) {
+    return NextResponse.json({ error: "EDITOR_KV is not configured" }, { status: 503 });
+  }
+
   try {
-    const session = cookies().get("editor_session");
-    if (!session || session.value !== "authenticated") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const body: unknown = await request.json();
+    if (!isRecord(body)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { editMap, version } = body;
-
-    const kv = getKV();
-    if (!kv) {
-      return NextResponse.json({ error: "KV namespace not configured" }, { status: 500 });
+    if (body.documentId !== EDITOR_DOCUMENT_ID) {
+      return NextResponse.json({ error: "Invalid document" }, { status: 400 });
     }
 
-    // Atomic version check could be implemented using metadata, but for now we trust the client or just save.
-    const currentVersionRaw = await kv.get("draft_version");
-    const currentDraftVersion = currentVersionRaw ? parseInt(currentVersionRaw, 10) : 0;
+    if (
+      typeof body.version !== "number" ||
+      !Number.isSafeInteger(body.version) ||
+      body.version < 0
+    ) {
+      return NextResponse.json({ error: "Invalid version" }, { status: 400 });
+    }
 
-    if (typeof version === "number" && version < currentDraftVersion) {
+    const data = parseEditorDocument(body.editMap);
+    const serializedData = JSON.stringify(data);
+    if (new TextEncoder().encode(serializedData).byteLength > MAX_DOCUMENT_BYTES) {
+      return NextResponse.json({ error: "Draft is too large" }, { status: 413 });
+    }
+
+    const currentDraft = await readDraft();
+    if (body.version !== currentDraft.version) {
       return NextResponse.json(
-        { error: "conflict", message: "A newer version already exists on the server." },
-        { status: 409 }
+        {
+          error: "VERSION_CONFLICT",
+          currentVersion: currentDraft.version,
+          remoteDraft: currentDraft,
+        },
+        { status: 409 },
       );
     }
 
-    const newVersion = (typeof version === "number" ? version : currentDraftVersion) + 1;
-    
-    // Save draft
-    await kv.put("draft_data", typeof editMap === "string" ? editMap : JSON.stringify(editMap));
-    await kv.put("draft_version", newVersion.toString());
+    const nextDraft: StoredEditorDocument = {
+      documentId: EDITOR_DOCUMENT_ID,
+      version: currentDraft.version + 1,
+      data,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await kv.put(DRAFT_KEY, JSON.stringify(nextDraft));
 
     return NextResponse.json({
       saved: true,
-      version: newVersion,
+      version: nextDraft.version,
+      draft: nextDraft,
     });
-  } catch (error) {
-    console.error(error);
+  } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
