@@ -1,0 +1,180 @@
+.push-toast-layer {
+  position: fixed;
+  z-index: 9999;
+  top: max(20px, calc(env(safe-area-inset-top) + 10px));
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding-inline: 12px;
+  pointer-events: none;
+}
+
+.push-toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  width: min(430px, calc(100vw - 24px));
+  min-height: 78px;
+  padding: 0.78rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(38, 38, 42, 0.88), rgba(18, 18, 21, 0.84));
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.42),
+    0 4px 14px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  text-decoration: none;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0;
+  transform: translate3d(0, -150%, 0);
+  transition:
+    transform 560ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 320ms ease;
+  will-change: transform, opacity;
+}
+
+.push-toast--entering {
+  opacity: 0;
+  transform: translate3d(0, -150%, 0);
+}
+
+.push-toast--visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.push-toast--leaving {
+  opacity: 0;
+  transform: translate3d(0, -150%, 0);
+}
+
+.push-toast__avatar {
+  display: block;
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: #111114;
+}
+
+.push-toast__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.push-toast__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.push-toast__identity strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.push-toast__verified {
+  display: block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: #1499f6;
+}
+
+.push-toast__message {
+  display: block;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .push-toast--visible:hover {
+    transform: translate3d(0, -2px, 0) scale(1.008);
+    background: linear-gradient(145deg, rgba(46, 46, 51, 0.92), rgba(23, 23, 27, 0.9));
+    box-shadow:
+      0 22px 56px rgba(0, 0, 0, 0.48),
+      0 5px 16px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+}
+
+.push-toast:focus-visible {
+  outline: 2px solid #1499f6;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .push-toast-layer {
+    padding-inline: 10px;
+  }
+
+  .push-toast {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 0.75rem;
+    width: calc(100vw - 20px);
+    min-height: 72px;
+    padding: 0.7rem 0.82rem;
+    border-radius: 19px;
+  }
+
+  .push-toast__avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .push-toast__identity strong {
+    font-size: 0.9rem;
+  }
+
+  .push-toast__verified {
+    width: 15px;
+    height: 15px;
+  }
+
+  .push-toast__message {
+    font-size: 0.84rem;
+    line-height: 1.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .push-toast {
+    transition: opacity 160ms linear;
+    transform: none;
+  }
+
+  .push-toast--entering,
+  .push-toast--leaving {
+    opacity: 0;
+    transform: none;
+  }
+
+  .push-toast--visible {
+    opacity: 1;
+    transform: none;
+  }
+}
