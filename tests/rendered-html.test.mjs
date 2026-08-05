@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("is a mobile-first semantic portfolio with controlled hydration", async () => {
+test("is a mobile-first commercial portfolio with controlled hydration", async () => {
   const [
     homePage,
     page,
@@ -22,6 +22,17 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     logoCss,
     socialProof,
     socialProofCss,
+    commercialCss,
+    siteNavigation,
+    contactForm,
+    dronePage,
+    grantsPage,
+    pricingPage,
+    aboutPage,
+    automationPage,
+    webPage,
+    grantCalculator,
+    sitemap,
     packageJson,
     picture,
     worker,
@@ -41,6 +52,17 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     source("app/logo-tunnel.css"),
     source("components/SocialProofCards.tsx"),
     source("app/social-proof-cards.css"),
+    source("app/commercial-pages.css"),
+    source("components/SiteNavigation.tsx"),
+    source("components/ContactWhatsAppForm.tsx"),
+    source("app/drons/page.tsx"),
+    source("app/ajuts/page.tsx"),
+    source("app/preus/page.tsx"),
+    source("app/sobre-nosaltres/page.tsx"),
+    source("app/ia-automatitzacio/page.tsx"),
+    source("app/disseny-web/page.tsx"),
+    source("components/GrantCalculator.tsx"),
+    source("app/sitemap.ts"),
     source("package.json"),
     source("components/ProjectPicture.tsx"),
     source("worker/index.ts"),
@@ -56,22 +78,61 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
   assert.match(page, /SocialProofCards/);
   assert.match(page, /PortfolioController/);
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
-  assert.match(page, />EL TEU</);
-  assert.match(page, />PARTNER</);
+  assert.match(page, /El teu únic/);
+  assert.match(page, /partner tecnològic i creatiu/);
+  assert.match(page, /Vull una auditoria gratuïta/);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
   assert.match(page, /<div className="scene-deck">/);
   assert.match(page, /01 \/ 10/);
   assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
-  assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat/);
+  assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat|cost ZERO/);
 
   assert.match(layout, /<html lang="ca">/);
-  assert.match(layout, /DESORDEN — Contingut, IA, web i dron/);
+  assert.match(layout, /DESORDEN — Agència creativa, IA, web i dron/);
   assert.match(layout, /ProfessionalService/);
+  assert.match(layout, /SiteNavigation/);
+  assert.match(layout, /commercial-pages\.css/);
   assert.match(layout, /social-proof-cards\.css/);
-  assert.match(layout, /video-layout-restore\.css/);
   assert.doesNotMatch(layout, /SocialProofPushNotifications|push-notifications\.css/);
   assert.doesNotMatch(layout, /Editable Portfolio Template/);
+
+  assert.match(siteNavigation, /IA i Automatització/);
+  assert.match(siteNavigation, /\/disseny-web/);
+  assert.match(siteNavigation, /\/drons/);
+  assert.match(siteNavigation, /Sol·licitar auditoria/);
+  assert.match(commercialCss, /html:has\(\.commercial-page\)/);
+  assert.match(commercialCss, /\.commercial-grid--three/);
+  assert.match(commercialCss, /\.contact-chatbot/);
+
+  assert.match(contactForm, /CHAT_MESSAGE/);
+  assert.match(contactForm, /Parlar per WhatsApp/);
+  assert.match(contactForm, /portalTarget && createPortal/);
+
+  assert.match(dronePage, /planificació legal integral/i);
+  assert.match(dronePage, /Reial decret 517\/2024/);
+  assert.doesNotMatch(dronePage, /Risc Legal ZERO|100% Legal/);
+
+  assert.match(grantsPage, /convocatòries publicades del Kit Digital consten com a tancades/);
+  assert.match(grantsPage, /GrantCalculator/);
+  assert.doesNotMatch(grantsPage, /cost ZERO|finançats fins al 100%/);
+  assert.match(grantCalculator, /3\.000 €/);
+  assert.match(grantCalculator, /6\.000 €/);
+  assert.match(grantCalculator, /12\.000 €/);
+
+  assert.match(pricingPage, /Impuls Digital/);
+  assert.match(pricingPage, /Domini Absolut/);
+  assert.match(pricingPage, /Desorden Total/);
+  assert.match(aboutPage, /Benvinguts a Desorden/);
+  assert.match(automationPage, /n8n/);
+  assert.match(webPage, /orientada a conversió/);
+
+  assert.match(sitemap, /\/ia-automatitzacio/);
+  assert.match(sitemap, /\/disseny-web/);
+  assert.match(sitemap, /\/drons/);
+  assert.match(sitemap, /\/ajuts/);
+  assert.match(sitemap, /\/preus/);
+  assert.match(sitemap, /\/sobre-nosaltres/);
 
   assert.match(socialProof, /@rosalia\.vt/);
   assert.match(socialProof, /@rozalenmusic/);
