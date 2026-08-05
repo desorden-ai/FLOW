@@ -18,8 +18,8 @@ button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 .scene-deck{position:absolute;z-index:3;inset:0;perspective:900px;transform-style:preserve-3d}
 .scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:clamp(76px,9vh,118px) clamp(34px,7vw,110px) clamp(76px,9vh,110px);opacity:0;visibility:visible;transform-origin:50% 50%;transition:opacity .72s ease,transform 1.05s cubic-bezier(.77,0,.18,1),filter .82s ease;contain:layout paint style}
 .scene[data-state="current"]{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0);pointer-events:auto;will-change:transform,opacity}
-.scene[data-state="future"]{opacity:0;transform:translate3d(0,15vh,-650px) scale(.18);filter:blur(2px);pointer-events:none}
-.scene[data-state="past"]{opacity:0;transform:translate3d(0,-16vh,420px) scale(4.2);filter:blur(2px);pointer-events:none}
+.scene[data-state="future"]{opacity:0;transform:translate3d(0,15vh,var(--scroll-z-future, -650px)) scale(var(--scroll-scale-future, .18));filter:blur(2px);pointer-events:none}
+.scene[data-state="past"]{opacity:0;transform:translate3d(0,-16vh,var(--scroll-z-past, 420px)) scale(var(--scroll-scale-past, 4.2));filter:blur(2px);pointer-events:none}
 .scene[data-distance="2"],.scene[data-distance="3"]{visibility:hidden;content-visibility:hidden}
 .scene h1,.scene h2{font-family:var(--display);font-weight:400;line-height:1.2}
 .eyebrow,.micro-label{font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--dim)}
@@ -146,5 +146,146 @@ html,body{background:#050505;width:100%;height:100%;overflow:hidden;margin:0;pad
 [draggable="true"]:active {
   cursor: grabbing;
 }
-/* DESORDEN VISUAL UPDATE — END */
+/* CANVAS STUDIO STYLES */
+.canvas-editor-active, .canvas-editor-active .site-shell {
+  touch-action: pan-y !important;
+}
+.canvas-editor-active [data-canvas-element], .canvas-editor-active [data-canvas-element] *, .resize-handle {
+  touch-action: none !important;
+}
 
+/* Prevenir auto-zoom en iOS Safari y ajustar resaltado */
+[contenteditable="true"] {
+  font-size: 16px !important;
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  -webkit-tap-highlight-color: rgba(227, 160, 8, 0.15);
+}
+
+body.canvas-editor-active [contenteditable="true"] {
+  border-bottom: 2px dashed rgba(227, 160, 8, 0.5) !important;
+  background-color: rgba(227, 160, 8, 0.04);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+body.canvas-editor-active [contenteditable="true"]:focus {
+  border-bottom: 2px solid #E3A008 !important;
+  background-color: rgba(227, 160, 8, 0.1);
+  box-shadow: 0 0 12px rgba(227, 160, 8, 0.2);
+}
+
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #E3A008;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+/* Ampliación de las Áreas Táctiles (Hitbox / Fat-Finger Fix) */
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  cursor: inherit;
+}
+
+.resize-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.resize-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.resize-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.resize-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+.resize-handle.n { top: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.resize-handle.s { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.resize-handle.e { top: 50%; right: -5px; transform: translateY(-50%); cursor: ew-resize; }
+.resize-handle.w { top: 50%; left: -5px; transform: translateY(-50%); cursor: ew-resize; }
+
+/* 3D EXPLODED LAYER INSPECTOR STYLES */
+.canvas-3d-exploded-active {
+  perspective: 1400px !important;
+  perspective-origin: 50% 40% !important;
+  overflow: visible !important;
+}
+
+.canvas-3d-exploded-active main,
+.canvas-3d-exploded-active .scene-deck {
+  transform-style: preserve-3d !important;
+  transform: rotateX(24deg) rotateY(-18deg) rotateZ(0deg) scale(0.82) !important;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 2px rgba(227, 160, 8, 0.4) !important;
+  border-radius: 16px !important;
+}
+
+.canvas-3d-exploded-active [data-canvas-element] {
+  transform-style: preserve-3d !important;
+  transition: transform 0.5s ease, box-shadow 0.5s ease, outline 0.3s ease !important;
+  outline: 1px dashed rgba(227, 160, 8, 0.4) !important;
+  outline-offset: 3px !important;
+}
+
+.canvas-3d-exploded-active [data-canvas-element]:hover {
+  outline: 2px solid #E3A008 !important;
+  box-shadow: 0 10px 30px rgba(227, 160, 8, 0.3) !important;
+}
+
+/* Touch targets for mobile handles */
+@media (max-width: 768px) {
+  .resize-handle {
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 3px !important;
+  }
+  .resize-handle.nw { top: -8px; left: -8px; }
+  .resize-handle.ne { top: -8px; right: -8px; }
+  .resize-handle.sw { bottom: -8px; left: -8px; }
+  .resize-handle.se { bottom: -8px; right: -8px; }
+  .resize-handle.n { top: -8px; }
+  .resize-handle.s { bottom: -8px; }
+  .resize-handle.e { right: -8px; }
+  .resize-handle.w { left: -8px; }
+}
+
+.editing-inline {
+  outline: 2px solid #E3A008 !important;
+  background-color: rgba(227, 160, 8, 0.15) !important;
+  border-radius: 4px !important;
+  padding: 2px 4px !important;
+  cursor: text !important;
+  font-size: 16px !important; /* Parche iOS Safari */
+  caret-color: #E3A008;
+}
+
+/* MOBILE ONLY SPECIFIC RESTRICTIONS */
+.mobile-only-message { display: none; }
+@media (min-width: 601px) {
+  body.canvas-editor-active > *:not(.mobile-only-message) { display: none !important; }
+  .mobile-only-message { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #000000; color: #ffffff; text-align: center; font-family: var(--display); }
+}
+
+.orientation-warning { display: none; }
+@media (orientation: landscape) and (max-height: 600px) {
+  body.canvas-editor-active > *:not(.orientation-warning) { visibility: hidden !important; }
+  .orientation-warning { position: fixed; inset: 0; z-index: 9999999; display: grid; place-items: center; padding: 24px; background: #000000; color: #ffffff; text-align: center; font-family: var(--display); }
+}
+
+/* EDITOR UI STATES FOR HIDDEN/DELETED ELEMENTS */
+.canvas-editor-active [data-hidden="true"] {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  outline: 2px dashed rgba(227, 160, 8, 0.5) !important;
+  filter: grayscale(100%);
+}
+.canvas-editor-active [data-deleted-at] {
+  display: none !important;
+}
+
+/* DESORDEN VISUAL UPDATE — END */
