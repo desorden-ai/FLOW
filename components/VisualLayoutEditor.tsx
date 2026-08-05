@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   EDITOR_DOCUMENT_ID,
@@ -108,17 +108,16 @@ export function VisualLayoutEditor() {
   const [version, setVersion] = useState(0);
   const [message, setMessage] = useState("");
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-
-  const historyRef = useRef<EditorDocument[]>([{}]);
-  const historyIndexRef = useRef(0);
+  const [history, setHistory] = useState<EditorDocument[]>([{}]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   const selectedEdit = selectedSelector ? editMap[selectedSelector] : undefined;
   const restorableItems = useMemo(
     () => Object.values(editMap).filter((edit) => edit.hidden || Boolean(edit.deletedAt)),
     [editMap],
   );
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   const installDocument = useCallback(
     (documentValue: EditorDocument, nextVersion: number, nextStatus: SaveStatus) => {
@@ -126,10 +125,8 @@ export function VisualLayoutEditor() {
       setEditMap(cloned);
       setVersion(nextVersion);
       setSaveStatus(nextStatus);
-      historyRef.current = [cloneEditorDocument(cloned)];
-      historyIndexRef.current = 0;
-      setCanUndo(false);
-      setCanRedo(false);
+      setHistory([cloneEditorDocument(cloned)]);
+      setHistoryIndex(0);
     },
     [],
   );
@@ -240,41 +237,41 @@ export function VisualLayoutEditor() {
   }, []);
 
   useEffect(() => {
+    if (saveStatus === "saved" || saveStatus === "idle") {
+      window.localStorage.removeItem(EDITOR_STORAGE_KEY);
+      return;
+    }
+
     const timer = window.setTimeout(() => {
       window.localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(editMap));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [editMap]);
+  }, [editMap, saveStatus]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!["dirty", "offline", "conflict", "error"].includes(saveStatus)) return;
       event.preventDefault();
+      event.returnValue = "";
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [saveStatus]);
 
-  const pushHistory = useCallback((nextDocument: EditorDocument) => {
-    const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-    nextHistory.push(cloneEditorDocument(nextDocument));
-
-    if (nextHistory.length > 30) nextHistory.shift();
-    historyRef.current = nextHistory;
-    historyIndexRef.current = nextHistory.length - 1;
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(false);
-  }, []);
-
   const commitDocument = useCallback(
     (nextDocument: EditorDocument) => {
       const cloned = cloneEditorDocument(nextDocument);
+      const nextHistory = history.slice(0, historyIndex + 1);
+      nextHistory.push(cloneEditorDocument(cloned));
+      if (nextHistory.length > 30) nextHistory.shift();
+
       setEditMap(cloned);
-      pushHistory(cloned);
+      setHistory(nextHistory);
+      setHistoryIndex(nextHistory.length - 1);
       setSaveStatus("dirty");
     },
-    [pushHistory],
+    [history, historyIndex],
   );
 
   const updateSelected = useCallback(
@@ -308,23 +305,19 @@ export function VisualLayoutEditor() {
   );
 
   const undo = () => {
-    if (historyIndexRef.current <= 0) return;
-    historyIndexRef.current -= 1;
-    const previous = cloneEditorDocument(historyRef.current[historyIndexRef.current]);
-    setEditMap(previous);
+    if (!canUndo) return;
+    const nextIndex = historyIndex - 1;
+    setHistoryIndex(nextIndex);
+    setEditMap(cloneEditorDocument(history[nextIndex]));
     setSaveStatus("dirty");
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(true);
   };
 
   const redo = () => {
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    historyIndexRef.current += 1;
-    const next = cloneEditorDocument(historyRef.current[historyIndexRef.current]);
-    setEditMap(next);
+    if (!canRedo) return;
+    const nextIndex = historyIndex + 1;
+    setHistoryIndex(nextIndex);
+    setEditMap(cloneEditorDocument(history[nextIndex]));
     setSaveStatus("dirty");
-    setCanUndo(true);
-    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
 
   const hideSelected = () => {
@@ -380,7 +373,6 @@ export function VisualLayoutEditor() {
       setVersion(payload.version);
       setSaveStatus("saved");
       setMessage("Borrador guardado.");
-      window.localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(editMap));
       safeVibrate([10, 40, 10]);
     } catch (error: unknown) {
       console.error("Unable to save editor draft", error);
