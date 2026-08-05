@@ -15,6 +15,8 @@ export function VisualLayoutEditor() {
   const [bgScale, setBgScale] = useState<number>(1.0);
   const [bgPosLeft, setBgPosLeft] = useState<number>(50);
   const [bgPosTop, setBgPosTop] = useState<number>(20);
+  const [bgOffsetX, setBgOffsetX] = useState<number>(0);
+  const [bgOffsetY, setBgOffsetY] = useState<number>(0);
 
   const [statusMessage, setStatusMessage] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(true);
@@ -179,6 +181,19 @@ export function VisualLayoutEditor() {
 
   const handleMove = (dx: number, dy: number) => {
     if (!selectedEl) return;
+
+    if (selectedEl.classList.contains("hero-picture")) {
+      const img = selectedEl.querySelector<HTMLElement>("img");
+      if (img) {
+        const nextX = bgOffsetX + dx;
+        const nextY = bgOffsetY + dy;
+        setBgOffsetX(nextX);
+        setBgOffsetY(nextY);
+        img.style.transform = `scale(${bgScale}) translate(${nextX}px, ${nextY}px)`;
+        return;
+      }
+    }
+
     const currentLeft = parseInt(selectedEl.style.left || "0", 10);
     const currentTop = parseInt(selectedEl.style.top || "0", 10);
     selectedEl.style.left = `${currentLeft + dx}px`;
@@ -199,7 +214,7 @@ export function VisualLayoutEditor() {
     setBgScale(scale);
     const img = document.querySelector<HTMLElement>(".hero-picture img");
     if (img) {
-      img.style.transform = `scale(${scale})`;
+      img.style.transform = `scale(${scale}) translate(${bgOffsetX}px, ${bgOffsetY}px)`;
       img.style.transformOrigin = "center center";
     }
   };
@@ -209,7 +224,7 @@ export function VisualLayoutEditor() {
     setBgPosTop(yPercent);
     const img = document.querySelector<HTMLElement>(".hero-picture img");
     if (img) {
-      img.style.setProperty("object-position", `${xPercent}% ${yPercent}%`, "important");
+      img.style.objectPosition = `${xPercent}% ${yPercent}%`;
     }
   };
 
@@ -387,10 +402,10 @@ export function VisualLayoutEditor() {
 
                 <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   <label style={{ color: "#a3a3a3" }}>Mover 2D:</label>
-                  <button type="button" onClick={() => handleMove(0, -5)} style={btnStyle}>⬆️</button>
-                  <button type="button" onClick={() => handleMove(0, 5)} style={btnStyle}>⬇️</button>
-                  <button type="button" onClick={() => handleMove(-5, 0)} style={btnStyle}>⬅️</button>
-                  <button type="button" onClick={() => handleMove(5, 0)} style={btnStyle}>➡️</button>
+                  <button type="button" onClick={() => handleMove(0, -10)} style={btnStyle}>⬆️</button>
+                  <button type="button" onClick={() => handleMove(0, 10)} style={btnStyle}>⬇️</button>
+                  <button type="button" onClick={() => handleMove(-10, 0)} style={btnStyle}>⬅️</button>
+                  <button type="button" onClick={() => handleMove(10, 0)} style={btnStyle}>➡️</button>
                 </div>
               </div>
 
