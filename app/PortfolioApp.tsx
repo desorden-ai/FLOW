@@ -223,7 +223,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
           <button type="button" className="section-toggle" data-menu-toggle aria-expanded="false"><span>Secció</span><b data-active-label>introducció</b><i /></button>
         </nav>
-        <div className="scroll-cue" data-scroll-cue><span>Desplaça&apos; t per explorar</span><i /></div>
+        <div className="scroll-cue" data-scroll-cue><span>Desplaça&apos;t per explorar</span><i /></div>
       </div>
 
       <div className="modal-backdrop" data-modal role="presentation" hidden>
