@@ -4,9 +4,9 @@ import { useEffect } from "react";
 
 export function VisualLayoutEditor() {
   useEffect(() => {
-    // Enable interactive drag & repositioning for visual blocks
+    // Enable interactive drag, repositioning & element deletion for visual blocks
     const elements = document.querySelectorAll<HTMLElement>(
-      ".intro-heading > *, .hero-picture, .intro-layout > *"
+      ".intro-heading > *, .hero-picture, .intro-layout > *, .hero-services li"
     );
 
     elements.forEach((el) => {
@@ -29,6 +29,14 @@ export function VisualLayoutEditor() {
         const newTop = startTop + deltaY;
         el.style.top = `${newTop}px`;
         el.setAttribute("data-custom-top", `${newTop}px`);
+      });
+
+      // Right-click or Alt+Click to instantly remove an element visually
+      el.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if (confirm("¿Quieres eliminar este elemento de la pantalla?")) {
+          el.style.display = "none";
+        }
       });
     });
   }, []);
