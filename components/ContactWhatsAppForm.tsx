@@ -1,15 +1,17 @@
 "use client";
 
-import { useSyncExternalStore, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { WHATSAPP_NUMBER, generateWhatsAppUrl } from "./whatsappMessage";
 
 const WHATSAPP_LABEL = "+34 640 92 57 88";
 const INSTAGRAM_HANDLE = "@desorden.cat";
 const INSTAGRAM_URL = "https://www.instagram.com/desorden.cat/";
+const CHAT_MESSAGE = "Hola! 👋 Busques donar-li una volta a la teva web, fer vídeos brutals o automatitzar processos? T'ajudo!";
 const subscribeToHydration = () => () => undefined;
 
 export function ContactWhatsAppForm() {
+  const [chatOpen, setChatOpen] = useState(true);
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
     () => true,
@@ -36,9 +38,9 @@ export function ContactWhatsAppForm() {
   if (!hydrated) return null;
 
   const portalTarget = document.querySelector<HTMLElement>("#contact");
-  if (!portalTarget) return null;
+  const chatbotUrl = generateWhatsAppUrl("", "", "Vull informació sobre els serveis de DESORDEN.");
 
-  return createPortal(
+  const contactForm = (
     <div className="contact-form-shell">
       <form className="contact-form" onSubmit={handleSubmit} aria-label="Formulari de contacte per WhatsApp">
         <h2>CONTACTE</h2>
@@ -91,7 +93,30 @@ export function ContactWhatsAppForm() {
           </a>
         </div>
       </form>
-    </div>,
-    portalTarget,
+    </div>
+  );
+
+  return (
+    <>
+      {portalTarget && createPortal(contactForm, portalTarget)}
+
+      <aside className="contact-chatbot" aria-label="Assistent de contacte">
+        {chatOpen && (
+          <div className="contact-chatbot__message">
+            <p>{CHAT_MESSAGE}</p>
+            <a href={chatbotUrl} target="_blank" rel="noopener noreferrer">Parlar per WhatsApp →</a>
+          </div>
+        )}
+        <button
+          type="button"
+          className="contact-chatbot__trigger"
+          aria-expanded={chatOpen}
+          aria-label={chatOpen ? "Amagar missatge de contacte" : "Obrir missatge de contacte"}
+          onClick={() => setChatOpen((current) => !current)}
+        >
+          {chatOpen ? "×" : "✦"}
+        </button>
+      </aside>
+    </>
   );
 }
