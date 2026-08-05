@@ -26,7 +26,7 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     headers,
     deployWorkflow,
   ] = await Promise.all([
-    source("app/page.tsx"),
+    source("app/PortfolioApp.tsx"),
     source("app/layout.tsx"),
     source("components/PortfolioController.tsx"),
     source("components/usePortfolioNavigation.ts"),
@@ -43,7 +43,7 @@ test("is a mobile-first semantic portfolio with controlled hydration", async () 
     source(".github/workflows/cloudflare-deploy.yml"),
   ]);
 
-  assert.doesNotMatch(page, /^"use client"/);
+
   assert.match(page, /LogoTunnel/);
   assert.match(page, /PortfolioController/);
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);

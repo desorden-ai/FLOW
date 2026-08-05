@@ -32,6 +32,8 @@ export interface CanvasElementEdit {
   textAlign?: string;
   borderRadius?: string;
   boxShadow?: string;
+  hidden?: boolean;
+  deletedAt?: number;
 }
 
 export function VisualLayoutEditor() {
@@ -97,10 +99,11 @@ export function VisualLayoutEditor() {
     }
   };
 
-  // Selected element & metadata
-  const [selectedEl, setSelectedEl] = useState<HTMLElement | null>(null);
+  // Selected element metadata
   const [selectedTag, setSelectedTag] = useState<string>("");
-  const [selectedSelector, setSelectedSelector] = useState<string>("");
+  const [selectedSelector, setSelectedSelector] = useState<string | null>(null);
+  
+  const selectedEl = selectedSelector ? document.querySelector<HTMLElement>(selectedSelector) : null;
 
   // Tabs for mobile bottom sheet
   const [activeTab, setActiveTab] = useState<'position' | 'typography' | 'style' | '3d' | 'library' | 'export' | 'restore'>('position');
@@ -135,7 +138,7 @@ export function VisualLayoutEditor() {
   const applyEditsToDOM = useCallback((editMap: Record<string, CanvasElementEdit>, resetMissing: boolean = false) => {
     // First, if resetting, clear all current edited elements not in editMap
     if (resetMissing) {
-      document.querySelectorAll<HTMLElement>("[data-edited='true'], [data-prefab='true']").forEach(el => {
+      document.querySelectorAll<HTMLElement>("[data-edited='true'], [data-prefab='true'], [data-hidden='true'], [data-deleted-at]").forEach(el => {
         const sel = el.getAttribute("data-canvas-selector") || "";
         if (!editMap[sel]) {
           if (el.hasAttribute("data-prefab")) {
@@ -143,6 +146,8 @@ export function VisualLayoutEditor() {
           } else {
             el.removeAttribute("style");
             el.removeAttribute("data-edited");
+            el.removeAttribute("data-hidden");
+            el.removeAttribute("data-deleted-at");
           }
         }
       });
@@ -189,6 +194,19 @@ export function VisualLayoutEditor() {
         if (data.textAlign) el.style.textAlign = data.textAlign;
         if (data.borderRadius) el.style.borderRadius = data.borderRadius;
         if (data.boxShadow) el.style.boxShadow = data.boxShadow;
+        
+        if (data.hidden) {
+          el.setAttribute("data-hidden", "true");
+        } else {
+          el.removeAttribute("data-hidden");
+        }
+        
+        if (data.deletedAt !== undefined) {
+          el.setAttribute("data-deleted-at", String(data.deletedAt));
+        } else {
+          el.removeAttribute("data-deleted-at");
+        }
+
         el.setAttribute("data-edited", "true");
       }
     });
@@ -314,17 +332,18 @@ export function VisualLayoutEditor() {
 
   const saveTimeout = useRef<any>(null);
 
-  // Save to LocalStorage
-  const saveToLocalStorage = useCallback(() => {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => {
+  const getEditMap = useCallback(() => {
     const editMap: Record<string, CanvasElementEdit> = {};
     const elements = document.querySelectorAll<HTMLElement>("[data-canvas-element]");
 
     elements.forEach((el) => {
       const selector = el.getAttribute("data-canvas-selector") || getUniqueSelector(el);
       const isPrefab = el.hasAttribute("data-prefab");
-      if (el.style.length > 0 || el.getAttribute("data-edited") === "true" || isPrefab) {
+      const isHidden = el.getAttribute("data-hidden") === "true";
+      const deletedAtStr = el.getAttribute("data-deleted-at");
+      const isDeleted = !!deletedAtStr;
+      
+      if (el.style.length > 0 || el.getAttribute("data-edited") === "true" || isPrefab || isHidden || isDeleted) {
         editMap[selector] = {
           isPrefab: isPrefab ? true : undefined,
           prefabTag: isPrefab ? el.tagName.toLowerCase() : undefined,
@@ -353,14 +372,23 @@ export function VisualLayoutEditor() {
           textAlign: el.style.textAlign || undefined,
           borderRadius: el.style.borderRadius || undefined,
           boxShadow: el.style.boxShadow || undefined,
+          hidden: isHidden ? true : undefined,
+          deletedAt: isDeleted ? parseInt(deletedAtStr, 10) : undefined,
         };
       }
     });
+    return editMap;
+  }, [getUniqueSelector]);
 
-    localStorage.setItem("desorden_canvas_studio_edits_v2", JSON.stringify(editMap));
+  // Save to LocalStorage
+  const saveToLocalStorage = useCallback(() => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      const editMap = getEditMap();
+      localStorage.setItem("desorden_canvas_studio_edits_v2", JSON.stringify(editMap));
       pushToHistory(editMap);
     }, 1500);
-  }, [getUniqueSelector, pushToHistory]);
+  }, [getEditMap, pushToHistory]);
 
   // Load edits from LocalStorage
   useEffect(() => {
@@ -394,7 +422,7 @@ export function VisualLayoutEditor() {
       document.querySelectorAll<HTMLElement>("[data-canvas-element]").forEach((el) => {
         el.style.outline = "none";
       });
-      setSelectedEl(null);
+      setSelectedSelector(null);
       return;
     }
 
@@ -428,7 +456,6 @@ export function VisualLayoutEditor() {
         el.style.outlineOffset = "4px";
         el.style.touchAction = "none";
 
-        setSelectedEl(el);
         setSelectedSelector(sel);
         setSelectedTag(el.className ? `.${el.className.split(" ")[0]}` : el.tagName.toLowerCase());
 
@@ -476,7 +503,6 @@ export function VisualLayoutEditor() {
       const handleTouchStart = (e: TouchEvent) => {
         if (!editorMode || e.touches.length > 1) return;
         handleSelect(e);
-        handleDoubleTap(e);
 
         const touch = e.touches[0];
         const styleLeft = parseInt(window.getComputedStyle(el).left || "0", 10);
@@ -570,7 +596,7 @@ export function VisualLayoutEditor() {
         document.querySelectorAll<HTMLElement>("[data-canvas-element]").forEach((other) => {
           other.style.outline = "none";
         });
-        setSelectedEl(null);
+        setSelectedSelector(null);
       }
     };
 
@@ -664,6 +690,7 @@ export function VisualLayoutEditor() {
       selectedEl.setAttribute("data-hidden", "true");
       selectedEl.setAttribute("data-edited", "true");
       setHasChanges(true);
+      saveToLocalStorage();
       vibrate([20, 20]);
     }
   };
@@ -673,35 +700,38 @@ export function VisualLayoutEditor() {
       selectedEl.setAttribute("data-deleted-at", Date.now().toString());
       selectedEl.setAttribute("data-edited", "true");
       setHasChanges(true);
-      setSelectedEl(null);
+      saveToLocalStorage();
+      setSelectedSelector(null);
       setIsDrawerOpen(false);
       vibrate([30, 30, 30]);
     }
   };
 
   const enableInlineEdit = () => {
-    if (!selectedEl || selectedEl.tagName === "IMG") return;
+    if (!selectedSelector) return;
+    const el = document.querySelector<HTMLElement>(selectedSelector);
+    if (!el || el.tagName === "IMG") return;
     
-    selectedEl.contentEditable = "true";
-    selectedEl.focus();
-    selectedEl.classList.add("editing-inline");
+    el.contentEditable = "true";
+    el.focus();
+    el.classList.add("editing-inline");
     setIsEditingInline(true);
     vibrate(12);
     (window as any).isTouchEditingActive = true;
     
     const handleInput = () => setHasChanges(true);
-    selectedEl.addEventListener("input", handleInput);
+    el.addEventListener("input", handleInput);
     
     // iOS auto-zoom prevention
-    const computedFont = window.getComputedStyle(selectedEl).fontSize;
+    const computedFont = window.getComputedStyle(el).fontSize;
     let originalFontSize = "";
     if (parseFloat(computedFont) < 16) {
-       originalFontSize = selectedEl.style.fontSize;
-       selectedEl.style.fontSize = "16px";
+       originalFontSize = el.style.fontSize;
+       el.style.fontSize = "16px";
     }
     
     setTimeout(() => {
-      selectedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
 
     const handlePaste = (e: ClipboardEvent) => {
@@ -716,26 +746,26 @@ export function VisualLayoutEditor() {
       selection.removeAllRanges();
       selection.addRange(range);
     };
-    (selectedEl as any)._pasteHandler = handlePaste;
-    selectedEl.addEventListener("paste", handlePaste as any);
+    (el as any)._pasteHandler = handlePaste;
+    el.addEventListener("paste", handlePaste as any);
 
     const finishEditing = () => {
       if (originalFontSize !== "") {
-         selectedEl.style.fontSize = originalFontSize;
+         el.style.fontSize = originalFontSize;
       }
-      selectedEl.contentEditable = "false";
-      selectedEl.classList.remove("editing-inline");
+      el.contentEditable = "false";
+      el.classList.remove("editing-inline");
       setIsEditingInline(false);
-      selectedEl.setAttribute("data-edited", "true");
+      el.setAttribute("data-edited", "true");
       setHasChanges(true);
       saveToLocalStorage();
-      selectedEl.removeEventListener("blur", finishEditing);
-      selectedEl.removeEventListener("input", handleInput);
-      selectedEl.removeEventListener("paste", (selectedEl as any)._pasteHandler);
+      el.removeEventListener("blur", finishEditing);
+      el.removeEventListener("input", handleInput);
+      el.removeEventListener("paste", (el as any)._pasteHandler);
       (window as any).isTouchEditingActive = false;
     };
 
-    selectedEl.addEventListener("blur", finishEditing);
+    el.addEventListener("blur", finishEditing);
   };
 
   // 3D Exploded Inspector Toggle
@@ -849,14 +879,12 @@ export function VisualLayoutEditor() {
     setSaveStatus("saving");
     
     try {
-      // Create a clean clone of the canvas layer
-      const canvas = document.getElementById("global-canvas-layer");
-      const htmlToSave = canvas ? canvas.innerHTML : "";
+      const editMap = getEditMap();
       
       const res = await fetch("/api/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html: htmlToSave, version: editorState.version })
+        body: JSON.stringify({ editMap, version: editorState.version })
       });
       
       const data = await res.json();
@@ -879,12 +907,13 @@ export function VisualLayoutEditor() {
         setSaveStatus("saved");
         vibrate([10, 50, 10]);
         // Also save to localStorage as fallback/cache
-        saveToLocalStorage();
+        localStorage.setItem("desorden_canvas_studio_edits_v2", JSON.stringify(editMap));
       }
     } catch (err) {
       console.warn("Network error, falling back to LocalStorage", err);
       setStatusMessage('Guardado en LocalStorage (Offline)');
-      saveToLocalStorage();
+      const editMap = getEditMap();
+      localStorage.setItem("desorden_canvas_studio_edits_v2", JSON.stringify(editMap));
       setHasChanges(false);
       setSaveStatus("offline");
       vibrate([50, 50, 50]);
@@ -895,6 +924,14 @@ export function VisualLayoutEditor() {
 
   const handlePublish = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    
+    if (editorState.saveStatus === "offline") {
+      setStatusMessage("⚠️ No puedes publicar sin conexión");
+      vibrate([50, 50, 50]);
+      setTimeout(() => setStatusMessage(""), 3000);
+      return;
+    }
+
     // Only allow publish if there are no unsaved changes or we just saved.
     if (editorState.hasUnsavedChanges || (editorState.saveStatus !== "saved" && editorState.saveStatus !== "offline" && editorState.saveStatus !== "idle")) {
       setStatusMessage("⚠️ Guarda los cambios primero");
@@ -1016,7 +1053,7 @@ export function VisualLayoutEditor() {
           <button type="button" onClick={handleRedo} disabled={!canRedo} style={{ color: "#fff", background: "transparent", border: "none", fontSize: "18px", opacity: canRedo ? 1 : 0.35, cursor: "pointer" }}>↪️</button>
           <button type="button" onClick={() => setEditorMode(false)} style={{ color: "#fff", background: "transparent", border: "none", fontSize: "18px", cursor: "pointer" }}>👁️</button>
           <button type="button" onClick={handleSaveDraft} style={{ color: "#fff", background: "transparent", border: "none", fontSize: "18px", cursor: "pointer" }}>💾</button>
-          <button type="button" onClick={handlePublish} style={{ color: "#000", background: "#f59e0b", border: "none", fontSize: "10px", fontWeight: 700, borderRadius: "12px", padding: "8px 4px", cursor: "pointer" }}>PUBLICAR</button>
+          <button type="button" onClick={handlePublish} style={{ color: "#000", background: "#f59e0b", border: "none", fontSize: "10px", fontWeight: 700, borderRadius: "12px", padding: "8px 4px", cursor: "pointer", opacity: editorState.saveStatus === "offline" ? 0.5 : 1 }}>PUBLICAR</button>
         </div>
       )}
 
@@ -1631,8 +1668,8 @@ export function VisualLayoutEditor() {
 }
 
 const btnStyle: React.CSSProperties = {
-  minWidth: "44px",
-  minHeight: "44px",
+  minWidth: "48px",
+  minHeight: "48px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1648,7 +1685,7 @@ const btnStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  minHeight: "44px",
+  minHeight: "48px",
   background: "#1a1a1a",
   color: "#fff",
   border: "1px solid #333",
