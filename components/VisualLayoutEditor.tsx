@@ -186,7 +186,9 @@ export function VisualLayoutEditor() {
     setBgPosLeft(xPercent);
     setBgPosTop(yPercent);
     const img = document.querySelector<HTMLElement>(".hero-picture img");
-    if (img) img.style.objectPosition = `${xPercent}% ${yPercent}%`;
+    if (img) {
+      img.style.setProperty("object-position", `${xPercent}% ${yPercent}%`, "important");
+    }
   };
 
   const handleDeleteSelected = () => {
