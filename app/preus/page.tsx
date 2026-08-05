@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CommercialCta, CommercialHero, CommercialSection } from "../../components/CommercialBlocks";
 
 export const metadata: Metadata = {
@@ -91,7 +92,7 @@ export default function PricingPage() {
         intro="Alguns serveis digitals poden ser subvencionables quan existeix una convocatòria oberta i el negoci compleix els requisits. Ho comprovem abans de pressupostar o prometre cap cobertura."
         className="commercial-section--contrast commercial-section--compact"
       >
-        <a className="commercial-inline-link" href="/ajuts">Consultar la pàgina d'ajuts →</a>
+        <Link className="commercial-inline-link" href="/ajuts">Consultar la pàgina d&apos;ajuts →</Link>
       </CommercialSection>
 
       <CommercialCta
