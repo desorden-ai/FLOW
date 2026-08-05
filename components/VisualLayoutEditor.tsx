@@ -27,11 +27,12 @@ export function VisualLayoutEditor() {
 
     if (!isDev) return; // Do not touch public production site!
 
-    // Ensure hero-picture is visible by default
+    // Ensure hero-picture is visible and clickable
     const pic = document.querySelector<HTMLElement>(".hero-picture");
     if (pic) {
       pic.style.opacity = "0.45";
       pic.style.display = "block";
+      pic.style.pointerEvents = "auto";
     }
 
     // Restore saved edits from localStorage if available on localhost
@@ -78,8 +79,15 @@ export function VisualLayoutEditor() {
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
+
+        // Clear previous selection outlines
+        elements.forEach((other) => (other.style.outline = "none"));
+
+        // Set current selection
+        el.style.outline = "2px dashed #E3A008";
+        el.style.outlineOffset = "4px";
         setSelectedEl(el);
-        setSelectedTag(el.className || el.tagName);
+        setSelectedTag(el.className ? `.${el.className.split(" ")[0]}` : el.tagName);
 
         const comp = window.getComputedStyle(el);
         setFontSize(parseFloat(comp.fontSize) || 16);
@@ -102,7 +110,7 @@ export function VisualLayoutEditor() {
       });
 
       el.addEventListener("dragend", (e) => {
-        el.style.opacity = "1";
+        el.style.opacity = el.classList.contains("hero-picture") ? `${bgOpacity}` : "1";
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
         const newLeft = startLeft + deltaX;
@@ -115,17 +123,31 @@ export function VisualLayoutEditor() {
     const handleDeselect = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest("#visual-editor-toolbar")) {
+        elements.forEach((other) => (other.style.outline = "none"));
         setSelectedEl(null);
       }
     };
 
     window.addEventListener("click", handleDeselect);
     return () => window.removeEventListener("click", handleDeselect);
-  }, []);
+  }, [bgOpacity]);
 
   if (!isLocalhost) {
     return null; // Production site remains 100% clean and pristine!
   }
+
+  const selectHeroPicture = () => {
+    const pic = document.querySelector<HTMLElement>(".hero-picture");
+    if (pic) {
+      document.querySelectorAll<HTMLElement>(".intro-heading > *, .hero-picture, .intro-layout > *").forEach((el) => {
+        el.style.outline = "none";
+      });
+      pic.style.outline = "2px dashed #E3A008";
+      pic.style.outlineOffset = "4px";
+      setSelectedEl(pic);
+      setSelectedTag(".hero-picture (Imagen B/N)");
+    }
+  };
 
   // Control Handlers
   const handleFontSizeChange = (newSize: number) => {
@@ -276,7 +298,7 @@ export function VisualLayoutEditor() {
           <span style={{ color: "#E3A008", fontWeight: "bold" }}>🛠️ ESTUDIO LOCAL (DEV)</span>
           {selectedTag && (
             <span style={{ background: "#E3A008", color: "#0a0a0a", fontSize: "10px", padding: "2px 6px", borderRadius: "3px", fontWeight: "bold" }}>
-              {selectedTag.split(" ")[0]}
+              {selectedTag}
             </span>
           )}
         </div>
@@ -284,11 +306,18 @@ export function VisualLayoutEditor() {
         <div style={{ display: "flex", gap: "6px" }}>
           <button
             type="button"
+            onClick={selectHeroPicture}
+            style={{ background: "#262626", border: "1px solid #E3A008", color: "#E3A008", padding: "2px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "10px", fontWeight: "bold" }}
+          >
+            🖼️ Seleccionar Imagen
+          </button>
+          <button
+            type="button"
             onClick={handleResetLocal}
             title="Restablecer vista original"
             style={{ background: "#333", border: "none", color: "#ccc", padding: "2px 6px", borderRadius: "3px", cursor: "pointer", fontSize: "10px" }}
           >
-            🔄 Restablecer
+            🔄
           </button>
           <button
             type="button"
@@ -357,7 +386,7 @@ export function VisualLayoutEditor() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <label style={{ color: "#a3a3a3" }}>Posición:</label>
+                  <label style={{ color: "#a3a3a3" }}>Mover 2D:</label>
                   <button type="button" onClick={() => handleMove(0, -5)} style={btnStyle}>⬆️</button>
                   <button type="button" onClick={() => handleMove(0, 5)} style={btnStyle}>⬇️</button>
                   <button type="button" onClick={() => handleMove(-5, 0)} style={btnStyle}>⬅️</button>
@@ -377,7 +406,7 @@ export function VisualLayoutEditor() {
             </>
           ) : (
             <div style={{ color: "#a3a3a3", fontStyle: "italic", textAlign: "center", padding: "4px 0" }}>
-              💡 Haz clic en cualquier texto, viñeta o botón para modificar su tipografía, tamaño o posición.
+              💡 Haz clic en cualquier texto o pulsa <strong>🖼️ Seleccionar Imagen</strong> para moverla en 2D.
             </div>
           )}
 
@@ -415,7 +444,7 @@ export function VisualLayoutEditor() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "6px" }}>
               <div>
-                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Posición X ({bgPosLeft}%):</label>
+                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Encuadre X ({bgPosLeft}%):</label>
                 <input
                   type="range"
                   min="0"
@@ -428,7 +457,7 @@ export function VisualLayoutEditor() {
               </div>
 
               <div>
-                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Posición Y ({bgPosTop}%):</label>
+                <label style={{ color: "#a3a3a3", display: "block", marginBottom: "2px" }}>Encuadre Y ({bgPosTop}%):</label>
                 <input
                   type="range"
                   min="0"
