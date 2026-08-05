@@ -20,8 +20,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     logoAnimation,
     logoAssets,
     logoCss,
-    socialProof,
-    socialProofCss,
+    pushNotifications,
+    pushNotificationsCss,
     commercialCss,
     siteNavigation,
     contactForm,
@@ -50,8 +50,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     source("hooks/useLogoTunnelAnimation.ts"),
     source("components/logoTunnelAssets.ts"),
     source("app/logo-tunnel.css"),
-    source("components/SocialProofCards.tsx"),
-    source("app/social-proof-cards.css"),
+    source("components/SocialProofPushNotifications.tsx"),
+    source("app/push-notifications.css"),
     source("app/commercial-pages.css"),
     source("components/SiteNavigation.tsx"),
     source("components/ContactWhatsAppForm.tsx"),
@@ -75,7 +75,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.doesNotMatch(homePage, /ReelToastSequence/);
 
   assert.match(page, /LogoTunnel/);
-  assert.match(page, /SocialProofCards/);
+  assert.doesNotMatch(page, /SocialProofCards/);
   assert.match(page, /PortfolioController/);
   assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
   assert.match(page, /El teu únic/);
@@ -84,7 +84,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
   assert.match(page, /<div className="scene-deck">/);
-  assert.match(page, /01 \/ 10/);
+  assert.match(page, /01 \/ 09/);
+  assert.doesNotMatch(page, /social-proof-scene|validació social/);
   assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
   assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat|cost ZERO/);
 
@@ -93,9 +94,23 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(layout, /ProfessionalService/);
   assert.match(layout, /SiteNavigation/);
   assert.match(layout, /commercial-pages\.css/);
-  assert.match(layout, /social-proof-cards\.css/);
-  assert.doesNotMatch(layout, /SocialProofPushNotifications|push-notifications\.css/);
+  assert.match(layout, /push-notifications\.css/);
+  assert.match(layout, /SocialProofPushNotifications/);
+  assert.match(layout, /heroSelector="#intro"/);
+  assert.doesNotMatch(layout, /social-proof-cards\.css/);
   assert.doesNotMatch(layout, /Editable Portfolio Template/);
+
+  assert.match(pushNotifications, /^"use client"/);
+  assert.match(pushNotifications, /createPortal/);
+  assert.match(pushNotifications, /IntersectionObserver/);
+  assert.match(pushNotifications, /@rosalia\.vt/);
+  assert.match(pushNotifications, /@rozalenmusic/);
+  assert.match(pushNotifications, /media\/social-proof\/rosalia\.webp/);
+  assert.match(pushNotifications, /media\/social-proof\/rozalen\.webp/);
+  assert.match(pushNotifications, /VISIBLE_DURATION_MS = 4_000/);
+  assert.match(pushNotificationsCss, /\.push-toast-layer/);
+  assert.match(pushNotificationsCss, /pointer-events: none/);
+  assert.match(pushNotificationsCss, /prefers-reduced-motion/);
 
   assert.match(siteNavigation, /IA i Automatització/);
   assert.match(siteNavigation, /\/disseny-web/);
@@ -133,15 +148,6 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(sitemap, /\/ajuts/);
   assert.match(sitemap, /\/preus/);
   assert.match(sitemap, /\/sobre-nosaltres/);
-
-  assert.match(socialProof, /@rosalia\.vt/);
-  assert.match(socialProof, /@rozalenmusic/);
-  assert.match(socialProof, /@leiremo_oficial/);
-  assert.match(socialProof, /media\/social-proof\/rosalia\.webp/);
-  assert.match(socialProof, /media\/social-proof\/rozalen\.webp/);
-  assert.match(socialProof, /media\/social-proof\/leire\.webp/);
-  assert.match(socialProofCss, /\.scene-social-proof\[data-state="current"\]/);
-  assert.match(socialProofCss, /prefers-reduced-motion/);
 
   assert.match(controller, /^"use client"/);
   assert.match(navigation, /scene\.inert = !isCurrent/);
