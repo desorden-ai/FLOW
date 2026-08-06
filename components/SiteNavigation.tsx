@@ -17,7 +17,7 @@ export function SiteNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  if (pathname.startsWith("/editor")) return null;
+  if (pathname === "/" || pathname.startsWith("/editor")) return null;
 
   const closeMenu = () => setOpen(false);
 
