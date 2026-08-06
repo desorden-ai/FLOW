@@ -162,11 +162,11 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         </p>
       </div>
 
+      <HeroParticlePortrait />
+
       <div className="scene-deck">
         <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
-            <HeroParticlePortrait />
-
             <header className="intro-heading">
               <p className="outline-word" data-canvas-selector="hero-partner-prefix">EL TEU</p>
               <h1 className="display-name" data-canvas-selector="hero-partner-title">PARTNER</h1>
