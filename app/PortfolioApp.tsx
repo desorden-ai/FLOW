@@ -169,8 +169,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
             <header className="intro-heading">
-              <p className="outline-word" data-canvas-selector="hero-partner-prefix">EL TEU</p>
-              <h1 className="display-name" data-canvas-selector="hero-partner-title">PARTNER</h1>
+              <h1 className="display-name hero-brand-title" data-canvas-selector="hero-brand-title">DESORDEN</h1>
               <p className="micro-label" data-canvas-selector="hero-partner-label">
                 ( TECNOLÒGIC I CREATIU )
               </p>
