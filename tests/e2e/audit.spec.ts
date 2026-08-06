@@ -30,29 +30,35 @@ test("renders the reference hero without a top menu or floating WhatsApp assista
   )).toBeGreaterThan(300);
 });
 
-test("uses two gestures for the particle phases and opens block two on the third", async ({ page }) => {
+test("opens block two on the first gesture and rebuilds the portrait in reverse", async ({ page }) => {
   const hero = page.locator("#intro");
   const pitch = page.locator("#pitch");
   const shell = page.locator(".site-shell");
   const portrait = page.locator(".hero-particle-portrait");
-
-  await page.keyboard.press("ArrowDown");
-  await expect(hero).toHaveAttribute("data-state", "current");
-  await expect.poll(async () => shell.evaluate((element) =>
-    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
-  )).toBe(0.5);
-
-  await page.keyboard.press("ArrowDown");
-  await expect(hero).toHaveAttribute("data-state", "current");
-  await expect.poll(async () => shell.evaluate((element) =>
-    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
-  )).toBe(0.72);
+  const fallback = page.locator(".hero-particle-portrait__fallback");
 
   await page.keyboard.press("ArrowDown");
   await expect(hero).toHaveAttribute("data-state", "past");
   await expect(pitch).toHaveAttribute("data-state", "current");
   await expect(portrait).toHaveAttribute("data-overlay", "pitch");
-  await expect(portrait).toBeVisible();
+  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
+  await expect(portrait).toHaveAttribute("data-particle-density-target", "0.820");
+
+  await page.keyboard.press("ArrowUp");
+  await expect(hero).toHaveAttribute("data-state", "current");
+  await expect(pitch).toHaveAttribute("data-state", "future");
+  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
+
+  await page.waitForTimeout(180);
+  await expect.poll(async () => shell.evaluate((element) =>
+    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "1"),
+  )).toBeLessThan(0.99);
+
+  await expect.poll(async () => shell.evaluate((element) =>
+    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "1"),
+  ), { timeout: 2_000 }).toBe(0);
+  await expect(portrait).toHaveAttribute("data-render-source", "html");
+  await expect(fallback).toHaveCSS("opacity", "1");
 });
 
 test("uses Catalan metadata and keeps keyboard focus inside the active scene", async ({ page }) => {
@@ -81,8 +87,8 @@ test("shows the first social proof notification with the DESORDEN theme", async 
   await expect(notification).toContainText("@rosalia.vt");
   await expect(notification).toContainText("li ha agradat el teu reel");
   await expect(toast).toHaveCSS("background-color", "rgb(0, 0, 0)");
-  await expect(toast).toHaveCSS("border-top-color", "rgb(245, 158, 11)");
-  await expect(toast).toHaveCSS("border-right-color", "rgb(245, 158, 11)");
+  await expect(toast).toHaveCSS("border-top-color", "rgb(115, 115, 115)");
+  await expect(toast).toHaveCSS("border-right-color", "rgb(115, 115, 115)");
 });
 
 test("traps modal focus, closes with Escape and restores the trigger", async ({ page }) => {
