@@ -38,7 +38,8 @@ const OUTPUT_MIME = {
   png: "image/png",
 } as const;
 const OUTPUT_QUALITY = { avif: 72, webp: 80, jpeg: 80, png: 100 } as const;
-const MEDIA_CACHE_CONTROL = "public, max-age=31536000, immutable";
+const TRANSFORM_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=2592000";
+const FALLBACK_CACHE_CONTROL = "no-store";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -118,7 +119,7 @@ async function fetchSourceImage(
 
 function sourceFallbackResponse(requestMethod: string, source: SourceImage): Response {
   const headers = new Headers({
-    "Cache-Control": MEDIA_CACHE_CONTROL,
+    "Cache-Control": FALLBACK_CACHE_CONTROL,
     "Content-Type": source.sourceType,
     "Cross-Origin-Resource-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
@@ -157,7 +158,7 @@ async function transformAndCacheImage(
 
     const headers = new Headers(transformed.headers);
     headers.set("Content-Type", OUTPUT_MIME[formatToken]);
-    headers.set("Cache-Control", MEDIA_CACHE_CONTROL);
+    headers.set("Cache-Control", TRANSFORM_CACHE_CONTROL);
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
     headers.set("X-Content-Type-Options", "nosniff");
 
