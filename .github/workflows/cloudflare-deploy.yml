@@ -24,15 +24,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node --input-type=module <<'NODE' > /tmp/deployment-status.json
-          const payload = {
-            state: "pending",
-            context: "cloudflare/deploy",
-            description: "Validating and deploying FLOW to Cloudflare",
-            target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-          };
-          process.stdout.write(JSON.stringify(payload));
-          NODE
+          cat > /tmp/deployment-status.json <<JSON
+          {
+            "state": "pending",
+            "context": "cloudflare/deploy",
+            "description": "Validating and deploying FLOW to Cloudflare",
+            "target_url": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          }
+          JSON
           curl --fail-with-body --silent --show-error \
             --request POST \
             --header "Authorization: Bearer ${GH_TOKEN}" \
@@ -48,16 +47,15 @@ jobs:
           git fetch --no-tags --depth=1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
 
-      - name: Set up Node.js 22 with nvm
+      - name: Select Node.js 22 from runner toolcache
         run: |
-          export NVM_DIR="$HOME/.nvm"
-          test -s "$NVM_DIR/nvm.sh" || (echo "nvm is not available on this runner" && exit 1)
-          . "$NVM_DIR/nvm.sh"
-          nvm install 22
-          nvm use 22
-          echo "$NVM_BIN" >> "$GITHUB_PATH"
-          node --version
-          npm --version
+          architecture="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
+          node_version_dir="$(find "$RUNNER_TOOL_CACHE/node" -mindepth 1 -maxdepth 1 -type d -name '22.*' | sort -V | tail -n 1)"
+          node_bin="${node_version_dir}/${architecture}/bin"
+          test -x "$node_bin/node" || (echo "Node.js 22 is not available in RUNNER_TOOL_CACHE" && exit 1)
+          echo "$node_bin" >> "$GITHUB_PATH"
+          "$node_bin/node" --version
+          "$node_bin/npm" --version
 
       - name: Install dependencies
         run: npm ci
