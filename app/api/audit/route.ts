@@ -216,8 +216,10 @@ export async function POST(request: Request) {
     return jsonError(403, "INVALID_ORIGIN", "Origen de la petició no permès.");
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_REQUEST_BYTES) {
+  const contentLengthHeader = request.headers.get("content-length");
+  if (!contentLengthHeader) return jsonError(411, "LENGTH_REQUIRED", "Es requereix Content-Length.");
+  const contentLength = Number(contentLengthHeader);
+  if (!Number.isSafeInteger(contentLength) || contentLength > MAX_REQUEST_BYTES) {
     return jsonError(413, "REQUEST_TOO_LARGE", "La petició és massa gran.");
   }
 

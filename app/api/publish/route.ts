@@ -57,6 +57,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "EDITOR_KV is not configured" }, { status: 503 });
   }
 
+  const contentLengthHeader = request.headers.get("content-length");
+  if (!contentLengthHeader) return NextResponse.json({ error: "Length Required" }, { status: 411 });
+  const contentLength = Number(contentLengthHeader);
+  if (!Number.isSafeInteger(contentLength) || contentLength > 5120) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) {
