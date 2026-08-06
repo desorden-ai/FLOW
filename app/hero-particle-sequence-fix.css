@@ -1,0 +1,48 @@
+/*
+ * Corrección de continuidad visual para la secuencia Hero -> bloque 2 -> bloque 3.
+ * El modo screen elimina visualmente los píxeles negros del retrato y conserva
+ * las zonas claras como polvo visible sobre el fondo oscuro de las escenas.
+ */
+
+.hero-particle-portrait__canvas {
+  filter: brightness(1.5) contrast(1.08);
+  mix-blend-mode: screen;
+}
+
+.hero-particle-portrait[data-phase="hero-particles"] .hero-particle-portrait__canvas,
+.hero-particle-portrait[data-phase="pitch-particles"] .hero-particle-portrait__canvas {
+  filter: brightness(1.62) contrast(1.12);
+}
+
+.hero-particle-portrait[data-phase="hero-particles"] .hero-particle-portrait__fallback {
+  opacity: var(--hero-fallback-opacity, 0.14) !important;
+}
+
+.hero-particle-portrait[data-overlay="pitch"],
+.hero-particle-portrait[data-overlay="leaving"] {
+  z-index: 3;
+  background: transparent !important;
+}
+
+.hero-particle-portrait[data-overlay="hidden"] {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+
+.hero-particle-portrait[data-phase="block-3-fade"] {
+  transition: opacity 720ms ease !important;
+}
+
+/* El texto del bloque 2 permanece legible mientras el polvo cruza la escena. */
+.scene-pitch .pitch-copy {
+  position: relative;
+  z-index: 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-particle-portrait,
+  .hero-particle-portrait__canvas,
+  .hero-particle-portrait__fallback {
+    transition-duration: 1ms !important;
+  }
+}
