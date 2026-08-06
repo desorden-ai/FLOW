@@ -15,6 +15,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const contentLengthHeader = request.headers.get("content-length");
+  if (!contentLengthHeader) return NextResponse.json({ error: "Length Required" }, { status: 411 });
+  const contentLength = Number(contentLengthHeader);
+  if (!Number.isSafeInteger(contentLength) || contentLength > 2048) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   try {
     const body: unknown = await request.json();
     if (!isRecord(body) || typeof body.password !== "string" || body.password.length > 256) {
