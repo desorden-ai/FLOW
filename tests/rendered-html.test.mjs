@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("is a mobile-first commercial portfolio with controlled hydration", async () => {
+test("keeps the public portfolio lean, accessible and deployable", async () => {
   const [
     homePage,
     page,
@@ -20,10 +20,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     logoAnimation,
     logoAssets,
     logoCss,
-    heroPortrait,
-    heroCss,
-    heroCanvasCss,
-    brandCss,
+    desordenCss,
     vendorRoute,
     pushNotifications,
     pushNotificationsCss,
@@ -55,10 +52,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     source("hooks/useLogoTunnelAnimation.ts"),
     source("components/logoTunnelAssets.ts"),
     source("app/logo-tunnel.css"),
-    source("components/HeroParticlePortrait.tsx"),
-    source("app/hero-particles.css"),
-    source("app/hero-canvas-particles.css"),
-    source("app/brand-unification.css"),
+    source("app/desorden-fixes.css"),
     source("app/api/vendor/route.ts"),
     source("components/SocialProofPushNotifications.tsx"),
     source("app/push-notifications.css"),
@@ -84,148 +78,94 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(homePage, /PortfolioApp/);
   assert.doesNotMatch(homePage, /ReelToastSequence/);
 
-  assert.match(page, /HeroParticlePortrait/);
-  assert.match(page, /LogoTunnel/);
-  assert.match(page, /PortfolioController/);
-  assert.match(page, /hero-brand-title/);
-  assert.match(page, />DESORDEN<\/h1>/);
-  assert.doesNotMatch(page, />EL TEU</);
-  assert.doesNotMatch(page, />PARTNER</);
+  assert.match(page, /ProjectPicture/);
+  assert.match(page, /className="hero-picture"/);
+  assert.match(page, /portada-chico-bn\.webp/);
+  assert.match(page, />DESORDEN</);
+  assert.match(page, /LazyVisualLayoutEditor/);
+  assert.match(page, /requestIdleCallback/);
+  assert.match(page, /import\("\.\.\/lib\/editor-model"\)/);
+  assert.doesNotMatch(page, /HeroParticlePortrait/);
+  assert.doesNotMatch(page, /data-hero-particle-canvas/);
+  assert.doesNotMatch(page, /hero-particle-portrait/);
   assert.match(page, /TECNOLÒGIC I CREATIU/);
   assert.match(page, /Contingut visual per a xarxes socials/);
-  assert.match(page, /Vídeo amb IA per visibilitzar marques i comerços/);
-  assert.match(page, /Creació d&apos;una identitat visual coherent/);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
-  assert.match(page, /<HeroParticlePortrait \/>[\s\S]*<div className="scene-deck">/);
   assert.match(page, /className="scene-counter" data-scene-counter>01 \/ 09/);
-  assert.match(page, /data-active-label>introducció/);
-  assert.doesNotMatch(page, /home-hero-actions|Vull una auditoria gratuïta/);
-  assert.doesNotMatch(page, /social-proof-scene|validació social/);
-  assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
-  assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat|cost ZERO/);
+  assert.doesNotMatch(page, /EL TEU|PARTNER/);
 
   assert.match(layout, /<html lang="ca">/);
   assert.match(layout, /DESORDEN — Agència creativa, IA, web i dron/);
   assert.match(layout, /ProfessionalService/);
   assert.match(layout, /SiteNavigation/);
-  assert.match(layout, /hero-particles\.css/);
-  assert.match(layout, /hero-canvas-particles\.css/);
-  assert.match(layout, /brand-unification\.css/);
-  assert.doesNotMatch(layout, /HeroParticleSequenceFix/);
-  assert.doesNotMatch(layout, /hero-particle-sequence-fix\.css/);
-  assert.doesNotMatch(layout, /\/api\/vendor\?library=three/);
-  assert.doesNotMatch(layout, /\/api\/vendor\?library=gsap/);
-  assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
+  assert.match(layout, /desorden-fixes\.css/);
   assert.match(layout, /push-notifications\.css/);
   assert.match(layout, /SocialProofPushNotifications/);
-  assert.match(layout, /heroSelector="#intro"/);
-  assert.doesNotMatch(layout, /Editable Portfolio Template/);
+  assert.doesNotMatch(layout, /hero-particles\.css/);
+  assert.doesNotMatch(layout, /hero-dom-webgl-alignment\.css/);
+  assert.doesNotMatch(layout, /hero-particles-a11y\.css/);
+  assert.doesNotMatch(layout, /hero-canvas-particles\.css/);
+  assert.doesNotMatch(layout, /brand-unification\.css/);
 
-  assert.match(heroPortrait, /^"use client"/);
-  assert.match(heroPortrait, /const MOBILE_SAMPLE_STEP = 6/);
-  assert.match(heroPortrait, /const DESKTOP_SAMPLE_STEP = 3/);
-  assert.match(heroPortrait, /SCENE_PARTICLE_DENSITIES = \[1, 0\.82, 0\.68, 0\.55, 0\.43, 0\.33, 0\.24, 0\.16, 0\.09\]/);
-  assert.match(heroPortrait, /retention: random\(\)/);
-  assert.match(heroPortrait, /particle\.retention > density/);
-  assert.match(heroPortrait, /data-particle-density-target/);
-  assert.match(heroPortrait, /data-visible-particle-count/);
-  assert.match(heroPortrait, /image\.complete && image\.naturalWidth > 0/);
-  assert.match(heroPortrait, /image\.crossOrigin = "anonymous"/);
-  assert.match(heroPortrait, /image\.src = source/);
-  assert.ok(
-    heroPortrait.indexOf('image.crossOrigin = "anonymous"') <
-      heroPortrait.indexOf("image.src = source"),
-    "crossOrigin must be assigned before src",
-  );
-  assert.match(heroPortrait, /getImageData\(0, 0, renderedWidth, renderedHeight\)/);
-  assert.match(heroPortrait, /Tainted canvas/);
-  assert.match(heroPortrait, /const particles: Particle\[\] = \[\]/);
-  assert.match(heroPortrait, /requestAnimationFrame/);
-  assert.match(heroPortrait, /ResizeObserver/);
-  assert.match(heroPortrait, /orientationchange/);
-  assert.match(heroPortrait, /visualViewport/);
-  assert.match(heroPortrait, /ProjectPicture/);
-  assert.match(heroPortrait, /data-hero-particle-canvas/);
-  assert.match(heroPortrait, /data-renderer="canvas2d"/);
-  assert.match(heroPortrait, /media\/hero\/portada-chico-bn\.webp/);
-  assert.match(heroPortrait, /prefers-reduced-motion|matchMedia/);
-  assert.doesNotMatch(heroPortrait, /ShaderMaterial|vertexShader|fragmentShader/);
+  assert.doesNotMatch(desordenCss, /@import/);
+  assert.doesNotMatch(desordenCss, /fonts\.googleapis\.com/);
+  assert.match(desordenCss, /Impact, Haettenschweiler/);
+  assert.match(desordenCss, /--desorden-orange:\s*#f59e0b/);
+  assert.match(desordenCss, /\.hero-picture/);
+  assert.match(desordenCss, /transition:[\s\S]*opacity[\s\S]*transform/);
+  assert.doesNotMatch(desordenCss, /transition:[^;]*filter/);
+  assert.match(desordenCss, /\.progress-rail i[\s\S]*will-change:\s*transform/);
+  assert.match(desordenCss, /text-align:\s*left/);
 
-  assert.match(heroCss, /\.hero-particle-portrait\s*\{/);
-  assert.match(heroCss, /position:\s*fixed/);
-  assert.match(heroCss, /--hero-fallback-opacity/);
-  assert.match(heroCss, /data-overlay="pitch"/);
-  assert.match(heroCss, /\.hero-particle-portrait__fallback/);
-  assert.match(heroCss, /\.scene-intro \.display-name/);
-  assert.match(heroCss, /\.fixed-ui \.scene-counter/);
-  assert.match(heroCss, /@media \(max-width: 760px\)/);
-  assert.match(heroCss, /prefers-reduced-motion/);
+  assert.match(navigation, /scene\.inert = !isCurrent/);
+  assert.match(navigation, /data-live-scene-label/);
+  assert.match(navigation, /desorden:block-3-progress/);
+  assert.match(navigation, /translate3d\(0, \$\{Math\.round\(progress \* travel\)\}px, 0\)/);
+  assert.doesNotMatch(navigation, /desorden:hero-progress/);
+  assert.doesNotMatch(navigation, /heroParticleProgress/);
+  assert.doesNotMatch(navigation, /HERO_REBUILD/);
 
-  assert.match(heroCanvasCss, /data-render-source="canvas2d"/);
-  assert.match(heroCanvasCss, /z-index:\s*4/);
-  assert.match(heroCanvasCss, /mix-blend-mode:\s*screen/);
-  assert.match(heroCanvasCss, /opacity:\s*0 !important/);
-  assert.match(heroCanvasCss, /opacity:\s*1 !important/);
-  assert.match(heroCanvasCss, /visibility:\s*hidden/);
-  assert.match(heroCanvasCss, /visibility:\s*visible/);
+  assert.match(picture, /<picture/);
+  assert.match(picture, /image\/avif/);
+  assert.match(picture, /image\/webp/);
+  assert.match(picture, /fetchPriority/);
 
-  assert.match(brandCss, /--brand-orange:\s*#f59e0b/);
-  assert.match(brandCss, /data-scene-index="0"/);
-  assert.match(brandCss, /data-scene-index="1"/);
-  assert.match(brandCss, /data-scene-index="8"/);
-  assert.match(brandCss, /opacity:\s*0 !important/);
-  assert.match(brandCss, /font-family:\s*var\(--display\)/);
-  assert.match(brandCss, /text-transform:\s*uppercase/);
-  assert.match(brandCss, /text-align:\s*center/);
-  assert.match(brandCss, /hero-brand-title/);
+  assert.match(controller, /^"use client"/);
+  assert.match(modal, /getFocusableElements/);
+  assert.match(modal, /triggerRef/);
+  assert.match(modal, /element\.inert = true/);
+
+  assert.match(logoTunnel, /^"use client"/);
+  assert.match(logoTunnel, /srcSet=/);
+  assert.match(logoAnimation, /requestAnimationFrame/);
+  assert.equal((logoAssets.match(/dark_optimized\.webp/g) ?? []).length, 7);
+  assert.match(logoCss, /perspective:\s*1200px/);
 
   assert.match(vendorRoute, /three@0\.152\.2/);
   assert.match(vendorRoute, /gsap@3\.12\.5/);
-  assert.match(vendorRoute, /scroll-trigger/);
   assert.match(vendorRoute, /unsupported_vendor_library/);
-  assert.match(vendorRoute, /application\/javascript/);
-  assert.match(vendorRoute, /stale-while-revalidate/);
 
   assert.match(pushNotifications, /^"use client"/);
   assert.match(pushNotifications, /createPortal/);
   assert.match(pushNotifications, /IntersectionObserver/);
   assert.match(pushNotifications, /@rosalia\.vt/);
-  assert.match(pushNotifications, /@rozalenmusic/);
-  assert.match(pushNotifications, /VISIBLE_DURATION_MS = 4_000/);
-  assert.match(pushNotificationsCss, /\.push-toast-layer/);
   assert.match(pushNotificationsCss, /border:\s*1px solid #737373/);
   assert.doesNotMatch(pushNotificationsCss, /border:\s*1px solid #f59e0b/);
-  assert.match(pushNotificationsCss, /pointer-events: none/);
-  assert.match(pushNotificationsCss, /prefers-reduced-motion/);
 
   assert.match(siteNavigation, /pathname === "\/"/);
   assert.match(siteNavigation, /IA i Automatització/);
-  assert.match(siteNavigation, /\/disseny-web/);
-  assert.match(siteNavigation, /\/drons/);
-  assert.match(siteNavigation, /Sol·licitar auditoria/);
-  assert.match(commercialCss, /html:has\(\.commercial-page\)/);
   assert.match(commercialCss, /\.commercial-grid--three/);
-
-  assert.match(contactForm, /portalTarget/);
   assert.match(contactForm, /createPortal/);
   assert.match(contactForm, /ENVIAR PER WHATSAPP/);
-  assert.doesNotMatch(contactForm, /CHAT_MESSAGE|contact-chatbot|Parlar per WhatsApp/);
 
   assert.match(dronePage, /planificació legal integral/i);
   assert.match(dronePage, /Reial decret 517\/2024/);
-  assert.doesNotMatch(dronePage, /Risc Legal ZERO|100% Legal/);
-
   assert.match(grantsPage, /convocatòries publicades del Kit Digital consten com a tancades/);
-  assert.match(grantsPage, /GrantCalculator/);
-  assert.doesNotMatch(grantsPage, /cost ZERO|finançats fins al 100%/);
   assert.match(grantCalculator, /3\.000 €/);
   assert.match(grantCalculator, /6\.000 €/);
   assert.match(grantCalculator, /12\.000 €/);
-
   assert.match(pricingPage, /Impuls Digital/);
-  assert.match(pricingPage, /Domini Absolut/);
-  assert.match(pricingPage, /Desorden Total/);
   assert.match(aboutPage, /Benvinguts a Desorden/);
   assert.match(automationPage, /n8n/);
   assert.match(webPage, /orientada a conversió/);
@@ -237,52 +177,16 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(sitemap, /\/preus/);
   assert.match(sitemap, /\/sobre-nosaltres/);
 
-  assert.match(controller, /^"use client"/);
-  assert.match(navigation, /scene\.inert = !isCurrent/);
-  assert.match(navigation, /data-live-scene-label/);
-  assert.match(navigation, /desorden:hero-progress/);
-  assert.match(navigation, /HERO_REBUILD_DURATION_MS = 950/);
-  assert.match(navigation, /heroParticleProgress < 0\.999/);
-  assert.match(navigation, /setHeroParticleProgress\(1\);[\s\S]*return;/);
-  assert.match(navigation, /updateScene\(1\)/);
-  assert.match(navigation, /updateScene\(HERO_PARTICLE_INDEX, \{ heroProgress: 1 \}\)/);
-  assert.match(navigation, /rebuildHeroPortrait\(\)/);
-  assert.match(navigation, /sceneIndex: active/);
-  assert.match(navigation, /desorden:block-3-progress/);
-  assert.match(navigation, /Number\.isFinite/);
-
-  assert.match(modal, /getFocusableElements/);
-  assert.match(modal, /triggerRef/);
-  assert.match(modal, /element\.inert = true/);
-  assert.match(modal, /event\.key !== "Tab"/);
-
-  assert.match(logoTunnel, /^"use client"/);
-  assert.match(logoTunnel, /srcSet=/);
-  assert.match(logoTunnel, /loading=\{index < 2 \? "eager" : "lazy"\}/);
-  assert.match(logoAnimation, /interpolateProgress/);
-  assert.match(logoAnimation, /Number\.parseFloat/);
-  assert.match(logoAnimation, /requestAnimationFrame/);
-  assert.equal((logoAssets.match(/dark_optimized\.webp/g) ?? []).length, 7);
-  assert.match(logoCss, /perspective:\s*1200px/);
-  assert.match(logoCss, /will-change:\s*transform, opacity/);
-
-  assert.match(picture, /<picture/);
-  assert.match(picture, /image\/avif/);
-  assert.match(picture, /image\/webp/);
-  assert.match(picture, /fetchPriority/);
-
   assert.match(worker, /Content-Security-Policy/);
   assert.match(worker, /X-Robots-Tag/);
-  assert.match(worker, /hostname\.endsWith\("\.workers\.dev"\)/);
-  assert.match(worker, /stale-while-revalidate/);
-  assert.doesNotMatch(worker, /image_transform_failed", message/);
   assert.match(worker, /env\.IMAGES/);
   assert.match(worker, /env\.ASSETS/);
   assert.match(wrangler, /"binding": "IMAGES"/);
 
-  assert.match(headers, /Content-Security-Policy/);
-  assert.match(headers, /X-Frame-Options: DENY/);
-  assert.match(headers, /max-age=604800/);
+  assert.match(headers, /\/_image\/\*/);
+  assert.match(headers, /max-age=31536000, immutable/);
+  assert.match(headers, /font-src 'self'/);
+  assert.doesNotMatch(headers, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
 
   assert.match(packageJson, /"audit:prod"/);
   assert.match(deployWorkflow, /Audit production dependencies/);

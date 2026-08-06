@@ -1,17 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-test("keeps prism gestures inside block two after the hero transition", async ({ page }) => {
+test("keeps prism gestures inside block two after the direct hero transition", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 
-  const portrait = page.locator(".hero-particle-portrait");
-  await expect(portrait).toHaveAttribute("data-renderer-status", "ready");
-  await expect(portrait).toHaveAttribute("data-particle-speed", "1.10");
-
   await page.keyboard.press("ArrowDown");
-  await expect(page.locator("#intro")).toHaveAttribute("data-state", "current");
-  await expect(page.locator("#pitch")).toHaveAttribute("data-state", "future");
-
-  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("#intro")).toHaveAttribute("data-state", "past");
   await expect(page.locator("#pitch")).toHaveAttribute("data-state", "current");
 
   const prism = page.locator("[data-text-prism]");

@@ -37,16 +37,16 @@ const OUTPUT_MIME = {
   jpeg: "image/jpeg",
   png: "image/png",
 } as const;
-const OUTPUT_QUALITY = { avif: 76, webp: 82, jpeg: 82, png: 100 } as const;
-const MEDIA_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=2592000";
+const OUTPUT_QUALITY = { avif: 72, webp: 80, jpeg: 80, png: 100 } as const;
+const MEDIA_CACHE_CONTROL = "public, max-age=31536000, immutable";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
   "form-action 'self' https://wa.me https://api.whatsapp.com",
   "img-src 'self' data:",
-  "font-src 'self' https://fonts.gstatic.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline'",
   "connect-src 'self'",
   "object-src 'none'",
@@ -118,7 +118,7 @@ async function fetchSourceImage(
 
 function sourceFallbackResponse(requestMethod: string, source: SourceImage): Response {
   const headers = new Headers({
-    "Cache-Control": "no-store",
+    "Cache-Control": MEDIA_CACHE_CONTROL,
     "Content-Type": source.sourceType,
     "Cross-Origin-Resource-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
