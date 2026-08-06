@@ -33,7 +33,7 @@ export function ContactWhatsAppForm() {
     }
   };
 
-  if (!hydrated || window.location.pathname.startsWith("/editor")) return null;
+  if (!hydrated) return null;
 
   const portalTarget = document.querySelector<HTMLElement>("#contact");
   if (!portalTarget) return null;
