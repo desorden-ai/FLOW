@@ -19,7 +19,8 @@ test("keeps CI/CD compatible with the repository-owned-actions policy", async ()
     );
 
     assert.match(content, /git fetch --no-tags --depth=1 origin/);
-    assert.match(content, /Set up Node\.js 22 with nvm/);
+    assert.match(content, /Select Node\.js 22 from runner toolcache/);
+    assert.match(content, /RUNNER_TOOL_CACHE\/node/);
   }
 });
 
