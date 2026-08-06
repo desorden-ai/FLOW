@@ -4,13 +4,13 @@ test("maps the WebGL mesh to the rendered portrait box and recalculates on resiz
   await page.goto("/", { waitUntil: "networkidle" });
 
   const portrait = page.locator(".hero-particle-portrait");
-  const fallbackImage = page.locator(".hero-particle-portrait__fallback img");
+  const fallbackLayer = page.locator(".hero-particle-portrait__fallback");
   const canvas = page.locator("[data-hero-particle-canvas]");
 
   await expect(portrait).toHaveAttribute("data-webgl", "ready");
   await expect(portrait).toHaveAttribute("data-render-source", "html");
   await expect(canvas).toHaveCSS("opacity", "0");
-  await expect(fallbackImage).toHaveCSS("opacity", "1");
+  await expect(fallbackLayer).toHaveCSS("opacity", "1");
 
   const readAlignment = async () => page.evaluate(() => {
     const wrapper = document.querySelector<HTMLElement>(".hero-particle-portrait");
@@ -49,7 +49,7 @@ test("maps the WebGL mesh to the rendered portrait box and recalculates on resiz
   await page.keyboard.press("ArrowDown");
   await expect(portrait).toHaveAttribute("data-render-source", "webgl");
   await expect(canvas).toHaveCSS("opacity", "1");
-  await expect(fallbackImage).toHaveCSS("opacity", "0");
+  await expect(fallbackLayer).toHaveCSS("opacity", "0");
 
   await page.setViewportSize({ width: 430, height: 932 });
   await expect.poll(async () => (await readAlignment()).mesh.width).toBeGreaterThan(400);
