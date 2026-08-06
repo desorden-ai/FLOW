@@ -23,6 +23,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     heroPortrait,
     heroCss,
     heroCanvasCss,
+    brandCss,
     vendorRoute,
     pushNotifications,
     pushNotificationsCss,
@@ -57,6 +58,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     source("components/HeroParticlePortrait.tsx"),
     source("app/hero-particles.css"),
     source("app/hero-canvas-particles.css"),
+    source("app/brand-unification.css"),
     source("app/api/vendor/route.ts"),
     source("components/SocialProofPushNotifications.tsx"),
     source("app/push-notifications.css"),
@@ -85,8 +87,10 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(page, /HeroParticlePortrait/);
   assert.match(page, /LogoTunnel/);
   assert.match(page, /PortfolioController/);
-  assert.match(page, />EL TEU</);
-  assert.match(page, />PARTNER</);
+  assert.match(page, /hero-brand-title/);
+  assert.match(page, />DESORDEN<\/h1>/);
+  assert.doesNotMatch(page, />EL TEU</);
+  assert.doesNotMatch(page, />PARTNER</);
   assert.match(page, /TECNOLÒGIC I CREATIU/);
   assert.match(page, /Contingut visual per a xarxes socials/);
   assert.match(page, /Vídeo amb IA per visibilitzar marques i comerços/);
@@ -107,6 +111,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(layout, /SiteNavigation/);
   assert.match(layout, /hero-particles\.css/);
   assert.match(layout, /hero-canvas-particles\.css/);
+  assert.match(layout, /brand-unification\.css/);
   assert.doesNotMatch(layout, /HeroParticleSequenceFix/);
   assert.doesNotMatch(layout, /hero-particle-sequence-fix\.css/);
   assert.doesNotMatch(layout, /\/api\/vendor\?library=three/);
@@ -164,6 +169,16 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroCanvasCss, /opacity:\s*1 !important/);
   assert.match(heroCanvasCss, /visibility:\s*hidden/);
   assert.match(heroCanvasCss, /visibility:\s*visible/);
+
+  assert.match(brandCss, /--brand-orange:\s*#f59e0b/);
+  assert.match(brandCss, /data-scene-index="0"/);
+  assert.match(brandCss, /data-scene-index="1"/);
+  assert.match(brandCss, /data-scene-index="8"/);
+  assert.match(brandCss, /opacity:\s*0 !important/);
+  assert.match(brandCss, /font-family:\s*var\(--display\)/);
+  assert.match(brandCss, /text-transform:\s*uppercase/);
+  assert.match(brandCss, /text-align:\s*center/);
+  assert.match(brandCss, /hero-brand-title/);
 
   assert.match(vendorRoute, /three@0\.152\.2/);
   assert.match(vendorRoute, /gsap@3\.12\.5/);
@@ -226,8 +241,10 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(navigation, /scene\.inert = !isCurrent/);
   assert.match(navigation, /data-live-scene-label/);
   assert.match(navigation, /desorden:hero-progress/);
-  assert.match(navigation, /HERO_REBUILD_DURATION_MS = 1_050/);
-  assert.match(navigation, /setHeroParticleProgress\(1\);[\s\S]*updateScene\(1\)/);
+  assert.match(navigation, /HERO_REBUILD_DURATION_MS = 950/);
+  assert.match(navigation, /heroParticleProgress < 0\.999/);
+  assert.match(navigation, /setHeroParticleProgress\(1\);[\s\S]*return;/);
+  assert.match(navigation, /updateScene\(1\)/);
   assert.match(navigation, /updateScene\(HERO_PARTICLE_INDEX, \{ heroProgress: 1 \}\)/);
   assert.match(navigation, /rebuildHeroPortrait\(\)/);
   assert.match(navigation, /sceneIndex: active/);
