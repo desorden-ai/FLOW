@@ -2,28 +2,14 @@ import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 const MEDIA_START = 6;
 const MEDIA_END = 7;
-const HERO_PARTICLE_INDEX = 0;
-const HERO_REBUILD_DURATION_MS = 950;
 const LOGO_TUNNEL_INDEX = 2;
 const LOGO_TUNNEL_STEP = 0.14;
 const WHEEL_LOCK_MS = 560;
-const HERO_WHEEL_LOCK_MS = 560;
 const TUNNEL_WHEEL_LOCK_MS = 170;
-
-type SceneUpdateOptions = {
-  heroProgress?: number;
-};
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
-}
-
-function easeInOutCubic(value: number) {
-  const progress = clamp(value, 0, 1);
-  return progress < 0.5
-    ? 4 * progress * progress * progress
-    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 }
 
 export function usePortfolioNavigation(
@@ -32,31 +18,10 @@ export function usePortfolioNavigation(
   closeMenu: () => void,
 ) {
   const activeRef = useRef(0);
-  const heroParticleProgressRef = useRef(0);
   const logoTunnelProgressRef = useRef(0);
   const wheelLockedRef = useRef(false);
   const wheelUnlockTimerRef = useRef<number | null>(null);
-  const heroRebuildFrameRef = useRef<number | null>(null);
   const touchStartRef = useRef<number | null>(null);
-
-  const emitHeroParticleProgress = useCallback(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const progress = clamp(heroParticleProgressRef.current, 0, 1);
-    const active = activeRef.current;
-
-    root.style.setProperty("--hero-particle-progress", String(progress));
-    root.dispatchEvent(
-      new CustomEvent("desorden:hero-progress", {
-        detail: {
-          progress,
-          active: active === HERO_PARTICLE_INDEX,
-          sceneIndex: active,
-        },
-      }),
-    );
-  }, [rootRef]);
 
   const emitLogoTunnelProgress = useCallback(() => {
     const root = rootRef.current;
@@ -81,13 +46,10 @@ export function usePortfolioNavigation(
     if (!root) return;
 
     const active = activeRef.current;
-    const heroParticleProgress = heroParticleProgressRef.current;
     const logoTunnelProgress = logoTunnelProgressRef.current;
-    const visualIndex = active === HERO_PARTICLE_INDEX
-      ? active + heroParticleProgress
-      : active === LOGO_TUNNEL_INDEX
-        ? active + logoTunnelProgress
-        : active;
+    const visualIndex = active === LOGO_TUNNEL_INDEX
+      ? active + logoTunnelProgress
+      : active;
     const progress = sceneCount > 1
       ? clamp(visualIndex / (sceneCount - 1), 0, 1)
       : 0;
@@ -95,16 +57,14 @@ export function usePortfolioNavigation(
     root.style.setProperty("--progress", String(progress));
 
     const progressBar = root.querySelector<HTMLElement>("[data-progress-bar]");
-    if (progressBar) {
-      progressBar.style.top = `calc(${progress * 100}% - ${progress * 76}px)`;
+    const progressRail = progressBar?.parentElement;
+
+    if (progressBar && progressRail) {
+      const travel = Math.max(0, progressRail.clientHeight - progressBar.offsetHeight);
+      progressBar.style.top = "0";
+      progressBar.style.transform = `translate3d(0, ${Math.round(progress * travel)}px, 0)`;
     }
   }, [rootRef, sceneCount]);
-
-  const setHeroParticleProgress = useCallback((next: number) => {
-    heroParticleProgressRef.current = clamp(next, 0, 1);
-    updateProgressUI();
-    emitHeroParticleProgress();
-  }, [updateProgressUI, emitHeroParticleProgress]);
 
   const setLogoTunnelProgress = useCallback((next: number) => {
     logoTunnelProgressRef.current = clamp(next, 0, 1);
@@ -112,13 +72,7 @@ export function usePortfolioNavigation(
     emitLogoTunnelProgress();
   }, [updateProgressUI, emitLogoTunnelProgress]);
 
-  const cancelHeroRebuild = useCallback(() => {
-    if (heroRebuildFrameRef.current === null) return;
-    window.cancelAnimationFrame(heroRebuildFrameRef.current);
-    heroRebuildFrameRef.current = null;
-  }, []);
-
-  const updateScene = useCallback((next: number, options?: SceneUpdateOptions) => {
+  const updateScene = useCallback((next: number) => {
     const root = rootRef.current;
     if (!root) return;
 
@@ -132,12 +86,6 @@ export function usePortfolioNavigation(
 
     const previousActive = activeRef.current;
     const nextActive = clamp(next, 0, Math.max(0, sceneCount - 1));
-
-    if (nextActive === HERO_PARTICLE_INDEX && previousActive !== HERO_PARTICLE_INDEX) {
-      heroParticleProgressRef.current = clamp(options?.heroProgress ?? 0, 0, 1);
-    } else if (previousActive === HERO_PARTICLE_INDEX && nextActive > HERO_PARTICLE_INDEX) {
-      heroParticleProgressRef.current = 1;
-    }
 
     if (nextActive === LOGO_TUNNEL_INDEX && previousActive !== LOGO_TUNNEL_INDEX) {
       logoTunnelProgressRef.current = previousActive > LOGO_TUNNEL_INDEX ? 1 : 0;
@@ -179,70 +127,19 @@ export function usePortfolioNavigation(
     if (marquee) marquee.hidden = active < MEDIA_START || active > MEDIA_END;
 
     updateProgressUI();
-    emitHeroParticleProgress();
     emitLogoTunnelProgress();
     closeMenu();
   }, [
     rootRef,
     sceneCount,
     updateProgressUI,
-    emitHeroParticleProgress,
     emitLogoTunnelProgress,
     closeMenu,
   ]);
 
-  const rebuildHeroPortrait = useCallback(() => {
-    cancelHeroRebuild();
-    const startedAt = performance.now();
-
-    const frame = (timestamp: number) => {
-      const elapsed = timestamp - startedAt;
-      const progress = clamp(elapsed / HERO_REBUILD_DURATION_MS, 0, 1);
-      setHeroParticleProgress(1 - easeInOutCubic(progress));
-
-      if (progress < 1) {
-        heroRebuildFrameRef.current = window.requestAnimationFrame(frame);
-      } else {
-        heroRebuildFrameRef.current = null;
-        setHeroParticleProgress(0);
-      }
-    };
-
-    heroRebuildFrameRef.current = window.requestAnimationFrame(frame);
-  }, [cancelHeroRebuild, setHeroParticleProgress]);
-
   const advance = useCallback((direction: 1 | -1, intensity = 1) => {
     const active = activeRef.current;
-    const heroParticleProgress = heroParticleProgressRef.current;
     const logoTunnelProgress = logoTunnelProgressRef.current;
-
-    if (active === HERO_PARTICLE_INDEX && direction > 0) {
-      cancelHeroRebuild();
-
-      if (heroParticleProgress < 0.999) {
-        setHeroParticleProgress(1);
-        return;
-      }
-
-      updateScene(1);
-      return;
-    }
-
-    if (
-      active === HERO_PARTICLE_INDEX &&
-      direction < 0 &&
-      heroParticleProgress > 0.001
-    ) {
-      rebuildHeroPortrait();
-      return;
-    }
-
-    if (active === 1 && direction < 0) {
-      cancelHeroRebuild();
-      updateScene(HERO_PARTICLE_INDEX, { heroProgress: 1 });
-      rebuildHeroPortrait();
-      return;
-    }
 
     if (active === LOGO_TUNNEL_INDEX) {
       const atStart = logoTunnelProgress <= 0.001;
@@ -259,15 +156,8 @@ export function usePortfolioNavigation(
       }
     }
 
-    cancelHeroRebuild();
     updateScene(active + direction);
-  }, [
-    cancelHeroRebuild,
-    rebuildHeroPortrait,
-    setHeroParticleProgress,
-    setLogoTunnelProgress,
-    updateScene,
-  ]);
+  }, [setLogoTunnelProgress, updateScene]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -280,11 +170,10 @@ export function usePortfolioNavigation(
       wheelUnlockTimerRef.current = null;
     };
 
-    const getActiveLockDuration = () => {
-      if (activeRef.current === HERO_PARTICLE_INDEX) return HERO_WHEEL_LOCK_MS;
-      if (activeRef.current === LOGO_TUNNEL_INDEX) return TUNNEL_WHEEL_LOCK_MS;
-      return WHEEL_LOCK_MS;
-    };
+    const getActiveLockDuration = () =>
+      activeRef.current === LOGO_TUNNEL_INDEX
+        ? TUNNEL_WHEEL_LOCK_MS
+        : WHEEL_LOCK_MS;
 
     const getGestureIntensity = (distance: number) => {
       if (activeRef.current === LOGO_TUNNEL_INDEX) {
@@ -341,11 +230,9 @@ export function usePortfolioNavigation(
         advance(-1, 1);
       } else if (event.key === "Home") {
         event.preventDefault();
-        cancelHeroRebuild();
         updateScene(0);
       } else if (event.key === "End") {
         event.preventDefault();
-        cancelHeroRebuild();
         updateScene(sceneCount - 1);
       }
     };
@@ -356,11 +243,10 @@ export function usePortfolioNavigation(
       if (!goButton) return;
 
       const next = Number(goButton.dataset.go);
-      if (Number.isFinite(next)) {
-        cancelHeroRebuild();
-        updateScene(next);
-      }
+      if (Number.isFinite(next)) updateScene(next);
     };
+
+    const onResize = () => updateProgressUI();
 
     root.addEventListener("wheel", onWheel, { passive: false });
     root.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -368,6 +254,7 @@ export function usePortfolioNavigation(
     root.addEventListener("touchcancel", onTouchCancel, { passive: true });
     root.addEventListener("click", onClick);
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize, { passive: true });
 
     updateScene(0);
 
@@ -378,11 +265,11 @@ export function usePortfolioNavigation(
       root.removeEventListener("touchcancel", onTouchCancel);
       root.removeEventListener("click", onClick);
       window.removeEventListener("keydown", onKeyDown);
-      cancelHeroRebuild();
+      window.removeEventListener("resize", onResize);
 
       if (wheelUnlockTimerRef.current !== null) {
         window.clearTimeout(wheelUnlockTimerRef.current);
       }
     };
-  }, [rootRef, sceneCount, advance, updateScene, cancelHeroRebuild]);
+  }, [rootRef, sceneCount, advance, updateScene, updateProgressUI]);
 }
