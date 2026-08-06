@@ -91,7 +91,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(page, /Creació d&apos;una identitat visual coherent/);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
-  assert.match(page, /<div className="scene-deck">/);
+  assert.match(page, /<HeroParticlePortrait \/>[\s\S]*<div className="scene-deck">/);
   assert.match(page, /className="scene-counter" data-scene-counter>01 \/ 09/);
   assert.match(page, /data-active-label>introducció/);
   assert.doesNotMatch(page, /home-hero-actions|Vull una auditoria gratuïta/);
@@ -117,9 +117,17 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroPortrait, /ShaderMaterial/);
   assert.match(heroPortrait, /vertexShader/);
   assert.match(heroPortrait, /fragmentShader/);
-  assert.match(heroPortrait, /uDisperse/);
-  assert.match(heroPortrait, /uDepth/);
-  assert.match(heroPortrait, /uFade/);
+  assert.match(heroPortrait, /const GRID_WIDTH = 200/);
+  assert.match(heroPortrait, /const GRID_HEIGHT = 300/);
+  assert.match(heroPortrait, /const PARTICLE_COUNT = GRID_WIDTH \* GRID_HEIGHT/);
+  assert.match(heroPortrait, /attribute vec2 aUv/);
+  assert.match(heroPortrait, /uniform sampler2D uTexture/);
+  assert.match(heroPortrait, /texture2D\(uTexture, sampleUv\)/);
+  assert.match(heroPortrait, /uDisperse: \{ value: 0 \}/);
+  assert.match(heroPortrait, /uFade: \{ value: 0 \}/);
+  assert.match(heroPortrait, /gl_PointSize = uPointSize \* perspective \* solidCoverage/);
+  assert.match(heroPortrait, /wrapper\.dataset\.particleCount = String\(PARTICLE_COUNT\)/);
+  assert.match(heroPortrait, /HERO_HANDOFF_PROGRESS = 0\.72/);
   assert.match(heroPortrait, /ScrollTrigger/);
   assert.match(heroPortrait, /ProjectPicture/);
   assert.match(heroPortrait, /data-hero-particle-canvas/);
@@ -129,6 +137,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
 
   assert.match(heroCss, /\.hero-particle-portrait\s*\{/);
   assert.match(heroCss, /position:\s*fixed/);
+  assert.match(heroCss, /--hero-fallback-opacity/);
+  assert.match(heroCss, /data-overlay="pitch"/);
   assert.match(heroCss, /\.hero-particle-portrait__fallback/);
   assert.match(heroCss, /\.scene-intro \.display-name/);
   assert.match(heroCss, /\.fixed-ui \.scene-counter/);
@@ -194,7 +204,10 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(navigation, /scene\.inert = !isCurrent/);
   assert.match(navigation, /data-live-scene-label/);
   assert.match(navigation, /desorden:hero-progress/);
-  assert.match(navigation, /HERO_PARTICLE_STEP/);
+  assert.match(navigation, /HERO_PHASE_ONE_PROGRESS = 0\.5/);
+  assert.match(navigation, /HERO_HANDOFF_PROGRESS = 0\.72/);
+  assert.match(navigation, /sceneIndex: active/);
+  assert.match(navigation, /updateScene\(1\)/);
   assert.match(navigation, /desorden:block-3-progress/);
   assert.match(navigation, /Number\.isFinite/);
 

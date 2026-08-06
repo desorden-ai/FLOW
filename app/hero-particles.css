@@ -5,7 +5,7 @@
 .scene-intro {
   padding: 0 !important;
   overflow: hidden !important;
-  background: #000 !important;
+  background: transparent !important;
 }
 
 .scene-intro .intro-layout {
@@ -15,16 +15,27 @@
   min-height: 100svh !important;
   display: block !important;
   isolation: isolate;
-  background: #000 !important;
+  background: transparent !important;
 }
 
 .hero-particle-portrait {
   position: fixed;
-  z-index: 0;
+  z-index: 2;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   background: #000;
+  opacity: var(--hero-layer-opacity, 1);
+  transition: opacity 280ms ease;
+  will-change: opacity;
+}
+
+.hero-particle-portrait[data-overlay="pitch"] {
+  background: transparent;
+}
+
+.hero-particle-portrait[data-overlay="hidden"] {
+  opacity: 0;
 }
 
 .hero-particle-portrait__fallback,
@@ -38,8 +49,8 @@
 
 .hero-particle-portrait__fallback {
   z-index: 0;
-  opacity: 1;
-  transition: opacity 560ms ease;
+  opacity: var(--hero-fallback-opacity, 1);
+  transition: opacity 240ms linear;
   will-change: opacity;
 }
 
@@ -53,8 +64,12 @@
   filter: grayscale(1) brightness(1.04) contrast(1.18) !important;
 }
 
+/*
+ * WebGL no oculta la fotografía al inicializarse. La imagen HTML permanece
+ * totalmente visible en progreso 0 y se retira al comenzar la dispersión.
+ */
 .hero-particle-portrait[data-webgl="ready"] .hero-particle-portrait__fallback {
-  opacity: 0;
+  opacity: var(--hero-fallback-opacity, 1);
 }
 
 .hero-particle-portrait[data-webgl="fallback"] .hero-particle-portrait__fallback {
@@ -65,7 +80,7 @@
   z-index: 1;
   display: block;
   opacity: 0;
-  transition: opacity 560ms ease;
+  transition: opacity 320ms ease;
   transform: translateZ(0);
   will-change: opacity;
 }
@@ -77,6 +92,8 @@
 .hero-particle-portrait__veil {
   z-index: 2;
   pointer-events: none;
+  opacity: var(--hero-veil-opacity, 1);
+  transition: opacity 360ms ease;
   background:
     linear-gradient(
       to bottom,
@@ -160,6 +177,13 @@
   margin-right: 0.45rem;
   color: rgba(246, 149, 4, 0.62);
   transform: translateY(-0.02em);
+}
+
+/* El bloque 2 queda por encima de la nube durante el handoff. */
+.scene-pitch .pitch-copy {
+  position: relative;
+  z-index: 4;
+  text-shadow: 0 4px 28px rgba(0, 0, 0, 0.78);
 }
 
 /* UI fija inspirada en la referencia. */
@@ -348,8 +372,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-particle-portrait,
   .hero-particle-portrait__fallback,
   .hero-particle-portrait__canvas,
+  .hero-particle-portrait__veil,
   .scene-intro .intro-heading {
     transition: none !important;
   }

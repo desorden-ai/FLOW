@@ -3,72 +3,111 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { ProjectPicture } from "./ProjectPicture";
 
-const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js";
-const GSAP_CDN = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js";
-const SCROLL_TRIGGER_CDN = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js";
+const THREE_VENDOR = "/api/vendor?library=three";
+const GSAP_VENDOR = "/api/vendor?library=gsap";
+const SCROLL_TRIGGER_VENDOR = "/api/vendor?library=scroll-trigger";
+const GRID_WIDTH = 200;
+const GRID_HEIGHT = 300;
+const PARTICLE_COUNT = GRID_WIDTH * GRID_HEIGHT;
+const HERO_HANDOFF_PROGRESS = 0.72;
 const subscribeToHydration = () => () => undefined;
 
 const vertexShader = `
+  attribute vec2 aUv;
   attribute vec3 aScatter;
   attribute float aDepth;
   attribute float aSeed;
-  attribute float aLuma;
 
   uniform float uDisperse;
   uniform float uDepth;
+  uniform float uFade;
   uniform float uPointSize;
   uniform float uTime;
 
-  varying float vLuma;
-  varying float vParticleAlpha;
+  varying vec2 vUv;
+  varying float vDisperse;
+  varying float vFade;
 
   void main() {
     float phaseOne = smoothstep(0.0, 1.0, uDisperse);
     float phaseTwo = smoothstep(0.0, 1.0, uDepth);
-    float flutter = sin((uTime * 0.85) + (aSeed * 31.4159)) * 0.045 * phaseOne;
+    float acceleratedDepth = pow(phaseTwo, 1.65);
 
+    // En uDisperse = 0.0 la posición coincide exactamente con la cuadrícula UV.
     vec3 transformed = position;
+
+    float flutter = sin((uTime * 0.9) + (aSeed * 31.4159)) * 0.055 * phaseOne;
     transformed += aScatter * phaseOne;
     transformed.xy += vec2(
       cos((aSeed * 41.0) + uTime),
-      sin((aSeed * 29.0) + uTime * 0.8)
+      sin((aSeed * 29.0) + uTime * 0.82)
     ) * flutter;
 
-    transformed.z += aDepth * phaseTwo * 5.8;
-    transformed.xy += aScatter.xy * phaseTwo * 1.45;
+    // Segunda fase: el polvo acelera hacia cámara y se abre lateralmente.
+    transformed.z += aDepth * acceleratedDepth * 6.35;
+    transformed.xy += aScatter.xy * acceleratedDepth * 1.65;
 
     vec4 modelPosition = modelViewMatrix * vec4(transformed, 1.0);
-    float perspective = clamp(2.9 / max(0.55, -modelPosition.z), 0.42, 3.1);
+    float perspective = clamp(7.2 / max(0.72, -modelPosition.z), 0.82, 7.5);
+    float solidCoverage = mix(1.24, 0.82, phaseOne);
+    float depthExpansion = 1.0 + acceleratedDepth * 1.45;
 
-    gl_PointSize = uPointSize * perspective * (1.0 + phaseTwo * 0.8);
+    // El multiplicador inicial solapa las celdas para que no existan huecos negros.
+    gl_PointSize = uPointSize * perspective * solidCoverage * depthExpansion;
     gl_Position = projectionMatrix * modelPosition;
 
-    vLuma = aLuma;
-    vParticleAlpha = 1.0 - phaseTwo * 0.28;
+    vUv = aUv;
+    vDisperse = phaseOne;
+    vFade = clamp(uFade, 0.0, 1.0);
   }
 `;
 
 const fragmentShader = `
   precision highp float;
 
-  uniform float uFade;
+  uniform sampler2D uTexture;
 
-  varying float vLuma;
-  varying float vParticleAlpha;
+  varying vec2 vUv;
+  varying float vDisperse;
+  varying float vFade;
 
   void main() {
-    float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
-    float softCircle = smoothstep(0.5, 0.08, distanceToCenter);
-    vec3 particleColor = mix(vec3(0.38), vec3(1.0), vLuma);
-    float alpha = softCircle * uFade * vParticleAlpha;
+    // Cada Point cubre su celda completa de la textura, no un único color plano.
+    vec2 cellOffset = vec2(
+      (gl_PointCoord.x - 0.5) / ${GRID_WIDTH.toFixed(1)},
+      (gl_PointCoord.y - 0.5) / ${GRID_HEIGHT.toFixed(1)}
+    );
+    vec2 sampleUv = clamp(vUv + cellOffset, vec2(0.0), vec2(1.0));
+    vec4 sampledColor = texture2D(uTexture, sampleUv);
 
-    if (alpha < 0.01) discard;
-    gl_FragColor = vec4(particleColor, alpha);
+    // Fotografía sólida al inicio; círculo suave únicamente al comenzar la dispersión.
+    float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
+    float roundMask = smoothstep(0.52, 0.12, distanceToCenter);
+    float particleMask = mix(1.0, roundMask, smoothstep(0.02, 0.22, vDisperse));
+
+    // Los píxeles negros conservan la foto inicial, pero no ensucian la nube de polvo.
+    float luminance = dot(sampledColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float dustVisibility = mix(1.0, smoothstep(0.025, 0.42, luminance), vDisperse);
+    float alpha = sampledColor.a * particleMask * dustVisibility * (1.0 - vFade);
+
+    if (alpha < 0.003) discard;
+
+    // En scroll 0 equivale visualmente a gl_FragColor = texture2D(uTexture, vUv).
+    gl_FragColor = vec4(sampledColor.rgb, alpha);
   }
 `;
 
 type UniformNumber = { value: number };
+type TextureLike = {
+  needsUpdate: boolean;
+  generateMipmaps: boolean;
+  minFilter?: unknown;
+  magFilter?: unknown;
+  colorSpace?: unknown;
+  dispose(): void;
+};
 type UniformMap = {
+  uTexture: { value: TextureLike };
   uDisperse: UniformNumber;
   uDepth: UniformNumber;
   uFade: UniformNumber;
@@ -100,6 +139,7 @@ type MaterialLike = {
 type PointsLike = {
   position: VectorLike;
   scale: ScaleLike;
+  frustumCulled: boolean;
 };
 
 type SceneLike = {
@@ -137,8 +177,10 @@ type ThreeLike = {
   BufferGeometry: new () => BufferGeometryLike;
   Float32BufferAttribute: new (values: Float32Array, itemSize: number) => unknown;
   ShaderMaterial: new (options: Record<string, unknown>) => MaterialLike;
+  Texture: new (image?: TexImageSource) => TextureLike;
   Points: new (geometry: BufferGeometryLike, material: MaterialLike) => PointsLike;
-  AdditiveBlending: unknown;
+  LinearFilter?: unknown;
+  SRGBColorSpace?: unknown;
 };
 
 type TweenLike = { kill(): void };
@@ -156,6 +198,7 @@ type ScrollTriggerLike = {
 type HeroProgressDetail = {
   progress: number;
   active: boolean;
+  sceneIndex: number;
 };
 
 type HeroParticlePortraitProps = {
@@ -199,7 +242,6 @@ function loadScript(source: string, isReady: () => boolean) {
     const script = document.createElement("script");
     script.src = source;
     script.async = true;
-    script.crossOrigin = "anonymous";
     script.addEventListener("load", handleReady, { once: true });
     script.addEventListener(
       "error",
@@ -260,75 +302,63 @@ function loadImage(source: string, signal: AbortSignal) {
   });
 }
 
-function samplePortrait(image: HTMLImageElement, isMobile: boolean) {
-  const sampleWidth = isMobile ? 154 : 210;
-  const sampleHeight = Math.max(
-    1,
-    Math.round(sampleWidth * (image.naturalHeight / image.naturalWidth)),
-  );
-  const offscreenCanvas = document.createElement("canvas");
-  const context = offscreenCanvas.getContext("2d", { willReadFrequently: true });
-
-  if (!context) throw new Error("Canvas 2D is unavailable");
-
-  offscreenCanvas.width = sampleWidth;
-  offscreenCanvas.height = sampleHeight;
-  context.drawImage(image, 0, 0, sampleWidth, sampleHeight);
-
-  const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
-  const positions: number[] = [];
-  const scatters: number[] = [];
-  const depths: number[] = [];
-  const seeds: number[] = [];
-  const luminances: number[] = [];
+function createPortraitGrid(image: HTMLImageElement, isMobile: boolean) {
+  const positions = new Float32Array(PARTICLE_COUNT * 3);
+  const uvs = new Float32Array(PARTICLE_COUNT * 2);
+  const scatters = new Float32Array(PARTICLE_COUNT * 3);
+  const depths = new Float32Array(PARTICLE_COUNT);
+  const seeds = new Float32Array(PARTICLE_COUNT);
   const random = createSeededRandom(20260806);
-  const portraitHeight = isMobile ? 6.4 : 6.8;
-  const portraitWidth = portraitHeight * (sampleWidth / sampleHeight);
+  const portraitHeight = isMobile ? 6.55 : 6.85;
+  const portraitWidth = portraitHeight * (image.naturalWidth / image.naturalHeight);
 
-  for (let y = 0; y < sampleHeight; y += 1) {
-    for (let x = 0; x < sampleWidth; x += 1) {
-      const pixelIndex = (y * sampleWidth + x) * 4;
-      const alpha = pixels[pixelIndex + 3] / 255;
-      const red = pixels[pixelIndex] / 255;
-      const green = pixels[pixelIndex + 1] / 255;
-      const blue = pixels[pixelIndex + 2] / 255;
-      const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-
-      if (alpha < 0.08 || luminance < 0.018) continue;
-
-      const keepProbability = clamp(0.16 + luminance * 1.35, 0.16, 0.96);
-      if (random() > keepProbability) continue;
-
-      const normalizedX = x / Math.max(1, sampleWidth - 1) - 0.5;
-      const normalizedY = 0.5 - y / Math.max(1, sampleHeight - 1);
+  for (let y = 0; y < GRID_HEIGHT; y += 1) {
+    for (let x = 0; x < GRID_WIDTH; x += 1) {
+      const index = y * GRID_WIDTH + x;
+      const positionOffset = index * 3;
+      const uvOffset = index * 2;
+      const u = (x + 0.5) / GRID_WIDTH;
+      const v = 1 - (y + 0.5) / GRID_HEIGHT;
       const seed = random();
       const angle = random() * Math.PI * 2;
-      const radius = 0.18 + random() * (1.1 + (1 - luminance) * 1.1);
-      const verticalBias = (random() - 0.5) * 1.9;
+      const radius = 0.22 + random() * 1.72;
+      const verticalDrift = (random() - 0.5) * 1.8;
 
-      positions.push(
-        normalizedX * portraitWidth,
-        normalizedY * portraitHeight,
-        (luminance - 0.45) * 0.16,
-      );
-      scatters.push(
-        Math.cos(angle) * radius,
-        Math.sin(angle) * radius + verticalBias,
-        (random() - 0.5) * 1.3,
-      );
-      depths.push(0.35 + random() * 0.68);
-      seeds.push(seed);
-      luminances.push(clamp(luminance * 1.3, 0.12, 1));
+      positions[positionOffset] = (u - 0.5) * portraitWidth;
+      positions[positionOffset + 1] = (v - 0.5) * portraitHeight;
+      positions[positionOffset + 2] = 0;
+
+      uvs[uvOffset] = u;
+      uvs[uvOffset + 1] = v;
+
+      scatters[positionOffset] = Math.cos(angle) * radius;
+      scatters[positionOffset + 1] = Math.sin(angle) * radius + verticalDrift;
+      scatters[positionOffset + 2] = (random() - 0.5) * 1.45;
+
+      depths[index] = 0.38 + random() * 0.72;
+      seeds[index] = seed;
     }
   }
 
-  return {
-    positions: new Float32Array(positions),
-    scatters: new Float32Array(scatters),
-    depths: new Float32Array(depths),
-    seeds: new Float32Array(seeds),
-    luminances: new Float32Array(luminances),
-  };
+  return { positions, uvs, scatters, depths, seeds };
+}
+
+function getRendererPixelRatio(isMobile: boolean) {
+  return Math.min(window.devicePixelRatio, isMobile ? 1.5 : 1.8);
+}
+
+function getPointSize(image: HTMLImageElement, isMobile: boolean) {
+  const aspect = image.naturalWidth / image.naturalHeight;
+  const portraitWidthCss = isMobile
+    ? window.innerWidth * 1.13
+    : Math.min(window.innerWidth * 0.62, 860);
+  const portraitHeightCss = portraitWidthCss / aspect;
+  const cellSizeCss = Math.max(
+    portraitWidthCss / GRID_WIDTH,
+    portraitHeightCss / GRID_HEIGHT,
+  );
+
+  return Math.max(2.4, cellSizeCss * getRendererPixelRatio(isMobile) * 1.12);
 }
 
 export function HeroParticlePortrait({
@@ -347,8 +377,8 @@ export function HeroParticlePortrait({
 
     const wrapper = wrapperRef.current;
     const canvas = canvasRef.current;
-    const hero = wrapper?.closest<HTMLElement>("[data-scene]");
     const shell = wrapper?.closest<HTMLElement>(".site-shell");
+    const hero = shell?.querySelector<HTMLElement>("#intro");
 
     if (!wrapper || !canvas || !hero) return;
 
@@ -357,16 +387,17 @@ export function HeroParticlePortrait({
     let scrollTriggerInstance: ScrollTriggerInstanceLike | null = null;
     let geometry: BufferGeometryLike | null = null;
     let material: MaterialLike | null = null;
+    let texture: TextureLike | null = null;
     let renderer: RendererLike | null = null;
     let animationFrame = 0;
     let destroyed = false;
 
     const initialize = async () => {
       await Promise.all([
-        loadScript(THREE_CDN, () => Boolean(window.THREE)),
-        loadScript(GSAP_CDN, () => Boolean(window.gsap)),
+        loadScript(THREE_VENDOR, () => Boolean(window.THREE)),
+        loadScript(GSAP_VENDOR, () => Boolean(window.gsap)),
       ]);
-      await loadScript(SCROLL_TRIGGER_CDN, () => Boolean(window.ScrollTrigger));
+      await loadScript(SCROLL_TRIGGER_VENDOR, () => Boolean(window.ScrollTrigger));
 
       if (abortController.signal.aborted || destroyed) return;
 
@@ -384,7 +415,7 @@ export function HeroParticlePortrait({
       if (abortController.signal.aborted || destroyed) return;
 
       const isMobile = window.matchMedia("(max-width: 760px)").matches;
-      const sampledPortrait = samplePortrait(image, isMobile);
+      const portraitGrid = createPortraitGrid(image, isMobile);
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(
         isMobile ? 42 : 38,
@@ -401,36 +432,31 @@ export function HeroParticlePortrait({
         powerPreference: "high-performance",
       });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.45 : 1.8));
+      renderer.setPixelRatio(getRendererPixelRatio(isMobile));
       renderer.setSize(window.innerWidth, window.innerHeight, false);
 
+      texture = new THREE.Texture(image);
+      texture.generateMipmaps = false;
+      if (THREE.LinearFilter) {
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+      }
+      if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+
       geometry = new THREE.BufferGeometry();
-      geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(sampledPortrait.positions, 3),
-      );
-      geometry.setAttribute(
-        "aScatter",
-        new THREE.Float32BufferAttribute(sampledPortrait.scatters, 3),
-      );
-      geometry.setAttribute(
-        "aDepth",
-        new THREE.Float32BufferAttribute(sampledPortrait.depths, 1),
-      );
-      geometry.setAttribute(
-        "aSeed",
-        new THREE.Float32BufferAttribute(sampledPortrait.seeds, 1),
-      );
-      geometry.setAttribute(
-        "aLuma",
-        new THREE.Float32BufferAttribute(sampledPortrait.luminances, 1),
-      );
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(portraitGrid.positions, 3));
+      geometry.setAttribute("aUv", new THREE.Float32BufferAttribute(portraitGrid.uvs, 2));
+      geometry.setAttribute("aScatter", new THREE.Float32BufferAttribute(portraitGrid.scatters, 3));
+      geometry.setAttribute("aDepth", new THREE.Float32BufferAttribute(portraitGrid.depths, 1));
+      geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(portraitGrid.seeds, 1));
 
       const uniforms: UniformMap = {
+        uTexture: { value: texture },
         uDisperse: { value: 0 },
         uDepth: { value: 0 },
-        uFade: { value: 1 },
-        uPointSize: { value: isMobile ? 4.3 : 4.8 },
+        uFade: { value: 0 },
+        uPointSize: { value: getPointSize(image, isMobile) },
         uTime: { value: 0 },
       };
 
@@ -439,13 +465,14 @@ export function HeroParticlePortrait({
         vertexShader,
         fragmentShader,
         transparent: true,
+        depthTest: false,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
       });
 
       const particles = new THREE.Points(geometry, material);
       particles.position.set(isMobile ? 0.78 : 2.05, isMobile ? 0.74 : 0.15, 0);
       particles.scale.setScalar(isMobile ? 1.15 : 1.22);
+      particles.frustumCulled = false;
       scene.add(particles);
 
       const heroCopy = hero.querySelector<HTMLElement>(".intro-heading");
@@ -455,13 +482,21 @@ export function HeroParticlePortrait({
         return tween;
       };
 
+      const setLayerVariables = (progress: number) => {
+        const fallbackOpacity = 1 - clamp(progress / 0.14);
+        const veilOpacity = 1 - clamp((progress - 0.48) / 0.52);
+        wrapper.style.setProperty("--hero-fallback-opacity", String(fallbackOpacity));
+        wrapper.style.setProperty("--hero-veil-opacity", String(veilOpacity));
+      };
+
       const applyProgress = (rawProgress: number, immediate = false) => {
         const progress = clamp(rawProgress);
         const phaseOne = clamp(progress * 2);
         const phaseTwo = clamp((progress - 0.5) * 2);
-        const duration = immediate ? 0 : 0.62;
+        const duration = immediate ? 0 : 0.48;
 
         hero.style.setProperty("--hero-particle-progress", String(progress));
+        setLayerVariables(progress);
 
         addTween(gsap.to(uniforms.uDisperse, {
           value: phaseOne,
@@ -476,9 +511,9 @@ export function HeroParticlePortrait({
           overwrite: true,
         }));
         addTween(gsap.to(uniforms.uFade, {
-          value: 1 - phaseTwo,
+          value: phaseTwo,
           duration,
-          ease: "power2.out",
+          ease: "power2.inOut",
           overwrite: true,
         }));
 
@@ -493,10 +528,56 @@ export function HeroParticlePortrait({
         }
       };
 
+      const completeHandoffOverPitch = () => {
+        wrapper.dataset.overlay = "pitch";
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        wrapper.style.setProperty("--hero-fallback-opacity", "0");
+        wrapper.style.setProperty("--hero-veil-opacity", "0");
+
+        addTween(gsap.to(uniforms.uDisperse, {
+          value: 1,
+          duration: 0.55,
+          ease: "power2.out",
+          overwrite: true,
+        }));
+        addTween(gsap.to(uniforms.uDepth, {
+          value: 1,
+          duration: 1.45,
+          delay: 0.12,
+          ease: "power3.in",
+          overwrite: true,
+        }));
+        addTween(gsap.to(uniforms.uFade, {
+          value: 1,
+          duration: 1.55,
+          delay: 0.18,
+          ease: "power2.inOut",
+          overwrite: true,
+        }));
+      };
+
       const handleHeroProgress = (event: Event) => {
         const detail = (event as CustomEvent<HeroProgressDetail>).detail;
         if (!detail) return;
-        applyProgress(detail.progress);
+
+        wrapper.dataset.sceneIndex = String(detail.sceneIndex);
+
+        if (detail.sceneIndex === 0) {
+          wrapper.dataset.overlay = "hero";
+          wrapper.style.setProperty("--hero-layer-opacity", "1");
+          applyProgress(detail.progress);
+          return;
+        }
+
+        if (detail.sceneIndex === 1) {
+          applyProgress(Math.max(detail.progress, HERO_HANDOFF_PROGRESS));
+          completeHandoffOverPitch();
+          return;
+        }
+
+        wrapper.dataset.overlay = "hidden";
+        wrapper.style.setProperty("--hero-layer-opacity", "0");
+        applyProgress(1, true);
       };
 
       shell?.addEventListener("desorden:hero-progress", handleHeroProgress);
@@ -515,16 +596,19 @@ export function HeroParticlePortrait({
       }
 
       const handleResize = () => {
-        if (!renderer) return;
+        if (!renderer || !material) return;
+        const mobileNow = window.innerWidth <= 760;
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth <= 760 ? 1.45 : 1.8));
+        renderer.setPixelRatio(getRendererPixelRatio(mobileNow));
         renderer.setSize(window.innerWidth, window.innerHeight, false);
+        material.uniforms.uPointSize.value = getPointSize(image, mobileNow);
         ScrollTrigger.refresh();
       };
 
       window.addEventListener("resize", handleResize, { passive: true });
       wrapper.dataset.webgl = "ready";
+      wrapper.dataset.particleCount = String(PARTICLE_COUNT);
       applyProgress(Number.parseFloat(shell?.style.getPropertyValue("--hero-particle-progress") || "0"), true);
 
       const startedAt = performance.now();
@@ -561,19 +645,26 @@ export function HeroParticlePortrait({
       tweens.forEach((tween) => tween.kill());
       geometry?.dispose();
       material?.dispose();
+      texture?.dispose();
       renderer?.dispose();
     };
   }, [hydrated, imageUrl]);
 
   return (
-    <div ref={wrapperRef} className="hero-particle-portrait" data-webgl="loading" aria-hidden="true">
+    <div
+      ref={wrapperRef}
+      className="hero-particle-portrait"
+      data-webgl="loading"
+      data-overlay="hero"
+      aria-hidden="true"
+    >
       <ProjectPicture
         file="media/hero/portada-chico-bn.webp"
         alt=""
         width={768}
         height={1028}
         className="hero-particle-portrait__fallback"
-        sizes="(max-width: 760px) 112vw, 62vw"
+        sizes="(max-width: 760px) 113vw, 62vw"
         eager
       />
       <canvas ref={canvasRef} className="hero-particle-portrait__canvas" data-hero-particle-canvas />

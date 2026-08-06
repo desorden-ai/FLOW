@@ -3,11 +3,12 @@ import { useCallback, useEffect, useRef, type RefObject } from "react";
 const MEDIA_START = 6;
 const MEDIA_END = 7;
 const HERO_PARTICLE_INDEX = 0;
-const HERO_PARTICLE_STEP = 0.115;
+const HERO_PHASE_ONE_PROGRESS = 0.5;
+const HERO_HANDOFF_PROGRESS = 0.72;
 const LOGO_TUNNEL_INDEX = 2;
 const LOGO_TUNNEL_STEP = 0.14;
 const WHEEL_LOCK_MS = 560;
-const HERO_WHEEL_LOCK_MS = 115;
+const HERO_WHEEL_LOCK_MS = 420;
 const TUNNEL_WHEEL_LOCK_MS = 170;
 
 function clamp(value: number, min: number, max: number) {
@@ -40,6 +41,7 @@ export function usePortfolioNavigation(
         detail: {
           progress,
           active: active === HERO_PARTICLE_INDEX,
+          sceneIndex: active,
         },
       }),
     );
@@ -116,7 +118,14 @@ export function usePortfolioNavigation(
 
     if (nextActive === HERO_PARTICLE_INDEX && previousActive !== HERO_PARTICLE_INDEX) {
       heroParticleProgressRef.current = 0;
-    } else if (previousActive === HERO_PARTICLE_INDEX && nextActive !== HERO_PARTICLE_INDEX) {
+    } else if (previousActive === HERO_PARTICLE_INDEX && nextActive === 1) {
+      heroParticleProgressRef.current = Math.max(
+        heroParticleProgressRef.current,
+        HERO_HANDOFF_PROGRESS,
+      );
+    } else if (previousActive === HERO_PARTICLE_INDEX && nextActive > 1) {
+      heroParticleProgressRef.current = 1;
+    } else if (previousActive === 1 && nextActive > 1) {
       heroParticleProgressRef.current = 1;
     }
 
@@ -178,16 +187,28 @@ export function usePortfolioNavigation(
     const logoTunnelProgress = logoTunnelProgressRef.current;
 
     if (active === HERO_PARTICLE_INDEX) {
-      const atStart = heroParticleProgress <= 0.001;
-      const atEnd = heroParticleProgress >= 0.999;
+      if (direction > 0) {
+        if (heroParticleProgress < HERO_PHASE_ONE_PROGRESS - 0.001) {
+          setHeroParticleProgress(HERO_PHASE_ONE_PROGRESS);
+          return;
+        }
 
-      if (direction > 0 && !atEnd) {
-        setHeroParticleProgress(heroParticleProgress + HERO_PARTICLE_STEP * intensity);
+        if (heroParticleProgress < HERO_HANDOFF_PROGRESS - 0.001) {
+          setHeroParticleProgress(HERO_HANDOFF_PROGRESS);
+          return;
+        }
+
+        updateScene(1);
         return;
       }
 
-      if (direction < 0 && !atStart) {
-        setHeroParticleProgress(heroParticleProgress - HERO_PARTICLE_STEP * intensity);
+      if (heroParticleProgress > HERO_HANDOFF_PROGRESS - 0.001) {
+        setHeroParticleProgress(HERO_PHASE_ONE_PROGRESS);
+        return;
+      }
+
+      if (heroParticleProgress > 0.001) {
+        setHeroParticleProgress(0);
         return;
       }
     }
@@ -228,9 +249,7 @@ export function usePortfolioNavigation(
     };
 
     const getGestureIntensity = (distance: number) => {
-      if (activeRef.current === HERO_PARTICLE_INDEX) {
-        return clamp(distance / 150, 0.8, 1.7);
-      }
+      if (activeRef.current === HERO_PARTICLE_INDEX) return 1;
 
       if (activeRef.current === LOGO_TUNNEL_INDEX) {
         return clamp(distance / 150, 0.8, 1.5);
@@ -280,10 +299,10 @@ export function usePortfolioNavigation(
 
       if (["ArrowDown", "PageDown", " "].includes(event.key)) {
         event.preventDefault();
-        advance(1, 1.15);
+        advance(1, 1);
       } else if (["ArrowUp", "PageUp"].includes(event.key)) {
         event.preventDefault();
-        advance(-1, 1.15);
+        advance(-1, 1);
       } else if (event.key === "Home") {
         event.preventDefault();
         updateScene(0);

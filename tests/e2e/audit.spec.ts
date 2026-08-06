@@ -20,20 +20,32 @@ test("renders the reference hero without a top menu or floating WhatsApp assista
   await expect(page.locator("[data-active-label]")).toHaveText("introducció");
   await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(1);
   await expect(page.locator(".hero-particle-portrait__fallback img")).toHaveCount(1);
+  await expect(page.locator(".hero-particle-portrait")).toHaveAttribute("data-particle-count", "60000");
 });
 
-test("uses the first scroll gestures to animate the portrait before changing scene", async ({ page }) => {
+test("uses two gestures for the particle phases and opens block two on the third", async ({ page }) => {
   const hero = page.locator("#intro");
+  const pitch = page.locator("#pitch");
+  const shell = page.locator(".site-shell");
+  const portrait = page.locator(".hero-particle-portrait");
 
   await page.keyboard.press("ArrowDown");
   await expect(hero).toHaveAttribute("data-state", "current");
-
-  const progress = await page.locator(".site-shell").evaluate((element) =>
+  await expect.poll(async () => shell.evaluate((element) =>
     Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
-  );
+  )).toBe(0.5);
 
-  expect(progress).toBeGreaterThan(0);
-  expect(progress).toBeLessThan(1);
+  await page.keyboard.press("ArrowDown");
+  await expect(hero).toHaveAttribute("data-state", "current");
+  await expect.poll(async () => shell.evaluate((element) =>
+    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
+  )).toBe(0.72);
+
+  await page.keyboard.press("ArrowDown");
+  await expect(hero).toHaveAttribute("data-state", "past");
+  await expect(pitch).toHaveAttribute("data-state", "current");
+  await expect(portrait).toHaveAttribute("data-overlay", "pitch");
+  await expect(portrait).toBeVisible();
 });
 
 test("uses Catalan metadata and keeps keyboard focus inside the active scene", async ({ page }) => {
