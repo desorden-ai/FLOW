@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
 import { SiteNavigation } from "../components/SiteNavigation";
@@ -11,6 +12,8 @@ import "./push-notifications.css";
 import "./video-layout-restore.css";
 import "./commercial-pages.css";
 import "./commercial-a11y-fixes.css";
+import "./hero-particles.css";
+import "./hero-particles-a11y.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =
@@ -60,6 +63,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="ca">
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <Script id="three-vendor" src="/api/vendor?library=three" strategy="beforeInteractive" />
+        <Script id="gsap-vendor" src="/api/vendor?library=gsap" strategy="beforeInteractive" />
+        <Script id="scroll-trigger-vendor" src="/api/vendor?library=scroll-trigger" strategy="beforeInteractive" />
       </head>
       <body>
         <SiteNavigation />

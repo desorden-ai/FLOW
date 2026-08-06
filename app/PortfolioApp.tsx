@@ -2,9 +2,9 @@
 
 import type { ReactNode } from "react";
 import { useEffect } from "react";
+import { HeroParticlePortrait } from "../components/HeroParticlePortrait";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
-import { ProjectPicture } from "../components/ProjectPicture";
 import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
 import {
   applyEditorDocument,
@@ -12,7 +12,7 @@ import {
 } from "../lib/editor-model";
 
 const scenes = [
-  ["intro", "inici", "intro"],
+  ["intro", "introducció", "intro"],
   ["pitch", "proposta", "pitch"],
   ["partners", "autoritat", "partners"],
   ["experience", "serveis", "experience"],
@@ -24,7 +24,7 @@ const scenes = [
 ] as const;
 
 const navigation = [
-  ["inici", 0],
+  ["introducció", 0],
   ["proposta", 1],
   ["autoritat", 2],
   ["serveis", 3],
@@ -153,7 +153,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         aria-atomic="true"
         data-live-scene-label
       >
-        inici
+        introducció
       </p>
 
       <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
@@ -163,36 +163,22 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       </div>
 
       <div className="scene-deck">
-        <SceneFrame index={0} name="intro" label="inici">
+        <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
-            <header className="home-hero-copy">
-              <p className="commercial-eyebrow" data-canvas-selector="hero-micro-label">Agència creativa i tecnològica · Catalunya</p>
-              <h1 className="home-hero-title" data-canvas-selector="hero-title-1">
-                El teu únic <strong>partner tecnològic i creatiu</strong> per escalar el teu negoci a Catalunya.
-              </h1>
-              <p className="home-hero-subtitle" data-canvas-selector="hero-subtitle">
-                Passa de coordinar cinc agències alhora. Integrem intel·ligència artificial, disseny web orientat a vendes i producció audiovisual prèmium per dominar el teu sector.
+            <HeroParticlePortrait />
+
+            <header className="intro-heading">
+              <p className="outline-word" data-canvas-selector="hero-partner-prefix">EL TEU</p>
+              <h1 className="display-name" data-canvas-selector="hero-partner-title">PARTNER</h1>
+              <p className="micro-label" data-canvas-selector="hero-partner-label">
+                ( TECNOLÒGIC I CREATIU )
               </p>
-              <div className="home-hero-actions">
-                <button type="button" className="home-button home-button--primary" data-go={8} data-canvas-selector="hero-cta-primary">Vull una auditoria gratuïta</button>
-                <button type="button" className="home-button home-button--secondary" data-go={5} data-canvas-selector="hero-cta-secondary">Veure casos d&apos;èxit</button>
-              </div>
-              <div className="home-authority" aria-label="Credencials i capacitats">
-                <span data-canvas-selector="authority-1">Projectes digitals i ajuts</span>
-                <span data-canvas-selector="authority-2">Operador UAS i pilot certificat</span>
-                <span data-canvas-selector="authority-3">Automatitzacions amb n8n</span>
-              </div>
+              <ul className="hero-services" aria-label="Serveis principals">
+                <li data-canvas-selector="hero-service-1">Contingut visual per a xarxes socials</li>
+                <li data-canvas-selector="hero-service-2">Vídeo amb IA per visibilitzar marques i comerços</li>
+                <li data-canvas-selector="hero-service-3">Creació d&apos;una identitat visual coherent</li>
+              </ul>
             </header>
-            <ProjectPicture
-              file="media/hero/portada-chico-bn.webp"
-              alt="Creador i director de DESORDEN"
-              width={768}
-              height={1028}
-              className="hero-picture"
-              sizes="(max-width: 760px) 82vw, 460px"
-              canvasSelector="hero-picture"
-              eager
-            />
           </div>
         </SceneFrame>
 
@@ -263,13 +249,12 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       </div>
 
       <div className="fixed-ui">
-        <header><button type="button" className="brand" data-go="0" aria-label="Torna a l'inici"><ImagePlaceholder number="00" className="brand-placeholder" label="Marca substituïble de DESORDEN" /><span>DESORDEN</span></button><p data-scene-counter>01 / 09</p></header>
+        <p className="scene-counter" data-scene-counter>01 / 09</p>
         <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
         <nav className="section-navigation" aria-label="Seccions de DESORDEN">
           <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
-          <button type="button" className="section-toggle" data-menu-toggle aria-expanded="false"><span>Secció</span><b data-active-label>inici</b><i /></button>
+          <button type="button" className="section-toggle" data-menu-toggle aria-expanded="false"><span>Secció</span><b data-active-label>introducció</b><i /></button>
         </nav>
-        <div className="scroll-cue" data-scroll-cue><span>Desplaça&apos;t per explorar</span><i /></div>
       </div>
 
       <div className="modal-backdrop" data-modal role="presentation" hidden>
