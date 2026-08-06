@@ -15,6 +15,7 @@ import "./hero-particles.css";
 import "./hero-dom-webgl-alignment.css";
 import "./hero-particles-a11y.css";
 import "./hero-canvas-particles.css";
+import "./brand-unification.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =

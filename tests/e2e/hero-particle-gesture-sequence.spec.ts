@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-const SCENE_DENSITIES = [0.82, 0.68, 0.55, 0.43, 0.33, 0.24, 0.16, 0.09];
-
-test("opens block two on the first gesture and keeps fewer particles in every following block", async ({ page }) => {
+test("disintegrates inside the hero, fades in block two and stays hidden afterwards", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 
   const hero = page.locator("#intro");
   const pitch = page.locator("#pitch");
+  const partners = page.locator("#partners");
+  const shell = page.locator(".site-shell");
   const portrait = page.locator(".hero-particle-portrait");
   const fallback = page.locator(".hero-particle-portrait__fallback");
   const canvas = page.locator<HTMLCanvasElement>("[data-hero-particle-canvas]");
@@ -20,16 +20,18 @@ test("opens block two on the first gesture and keeps fewer particles in every fo
   await page.mouse.move(200, 400);
   await page.mouse.wheel(0, 900);
 
-  await expect(hero).toHaveAttribute("data-state", "past");
-  await expect(pitch).toHaveAttribute("data-state", "current");
-  await expect(portrait).toHaveAttribute("data-phase", "pitch-particles");
-  await expect(portrait).toHaveAttribute("data-particle-motion", "over-pitch");
+  await expect(hero).toHaveAttribute("data-state", "current");
+  await expect(pitch).toHaveAttribute("data-state", "future");
+  await expect(portrait).toHaveAttribute("data-scene-index", "0");
   await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-  await expect(portrait).toHaveAttribute("data-particle-density-target", "0.820");
+  await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
   await expect(canvas).toHaveCSS("opacity", "1");
   await expect.poll(async () => Number.parseFloat(await fallback.evaluate((element) =>
     getComputedStyle(element).opacity,
   ))).toBeLessThanOrEqual(0.05);
+  await expect.poll(async () => shell.evaluate((element) =>
+    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
+  )).toBe(1);
 
   const canvasChecksum = async () => canvas.evaluate((element) => {
     const context = element.getContext("2d");
@@ -51,44 +53,19 @@ test("opens block two on the first gesture and keeps fewer particles in every fo
   const secondFrame = await canvasChecksum();
   expect(secondFrame).not.toBe(firstFrame);
 
-  let previousDensity = 1;
-  let previousTargetCount = Number.POSITIVE_INFINITY;
+  await page.waitForTimeout(580);
+  await page.mouse.wheel(0, 900);
 
-  for (let sceneIndex = 1; sceneIndex <= 8; sceneIndex += 1) {
-    if (sceneIndex > 1 && sceneIndex <= 6) {
-      await page.locator(`[data-go="${sceneIndex}"]`).first().evaluate((element: HTMLElement) => element.click());
-    } else if (sceneIndex === 7) {
-      await page.keyboard.press("ArrowDown");
-      await expect(page.locator("#media-2")).toHaveAttribute("data-state", "current");
-    } else if (sceneIndex === 8) {
-      await page.locator('[data-go="8"]').first().evaluate((element: HTMLElement) => element.click());
-      await expect(page.locator("#contact")).toHaveAttribute("data-state", "current");
-    }
+  await expect(hero).toHaveAttribute("data-state", "past");
+  await expect(pitch).toHaveAttribute("data-state", "current");
+  await expect(portrait).toHaveAttribute("data-scene-index", "1");
+  await expect.poll(async () => Number.parseFloat(await portrait.evaluate((element) =>
+    getComputedStyle(element).opacity,
+  )), { timeout: 1_500 }).toBeLessThanOrEqual(0.01);
 
-    const expectedDensity = SCENE_DENSITIES[sceneIndex - 1];
-    const density = Number.parseFloat(
-      await portrait.getAttribute("data-particle-density-target") ?? "0",
-    );
-    const targetCount = Number.parseInt(
-      await portrait.getAttribute("data-visible-particle-target") ?? "0",
-      10,
-    );
-
-    expect(density).toBeCloseTo(expectedDensity, 3);
-    expect(density).toBeLessThan(previousDensity);
-    expect(targetCount).toBeGreaterThan(0);
-    expect(targetCount).toBeLessThan(previousTargetCount);
-    await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-    await expect(canvas).toHaveCSS("opacity", "1");
-
-    previousDensity = density;
-    previousTargetCount = targetCount;
-  }
-
-  await expect(portrait).toHaveAttribute("data-scene-index", "8");
-  await expect(portrait).toHaveAttribute("data-particle-density-target", "0.090");
-  await expect.poll(async () => Number.parseInt(
-    await portrait.getAttribute("data-visible-particle-count") ?? "0",
-    10,
-  )).toBeGreaterThan(0);
+  await page.locator('[data-go="2"]').first().evaluate((element: HTMLElement) => element.click());
+  await expect(partners).toHaveAttribute("data-state", "current");
+  await expect(portrait).toHaveAttribute("data-scene-index", "2");
+  await expect(portrait).toHaveCSS("visibility", "hidden");
+  await expect(portrait).toHaveCSS("opacity", "0");
 });

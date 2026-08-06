@@ -49,10 +49,11 @@ test("maps Canvas 2D particles to the rendered portrait and recalculates on resi
   expectAligned(await readAlignment());
 
   await page.keyboard.press("ArrowDown");
-  await expect(page.locator("#pitch")).toHaveAttribute("data-state", "current");
+  await expect(page.locator("#intro")).toHaveAttribute("data-state", "current");
+  await expect(page.locator("#pitch")).toHaveAttribute("data-state", "future");
   await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-  await expect(portrait).toHaveAttribute("data-particle-motion", "over-pitch");
-  await expect(portrait).toHaveAttribute("data-particle-density-target", "0.820");
+  await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
+  await expect(portrait).toHaveAttribute("data-particle-density-target", "1.000");
   await expect(canvas).toHaveCSS("opacity", "1");
   await expect.poll(async () => Number.parseFloat(await fallbackLayer.evaluate((element) =>
     getComputedStyle(element).opacity,
