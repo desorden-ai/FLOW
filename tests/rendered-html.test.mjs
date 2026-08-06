@@ -20,6 +20,9 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     logoAnimation,
     logoAssets,
     logoCss,
+    heroPortrait,
+    heroCss,
+    vendorRoute,
     pushNotifications,
     pushNotificationsCss,
     commercialCss,
@@ -50,6 +53,9 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     source("hooks/useLogoTunnelAnimation.ts"),
     source("components/logoTunnelAssets.ts"),
     source("app/logo-tunnel.css"),
+    source("components/HeroParticlePortrait.tsx"),
+    source("app/hero-particles.css"),
+    source("app/api/vendor/route.ts"),
     source("components/SocialProofPushNotifications.tsx"),
     source("app/push-notifications.css"),
     source("app/commercial-pages.css"),
@@ -74,17 +80,21 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(homePage, /PortfolioApp/);
   assert.doesNotMatch(homePage, /ReelToastSequence/);
 
+  assert.match(page, /HeroParticlePortrait/);
   assert.match(page, /LogoTunnel/);
-  assert.doesNotMatch(page, /SocialProofCards/);
   assert.match(page, /PortfolioController/);
-  assert.match(page, /media\/hero\/portada-chico-bn\.webp/);
-  assert.match(page, /El teu únic/);
-  assert.match(page, /partner tecnològic i creatiu/);
-  assert.match(page, /Vull una auditoria gratuïta/);
+  assert.match(page, />EL TEU</);
+  assert.match(page, />PARTNER</);
+  assert.match(page, /TECNOLÒGIC I CREATIU/);
+  assert.match(page, /Contingut visual per a xarxes socials/);
+  assert.match(page, /Vídeo amb IA per visibilitzar marques i comerços/);
+  assert.match(page, /Creació d&apos;una identitat visual coherent/);
   assert.match(page, /data-live-scene-label/);
   assert.match(page, /inert=\{!isInitialScene\}/);
   assert.match(page, /<div className="scene-deck">/);
-  assert.match(page, /01 \/ 09/);
+  assert.match(page, /className="scene-counter" data-scene-counter>01 \/ 09/);
+  assert.match(page, /data-active-label>introducció/);
+  assert.doesNotMatch(page, /home-hero-actions|Vull una auditoria gratuïta/);
   assert.doesNotMatch(page, /social-proof-scene|validació social/);
   assert.doesNotMatch(page, /<div className="scene-deck"[^>]*aria-live=/);
   assert.doesNotMatch(page, /Risc Legal Zero|100% Subvencionat|cost ZERO/);
@@ -93,36 +103,67 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(layout, /DESORDEN — Agència creativa, IA, web i dron/);
   assert.match(layout, /ProfessionalService/);
   assert.match(layout, /SiteNavigation/);
-  assert.match(layout, /commercial-pages\.css/);
+  assert.match(layout, /hero-particles\.css/);
+  assert.match(layout, /\/api\/vendor\?library=three/);
+  assert.match(layout, /\/api\/vendor\?library=gsap/);
+  assert.match(layout, /\/api\/vendor\?library=scroll-trigger/);
+  assert.match(layout, /strategy="beforeInteractive"/);
   assert.match(layout, /push-notifications\.css/);
   assert.match(layout, /SocialProofPushNotifications/);
   assert.match(layout, /heroSelector="#intro"/);
-  assert.doesNotMatch(layout, /social-proof-cards\.css/);
   assert.doesNotMatch(layout, /Editable Portfolio Template/);
+
+  assert.match(heroPortrait, /^"use client"/);
+  assert.match(heroPortrait, /ShaderMaterial/);
+  assert.match(heroPortrait, /vertexShader/);
+  assert.match(heroPortrait, /fragmentShader/);
+  assert.match(heroPortrait, /uDisperse/);
+  assert.match(heroPortrait, /uDepth/);
+  assert.match(heroPortrait, /uFade/);
+  assert.match(heroPortrait, /ScrollTrigger/);
+  assert.match(heroPortrait, /ProjectPicture/);
+  assert.match(heroPortrait, /data-hero-particle-canvas/);
+  assert.match(heroPortrait, /media\/hero\/portada-chico-bn\.webp/);
+  assert.match(heroPortrait, /requestAnimationFrame/);
+  assert.match(heroPortrait, /prefers-reduced-motion|matchMedia/);
+
+  assert.match(heroCss, /\.hero-particle-portrait\s*\{/);
+  assert.match(heroCss, /position:\s*fixed/);
+  assert.match(heroCss, /\.hero-particle-portrait__fallback/);
+  assert.match(heroCss, /\.scene-intro \.display-name/);
+  assert.match(heroCss, /\.fixed-ui \.scene-counter/);
+  assert.match(heroCss, /@media \(max-width: 760px\)/);
+  assert.match(heroCss, /prefers-reduced-motion/);
+
+  assert.match(vendorRoute, /three@0\.152\.2/);
+  assert.match(vendorRoute, /gsap@3\.12\.5/);
+  assert.match(vendorRoute, /scroll-trigger/);
+  assert.match(vendorRoute, /unsupported_vendor_library/);
+  assert.match(vendorRoute, /application\/javascript/);
+  assert.match(vendorRoute, /stale-while-revalidate/);
 
   assert.match(pushNotifications, /^"use client"/);
   assert.match(pushNotifications, /createPortal/);
   assert.match(pushNotifications, /IntersectionObserver/);
   assert.match(pushNotifications, /@rosalia\.vt/);
   assert.match(pushNotifications, /@rozalenmusic/);
-  assert.match(pushNotifications, /media\/social-proof\/rosalia\.webp/);
-  assert.match(pushNotifications, /media\/social-proof\/rozalen\.webp/);
   assert.match(pushNotifications, /VISIBLE_DURATION_MS = 4_000/);
   assert.match(pushNotificationsCss, /\.push-toast-layer/);
   assert.match(pushNotificationsCss, /pointer-events: none/);
   assert.match(pushNotificationsCss, /prefers-reduced-motion/);
 
+  assert.match(siteNavigation, /pathname === "\/"/);
   assert.match(siteNavigation, /IA i Automatització/);
   assert.match(siteNavigation, /\/disseny-web/);
   assert.match(siteNavigation, /\/drons/);
   assert.match(siteNavigation, /Sol·licitar auditoria/);
   assert.match(commercialCss, /html:has\(\.commercial-page\)/);
   assert.match(commercialCss, /\.commercial-grid--three/);
-  assert.match(commercialCss, /\.contact-chatbot/);
 
-  assert.match(contactForm, /CHAT_MESSAGE/);
-  assert.match(contactForm, /Parlar per WhatsApp/);
-  assert.match(contactForm, /portalTarget && createPortal/);
+  assert.match(contactForm, /portalTarget/);
+  assert.match(contactForm, /createPortal/);
+  assert.match(contactForm, /ENVIAR PER WHATSAPP/);
+  assert.doesNotMatch(contactForm, /CHAT_MESSAGE|contact-chatbot|Parlar per WhatsApp/);
 
   assert.match(dronePage, /planificació legal integral/i);
   assert.match(dronePage, /Reial decret 517\/2024/);
@@ -152,6 +193,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(controller, /^"use client"/);
   assert.match(navigation, /scene\.inert = !isCurrent/);
   assert.match(navigation, /data-live-scene-label/);
+  assert.match(navigation, /desorden:hero-progress/);
+  assert.match(navigation, /HERO_PARTICLE_STEP/);
   assert.match(navigation, /desorden:block-3-progress/);
   assert.match(navigation, /Number\.isFinite/);
 
