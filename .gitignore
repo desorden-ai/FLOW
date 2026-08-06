@@ -10,8 +10,12 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# testing and browser audit output
 /coverage
+/playwright-report/
+/test-results/
+/lighthouse-report*
+/.lighthouseci/
 
 # next.js
 /.next/

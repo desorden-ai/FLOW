@@ -36,9 +36,14 @@ const EXIT_DURATION_MS = 560;
 const PAUSE_BETWEEN_TOASTS_MS = 1_000;
 const subscribeToHydration = () => () => undefined;
 
-function wait(milliseconds: number) {
+function wait(milliseconds: number, timers: Set<number>) {
   return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, milliseconds);
+    const timer = window.setTimeout(() => {
+      timers.delete(timer);
+      resolve();
+    }, milliseconds);
+
+    timers.add(timer);
   });
 }
 
@@ -95,11 +100,6 @@ export function SocialProofPushNotifications({
       window.requestAnimationFrame(triggerSequence);
     };
 
-    /*
-     * FLOW no desplaza el documento de forma nativa: cambia cada escena entre
-     * current, past y future. Observamos ese estado para iniciar la secuencia
-     * exactamente al abandonar la portada.
-     */
     if (hero?.hasAttribute("data-scene")) {
       const checkSceneState = () => {
         if (hero.dataset.state === "past") {
@@ -118,9 +118,6 @@ export function SocialProofPushNotifications({
       return () => sceneObserver.disconnect();
     }
 
-    /*
-     * Fallback para páginas con scroll convencional.
-     */
     if (!hero) {
       const handleScroll = () => {
         if (window.scrollY >= window.innerHeight * 0.6) {
@@ -185,6 +182,7 @@ export function SocialProofPushNotifications({
     if (!hasStarted) return;
 
     let cancelled = false;
+    const timers = new Set<number>();
 
     const runSequence = async () => {
       for (let index = 0; index < notifications.length; index += 1) {
@@ -193,23 +191,23 @@ export function SocialProofPushNotifications({
         setActiveIndex(index);
         setPhase("entering");
 
-        await wait(ENTER_DELAY_MS);
+        await wait(ENTER_DELAY_MS, timers);
         if (cancelled) return;
 
         setPhase("visible");
 
-        await wait(VISIBLE_DURATION_MS);
+        await wait(VISIBLE_DURATION_MS, timers);
         if (cancelled) return;
 
         setPhase("leaving");
 
-        await wait(EXIT_DURATION_MS);
+        await wait(EXIT_DURATION_MS, timers);
         if (cancelled) return;
 
         setActiveIndex(null);
 
         if (index !== notifications.length - 1) {
-          await wait(PAUSE_BETWEEN_TOASTS_MS);
+          await wait(PAUSE_BETWEEN_TOASTS_MS, timers);
         }
       }
     };
@@ -218,6 +216,8 @@ export function SocialProofPushNotifications({
 
     return () => {
       cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
     };
   }, [hasStarted]);
 

@@ -15,12 +15,6 @@
   "cache": {
     "enabled": true
   },
-  "kv_namespaces": [
-    {
-      "binding": "EDITOR_KV",
-      "id": "00000000000000000000000000000000"
-    }
-  ],
   "observability": {
     "enabled": true
   }
