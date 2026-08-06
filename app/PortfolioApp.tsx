@@ -1,16 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
-import { HeroParticlePortrait } from "../components/HeroParticlePortrait";
+import { lazy, Suspense, useEffect } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
+import { ProjectPicture } from "../components/ProjectPicture";
 import { TextPrism3D } from "../components/TextPrism3D";
-import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
-import {
-  applyEditorDocument,
-  parseStoredEditorDocument,
-} from "../lib/editor-model";
+
+const LazyVisualLayoutEditor = lazy(async () => {
+  const module = await import("../components/VisualLayoutEditor");
+  return { default: module.VisualLayoutEditor };
+});
 
 const scenes = [
   ["intro", "introducció", "intro"],
@@ -124,30 +124,49 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
     if (enableEditor) return;
 
     const controller = new AbortController();
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
 
-    void fetch("/api/publish", {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
+    const loadPublishedContent = async () => {
+      try {
+        const response = await fetch("/api/publish", {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
         if (!response.ok) return;
+
         const payload: unknown = await response.json();
         if (!isRecord(payload)) return;
 
-        const published = parseStoredEditorDocument(payload.published);
-        if (published) applyEditorDocument(published.data, false);
-      })
-      .catch((error: unknown) => {
+        const editorModel = await import("../lib/editor-model");
+        const published = editorModel.parseStoredEditorDocument(payload.published);
+        if (published) editorModel.applyEditorDocument(published.data, false);
+      } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         console.error("Unable to load published editor data", error);
-      });
+      }
+    };
 
-    return () => controller.abort();
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(() => void loadPublishedContent(), { timeout: 2_500 });
+    } else {
+      timeoutId = window.setTimeout(() => void loadPublishedContent(), 900);
+    }
+
+    return () => {
+      controller.abort();
+      if (idleId !== null) window.cancelIdleCallback(idleId);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
   }, [enableEditor]);
 
   return (
     <PortfolioController sceneCount={scenes.length}>
-      {enableEditor && <VisualLayoutEditor />}
+      {enableEditor && (
+        <Suspense fallback={null}>
+          <LazyVisualLayoutEditor />
+        </Suspense>
+      )}
       <p
         style={visuallyHiddenStyle}
         aria-live="polite"
@@ -163,11 +182,19 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         </p>
       </div>
 
-      <HeroParticlePortrait />
-
       <div className="scene-deck">
         <SceneFrame index={0} name="intro" label="introducció">
           <div className="intro-layout">
+            <ProjectPicture
+              file="media/hero/portada-chico-bn.webp"
+              alt="Perfil en blanc i negre del creador de DESORDEN"
+              width={768}
+              height={1028}
+              className="hero-picture"
+              canvasSelector="hero-image"
+              sizes="(max-width: 760px) 64vw, 48vw"
+              eager
+            />
             <header className="intro-heading">
               <h1 className="display-name hero-brand-title" data-canvas-selector="hero-brand-title">DESORDEN</h1>
               <p className="micro-label" data-canvas-selector="hero-partner-label">
