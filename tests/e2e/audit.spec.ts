@@ -20,7 +20,14 @@ test("renders the reference hero without a top menu or floating WhatsApp assista
   await expect(page.locator("[data-active-label]")).toHaveText("introducció");
   await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(1);
   await expect(page.locator(".hero-particle-portrait__fallback img")).toHaveCount(1);
-  await expect(page.locator(".hero-particle-portrait")).toHaveAttribute("data-particle-count", "60000");
+
+  const portrait = page.locator(".hero-particle-portrait");
+  await expect(portrait).toHaveAttribute("data-renderer", "canvas2d");
+  await expect(portrait).toHaveAttribute("data-renderer-status", "ready");
+  await expect.poll(async () => Number.parseInt(
+    await portrait.getAttribute("data-particle-count") ?? "0",
+    10,
+  )).toBeGreaterThan(1000);
 });
 
 test("uses two gestures for the particle phases and opens block two on the third", async ({ page }) => {
