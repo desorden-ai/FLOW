@@ -5,7 +5,6 @@ type ProjectPictureProps = {
   height: number;
   className?: string;
   sizes?: string;
-  canvasSelector?: string;
   eager?: boolean;
 };
 
@@ -28,11 +27,10 @@ export function ProjectPicture({
   height,
   className,
   sizes = "(max-width: 640px) 92vw, (max-width: 1024px) 48vw, 560px",
-  canvasSelector,
   eager = false,
 }: ProjectPictureProps) {
   return (
-    <picture className={className} data-canvas-selector={canvasSelector}>
+    <picture className={className}>
       <source type="image/avif" srcSet={imageSrcSet(file, "avif")} sizes={sizes} />
       <source type="image/webp" srcSet={imageSrcSet(file, "webp")} sizes={sizes} />
       <img
