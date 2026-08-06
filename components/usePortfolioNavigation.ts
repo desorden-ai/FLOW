@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, type RefObject } from "react";
 const MEDIA_START = 6;
 const MEDIA_END = 7;
 const HERO_PARTICLE_INDEX = 0;
-const HERO_REBUILD_DURATION_MS = 1_050;
+const HERO_REBUILD_DURATION_MS = 950;
 const LOGO_TUNNEL_INDEX = 2;
 const LOGO_TUNNEL_STEP = 0.14;
 const WHEEL_LOCK_MS = 560;
@@ -213,12 +213,27 @@ export function usePortfolioNavigation(
 
   const advance = useCallback((direction: 1 | -1, intensity = 1) => {
     const active = activeRef.current;
+    const heroParticleProgress = heroParticleProgressRef.current;
     const logoTunnelProgress = logoTunnelProgressRef.current;
 
     if (active === HERO_PARTICLE_INDEX && direction > 0) {
       cancelHeroRebuild();
-      setHeroParticleProgress(1);
+
+      if (heroParticleProgress < 0.999) {
+        setHeroParticleProgress(1);
+        return;
+      }
+
       updateScene(1);
+      return;
+    }
+
+    if (
+      active === HERO_PARTICLE_INDEX &&
+      direction < 0 &&
+      heroParticleProgress > 0.001
+    ) {
+      rebuildHeroPortrait();
       return;
     }
 
