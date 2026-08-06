@@ -126,7 +126,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroPortrait, /uDisperse: \{ value: 0 \}/);
   assert.match(heroPortrait, /uFade: \{ value: 0 \}/);
   assert.match(heroPortrait, /gl_PointSize = uPointSize \* perspective \* solidCoverage/);
-  assert.match(heroPortrait, /data\.particleCount = String\(PARTICLE_COUNT\)/);
+  assert.match(heroPortrait, /wrapper\.dataset\.particleCount = String\(PARTICLE_COUNT\)/);
   assert.match(heroPortrait, /HERO_HANDOFF_PROGRESS = 0\.72/);
   assert.match(heroPortrait, /ScrollTrigger/);
   assert.match(heroPortrait, /ProjectPicture/);
