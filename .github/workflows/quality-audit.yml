@@ -44,7 +44,7 @@ jobs:
 
       - name: Start production Worker preview
         run: |
-          npx --yes wrangler@4.118.0 dev --local --ip 127.0.0.1 --port 3000 > /tmp/flow-preview.log 2>&1 &
+          npx wrangler dev --local --ip 127.0.0.1 --port 3000 > /tmp/flow-preview.log 2>&1 &
           echo $! > /tmp/flow-preview.pid
           for attempt in {1..60}; do
             if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
@@ -69,6 +69,9 @@ jobs:
             --output=html \
             --output=json \
             --output-path=./lighthouse-report
+
+      - name: Enforce mobile Lighthouse budgets
+        run: node scripts/assert-lighthouse.mjs
 
       - name: Upload browser audit reports
         if: always()
