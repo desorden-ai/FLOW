@@ -65,20 +65,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          EDITOR_PASSWORD: ${{ secrets.EDITOR_PASSWORD }}
-          EDITOR_SESSION_SECRET: ${{ secrets.EDITOR_SESSION_SECRET }}
           EDITOR_KV_ID: ${{ vars.EDITOR_KV_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || (echo "Missing CLOUDFLARE_API_TOKEN" && exit 1)
           test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo "Missing CLOUDFLARE_ACCOUNT_ID" && exit 1)
-          test -n "$EDITOR_PASSWORD" || (echo "Missing EDITOR_PASSWORD" && exit 1)
-          test "${#EDITOR_PASSWORD}" -ge 12 || (echo "EDITOR_PASSWORD must contain at least 12 characters" && exit 1)
-          test -n "$EDITOR_SESSION_SECRET" || (echo "Missing EDITOR_SESSION_SECRET" && exit 1)
-          test "${#EDITOR_SESSION_SECRET}" -ge 32 || (echo "EDITOR_SESSION_SECRET must contain at least 32 characters" && exit 1)
-          test -n "$EDITOR_KV_ID" || (echo "Missing EDITOR_KV_ID repository variable" && exit 1)
+          test -n "$EDITOR_KV_ID" || (echo "Missing EDITOR_KV_ID repository variable used by the Instagram audit cache" && exit 1)
           [[ "$EDITOR_KV_ID" =~ ^[0-9a-fA-F]{32}$ ]] || (echo "EDITOR_KV_ID must be a 32-character Cloudflare KV namespace ID" && exit 1)
 
-      - name: Configure production KV binding
+      - name: Configure Instagram audit KV binding
         id: binding
         env:
           EDITOR_KV_ID: ${{ vars.EDITOR_KV_ID }}
@@ -126,38 +120,12 @@ jobs:
         id: dry_run
         run: npm run deploy:dry
 
-      - name: Prepare encrypted editor secrets
-        id: editor_secrets
-        env:
-          EDITOR_PASSWORD: ${{ secrets.EDITOR_PASSWORD }}
-          EDITOR_SESSION_SECRET: ${{ secrets.EDITOR_SESSION_SECRET }}
-        run: |
-          umask 077
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          import path from "node:path";
-
-          const outputPath = path.join(process.env.RUNNER_TEMP, "editor-secrets.json");
-          fs.writeFileSync(
-            outputPath,
-            JSON.stringify({
-              EDITOR_PASSWORD: process.env.EDITOR_PASSWORD,
-              EDITOR_SESSION_SECRET: process.env.EDITOR_SESSION_SECRET,
-            }),
-            { mode: 0o600 },
-          );
-          NODE
-
       - name: Deploy to Cloudflare Workers
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --no-install wrangler deploy --secrets-file "${RUNNER_TEMP}/editor-secrets.json" --keep-vars
-
-      - name: Remove temporary editor secrets
-        if: always()
-        run: rm -f "${RUNNER_TEMP}/editor-secrets.json"
+        run: npx --no-install wrangler deploy --keep-vars
 
       - name: Publish deployment result
         if: always()
@@ -170,19 +138,17 @@ jobs:
           TEST_OUTCOME: ${{ steps.test.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           DRY_RUN_OUTCOME: ${{ steps.dry_run.outcome }}
-          EDITOR_SECRETS_OUTCOME: ${{ steps.editor_secrets.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         run: |
           node --input-type=module <<'NODE' > /tmp/deployment-status.json
           const outcomes = [
             ["configuration", process.env.CONFIGURATION_OUTCOME],
-            ["KV binding", process.env.BINDING_OUTCOME],
+            ["Instagram audit KV binding", process.env.BINDING_OUTCOME],
             ["dependency audit", process.env.AUDIT_OUTCOME],
             ["lint", process.env.LINT_OUTCOME],
             ["tests", process.env.TEST_OUTCOME],
             ["build", process.env.BUILD_OUTCOME],
             ["dry run", process.env.DRY_RUN_OUTCOME],
-            ["editor secrets", process.env.EDITOR_SECRETS_OUTCOME],
             ["deployment", process.env.DEPLOY_OUTCOME],
           ];
           const success = process.env.DEPLOY_OUTCOME === "success";
