@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: quality-audit-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   browser-audit:
     runs-on: ubuntu-latest
