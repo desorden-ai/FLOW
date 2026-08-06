@@ -9,7 +9,8 @@ import {
 const APIFY_ACTOR_ID = "apify~instagram-profile-scraper";
 const CACHE_TTL_SECONDS = 60 * 60 * 6;
 const RATE_WINDOW_SECONDS = 60 * 10;
-const RATE_LIMIT = 4;
+const RATE_LIMIT = 12;
+const RATE_KEY_VERSION = "v2";
 const MAX_REQUEST_BYTES = 1_024;
 
 interface AuditKVNamespace {
@@ -30,6 +31,10 @@ type RateRecord = {
   count: number;
   resetAt: number;
 };
+
+type RateResult =
+  | { allowed: true; remaining: number; resetAt: number }
+  | { allowed: false; remaining: 0; resetAt: number; retryAfter: number };
 
 type RequestBody = {
   username?: unknown;
@@ -56,6 +61,14 @@ function jsonError(
     { error: { code, message } },
     { status, headers: responseHeaders },
   );
+}
+
+function rateHeaders(rate: RateResult): HeadersInit {
+  return {
+    "X-RateLimit-Limit": String(RATE_LIMIT),
+    "X-RateLimit-Remaining": String(rate.remaining),
+    "X-RateLimit-Reset": String(rate.resetAt),
+  };
 }
 
 async function digest(value: string): Promise<string> {
@@ -96,26 +109,46 @@ async function writeCachedAudit(
       { expirationTtl: CACHE_TTL_SECONDS },
     );
   } catch {
-    // La caché es una optimización; no debe invalidar una auditoría correcta.
+    // La caché es una optimització i no ha d'invalidar una auditoria correcta.
   }
 }
 
 async function enforceRateLimit(
   request: Request,
   kv: AuditKVNamespace | undefined,
-): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
-  if (!kv) return { allowed: true };
+): Promise<RateResult> {
+  const now = Math.floor(Date.now() / 1_000);
 
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const key = `instagram-audit:rate:${await digest(clientIp)}`;
-  const now = Math.floor(Date.now() / 1000);
+  if (!kv) {
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT,
+      resetAt: now + RATE_WINDOW_SECONDS,
+    };
+  }
+
+  const clientIp = request.headers.get("cf-connecting-ip");
+  if (!clientIp) {
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT,
+      resetAt: now + RATE_WINDOW_SECONDS,
+    };
+  }
+
+  const key = `instagram-audit:rate:${RATE_KEY_VERSION}:${await digest(clientIp)}`;
 
   try {
     const stored = await kv.get(key);
     const current = stored ? (JSON.parse(stored) as RateRecord) : null;
 
     if (current && current.resetAt > now && current.count >= RATE_LIMIT) {
-      return { allowed: false, retryAfter: Math.max(1, current.resetAt - now) };
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: current.resetAt,
+        retryAfter: Math.max(1, current.resetAt - now),
+      };
     }
 
     const next: RateRecord = current && current.resetAt > now
@@ -125,11 +158,20 @@ async function enforceRateLimit(
     await kv.put(key, JSON.stringify(next), {
       expirationTtl: Math.max(60, next.resetAt - now),
     });
-  } catch {
-    // Si KV falla, el proveedor sigue protegido por los límites de coste.
-  }
 
-  return { allowed: true };
+    return {
+      allowed: true,
+      remaining: Math.max(0, RATE_LIMIT - next.count),
+      resetAt: next.resetAt,
+    };
+  } catch {
+    // Si KV falla, el proveïdor continua protegit pel límit de cost d'Apify.
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT,
+      resetAt: now + RATE_WINDOW_SECONDS,
+    };
+  }
 }
 
 async function fetchInstagramProfile(username: string, apiKey: string): Promise<unknown> {
@@ -209,22 +251,25 @@ export async function POST(request: Request) {
     });
   }
 
-  const rate = await enforceRateLimit(request, bindings.EDITOR_KV);
-  if (!rate.allowed) {
-    return jsonError(
-      429,
-      "RATE_LIMITED",
-      "Has arribat al límit temporal d’auditories. Torna-ho a provar més tard.",
-      { "Retry-After": String(rate.retryAfter) },
-    );
-  }
-
   const apiKey = bindings.APIFY_API_KEY;
   if (!apiKey) {
     return jsonError(
       503,
       "AUDIT_PROVIDER_NOT_CONFIGURED",
       "L’auditoria encara no està connectada al proveïdor de dades.",
+    );
+  }
+
+  const rate = await enforceRateLimit(request, bindings.EDITOR_KV);
+  if (!rate.allowed) {
+    return jsonError(
+      429,
+      "RATE_LIMITED",
+      "Has arribat al límit temporal d’auditories. Torna-ho a provar en uns minuts.",
+      {
+        ...rateHeaders(rate),
+        "Retry-After": String(rate.retryAfter),
+      },
     );
   }
 
@@ -237,16 +282,19 @@ export async function POST(request: Request) {
       headers: {
         "Cache-Control": "private, max-age=0, no-store",
         "X-Audit-Source": "live",
+        ...rateHeaders(rate),
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+    const headers = rateHeaders(rate);
 
     if (message === "PRIVATE_PROFILE") {
       return jsonError(
         422,
         "PRIVATE_PROFILE",
         "El perfil és privat i no es pot auditar amb dades públiques.",
+        headers,
       );
     }
 
@@ -255,6 +303,7 @@ export async function POST(request: Request) {
         404,
         "PROFILE_NOT_FOUND",
         "No s’ha trobat un perfil públic amb aquest usuari.",
+        headers,
       );
     }
 
@@ -263,6 +312,7 @@ export async function POST(request: Request) {
         504,
         "PROVIDER_TIMEOUT",
         "El proveïdor de dades ha superat el temps d’espera. Torna-ho a provar.",
+        headers,
       );
     }
 
@@ -271,6 +321,7 @@ export async function POST(request: Request) {
       502,
       "AUDIT_PROVIDER_ERROR",
       "No s’ha pogut completar l’auditoria amb dades públiques.",
+      headers,
     );
   }
 }
