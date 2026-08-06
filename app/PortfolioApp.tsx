@@ -192,7 +192,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
               height={1028}
               className="hero-picture"
               canvasSelector="hero-image"
-              sizes="(max-width: 760px) 64vw, 48vw"
+              sizes="(max-width: 760px) 98vw, 48vw"
               eager
             />
             <header className="intro-heading">
