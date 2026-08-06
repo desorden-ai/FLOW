@@ -9,9 +9,10 @@ async function source(path) {
 }
 
 test("keeps preview builds resource-neutral and injects the production KV binding", async () => {
-  const [wrangler, deployWorkflow] = await Promise.all([
+  const [wrangler, deployWorkflow, qualityWorkflow] = await Promise.all([
     source("wrangler.jsonc"),
     source(".github/workflows/cloudflare-deploy.yml"),
+    source(".github/workflows/quality-audit.yml"),
   ]);
 
   assert.doesNotMatch(wrangler, /00000000000000000000000000000000/);
@@ -21,4 +22,7 @@ test("keeps preview builds resource-neutral and injects the production KV bindin
   assert.match(deployWorkflow, /config\.kv_namespaces \?\?= \[\]/);
   assert.match(deployWorkflow, /binding:\s*"EDITOR_KV"/);
   assert.match(deployWorkflow, /id:\s*process\.env\.EDITOR_KV_ID/);
+
+  assert.match(qualityWorkflow, /ready_for_review/);
+  assert.match(qualityWorkflow, /synchronize/);
 });
