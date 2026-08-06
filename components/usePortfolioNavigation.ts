@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 const MEDIA_START = 6;
 const MEDIA_END = 7;
+const HERO_PARTICLE_INDEX = 0;
+const HERO_PARTICLE_STEP = 0.115;
 const LOGO_TUNNEL_INDEX = 2;
 const LOGO_TUNNEL_STEP = 0.14;
 const WHEEL_LOCK_MS = 560;
+const HERO_WHEEL_LOCK_MS = 115;
 const TUNNEL_WHEEL_LOCK_MS = 170;
 
 function clamp(value: number, min: number, max: number) {
@@ -18,10 +21,29 @@ export function usePortfolioNavigation(
   closeMenu: () => void,
 ) {
   const activeRef = useRef(0);
+  const heroParticleProgressRef = useRef(0);
   const logoTunnelProgressRef = useRef(0);
   const wheelLockedRef = useRef(false);
   const wheelUnlockTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<number | null>(null);
+
+  const emitHeroParticleProgress = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const progress = clamp(heroParticleProgressRef.current, 0, 1);
+    const active = activeRef.current;
+
+    root.style.setProperty("--hero-particle-progress", String(progress));
+    root.dispatchEvent(
+      new CustomEvent("desorden:hero-progress", {
+        detail: {
+          progress,
+          active: active === HERO_PARTICLE_INDEX,
+        },
+      }),
+    );
+  }, [rootRef]);
 
   const emitLogoTunnelProgress = useCallback(() => {
     const root = rootRef.current;
@@ -46,10 +68,13 @@ export function usePortfolioNavigation(
     if (!root) return;
 
     const active = activeRef.current;
+    const heroParticleProgress = heroParticleProgressRef.current;
     const logoTunnelProgress = logoTunnelProgressRef.current;
-    const visualIndex = active === LOGO_TUNNEL_INDEX
-      ? active + logoTunnelProgress
-      : active;
+    const visualIndex = active === HERO_PARTICLE_INDEX
+      ? active + heroParticleProgress
+      : active === LOGO_TUNNEL_INDEX
+        ? active + logoTunnelProgress
+        : active;
     const progress = sceneCount > 1
       ? clamp(visualIndex / (sceneCount - 1), 0, 1)
       : 0;
@@ -61,6 +86,12 @@ export function usePortfolioNavigation(
       progressBar.style.top = `calc(${progress * 100}% - ${progress * 76}px)`;
     }
   }, [rootRef, sceneCount]);
+
+  const setHeroParticleProgress = useCallback((next: number) => {
+    heroParticleProgressRef.current = clamp(next, 0, 1);
+    updateProgressUI();
+    emitHeroParticleProgress();
+  }, [updateProgressUI, emitHeroParticleProgress]);
 
   const setLogoTunnelProgress = useCallback((next: number) => {
     logoTunnelProgressRef.current = clamp(next, 0, 1);
@@ -82,6 +113,12 @@ export function usePortfolioNavigation(
 
     const previousActive = activeRef.current;
     const nextActive = clamp(next, 0, Math.max(0, sceneCount - 1));
+
+    if (nextActive === HERO_PARTICLE_INDEX && previousActive !== HERO_PARTICLE_INDEX) {
+      heroParticleProgressRef.current = 0;
+    } else if (previousActive === HERO_PARTICLE_INDEX && nextActive !== HERO_PARTICLE_INDEX) {
+      heroParticleProgressRef.current = 1;
+    }
 
     if (nextActive === LOGO_TUNNEL_INDEX && previousActive !== LOGO_TUNNEL_INDEX) {
       logoTunnelProgressRef.current = previousActive > LOGO_TUNNEL_INDEX ? 1 : 0;
@@ -123,13 +160,37 @@ export function usePortfolioNavigation(
     if (marquee) marquee.hidden = active < MEDIA_START || active > MEDIA_END;
 
     updateProgressUI();
+    emitHeroParticleProgress();
     emitLogoTunnelProgress();
     closeMenu();
-  }, [rootRef, sceneCount, updateProgressUI, emitLogoTunnelProgress, closeMenu]);
+  }, [
+    rootRef,
+    sceneCount,
+    updateProgressUI,
+    emitHeroParticleProgress,
+    emitLogoTunnelProgress,
+    closeMenu,
+  ]);
 
   const advance = useCallback((direction: 1 | -1, intensity = 1) => {
     const active = activeRef.current;
+    const heroParticleProgress = heroParticleProgressRef.current;
     const logoTunnelProgress = logoTunnelProgressRef.current;
+
+    if (active === HERO_PARTICLE_INDEX) {
+      const atStart = heroParticleProgress <= 0.001;
+      const atEnd = heroParticleProgress >= 0.999;
+
+      if (direction > 0 && !atEnd) {
+        setHeroParticleProgress(heroParticleProgress + HERO_PARTICLE_STEP * intensity);
+        return;
+      }
+
+      if (direction < 0 && !atStart) {
+        setHeroParticleProgress(heroParticleProgress - HERO_PARTICLE_STEP * intensity);
+        return;
+      }
+    }
 
     if (active === LOGO_TUNNEL_INDEX) {
       const atStart = logoTunnelProgress <= 0.001;
@@ -147,7 +208,7 @@ export function usePortfolioNavigation(
     }
 
     updateScene(active + direction);
-  }, [setLogoTunnelProgress, updateScene]);
+  }, [setHeroParticleProgress, setLogoTunnelProgress, updateScene]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -160,14 +221,30 @@ export function usePortfolioNavigation(
       wheelUnlockTimerRef.current = null;
     };
 
+    const getActiveLockDuration = () => {
+      if (activeRef.current === HERO_PARTICLE_INDEX) return HERO_WHEEL_LOCK_MS;
+      if (activeRef.current === LOGO_TUNNEL_INDEX) return TUNNEL_WHEEL_LOCK_MS;
+      return WHEEL_LOCK_MS;
+    };
+
+    const getGestureIntensity = (distance: number) => {
+      if (activeRef.current === HERO_PARTICLE_INDEX) {
+        return clamp(distance / 150, 0.8, 1.7);
+      }
+
+      if (activeRef.current === LOGO_TUNNEL_INDEX) {
+        return clamp(distance / 150, 0.8, 1.5);
+      }
+
+      return 1;
+    };
+
     const onWheel = (event: WheelEvent) => {
       if (isModalOpen() || wheelLockedRef.current || Math.abs(event.deltaY) < 12) return;
       event.preventDefault();
 
       const direction: 1 | -1 = event.deltaY > 0 ? 1 : -1;
-      const intensity = activeRef.current === LOGO_TUNNEL_INDEX
-        ? clamp(Math.abs(event.deltaY) / 150, 0.8, 1.5)
-        : 1;
+      const intensity = getGestureIntensity(Math.abs(event.deltaY));
 
       wheelLockedRef.current = true;
       advance(direction, intensity);
@@ -175,10 +252,7 @@ export function usePortfolioNavigation(
       if (wheelUnlockTimerRef.current !== null) {
         window.clearTimeout(wheelUnlockTimerRef.current);
       }
-      wheelUnlockTimerRef.current = window.setTimeout(
-        unlockWheel,
-        activeRef.current === LOGO_TUNNEL_INDEX ? TUNNEL_WHEEL_LOCK_MS : WHEEL_LOCK_MS,
-      );
+      wheelUnlockTimerRef.current = window.setTimeout(unlockWheel, getActiveLockDuration());
     };
 
     const onTouchStart = (event: TouchEvent) => {
@@ -191,7 +265,7 @@ export function usePortfolioNavigation(
       const delta = touchStartRef.current - currentY;
 
       if (Math.abs(delta) > 25) {
-        advance(delta > 0 ? 1 : -1, activeRef.current === LOGO_TUNNEL_INDEX ? 1.15 : 1);
+        advance(delta > 0 ? 1 : -1, getGestureIntensity(Math.abs(delta)));
       }
 
       touchStartRef.current = null;
@@ -206,10 +280,10 @@ export function usePortfolioNavigation(
 
       if (["ArrowDown", "PageDown", " "].includes(event.key)) {
         event.preventDefault();
-        advance(1, activeRef.current === LOGO_TUNNEL_INDEX ? 1.15 : 1);
+        advance(1, 1.15);
       } else if (["ArrowUp", "PageUp"].includes(event.key)) {
         event.preventDefault();
-        advance(-1, activeRef.current === LOGO_TUNNEL_INDEX ? 1.15 : 1);
+        advance(-1, 1.15);
       } else if (event.key === "Home") {
         event.preventDefault();
         updateScene(0);
