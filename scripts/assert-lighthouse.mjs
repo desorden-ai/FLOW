@@ -9,6 +9,7 @@ if (!reportFile) {
 
 const report = JSON.parse(await readFile(reportFile, "utf8"));
 
+// Defaults preserve the last approved mobile baseline while blocking measurable regressions.
 const categoryBudgets = {
   performance: Number(process.env.LH_MIN_PERFORMANCE ?? 0.75),
   accessibility: Number(process.env.LH_MIN_ACCESSIBILITY ?? 0.95),
