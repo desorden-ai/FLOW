@@ -55,8 +55,14 @@ test("opens block two on the first gesture and keeps fewer particles in every fo
   let previousTargetCount = Number.POSITIVE_INFINITY;
 
   for (let sceneIndex = 1; sceneIndex <= 8; sceneIndex += 1) {
-    if (sceneIndex > 1) {
+    if (sceneIndex > 1 && sceneIndex <= 6) {
       await page.locator(`[data-go="${sceneIndex}"]`).first().evaluate((element: HTMLElement) => element.click());
+    } else if (sceneIndex === 7) {
+      await page.keyboard.press("ArrowDown");
+      await expect(page.locator("#media-2")).toHaveAttribute("data-state", "current");
+    } else if (sceneIndex === 8) {
+      await page.locator('[data-go="8"]').first().evaluate((element: HTMLElement) => element.click());
+      await expect(page.locator("#contact")).toHaveAttribute("data-state", "current");
     }
 
     const expectedDensity = SCENE_DENSITIES[sceneIndex - 1];
