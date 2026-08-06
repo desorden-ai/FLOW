@@ -66,12 +66,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         {children}
         <ContactWhatsAppForm />
         <SocialProofPushNotifications heroSelector="#intro" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(entityJsonLd).replace(/</g, "\\u003c"),
-          }}
-        />
+        <script type="application/ld+json">
+          {JSON.stringify(entityJsonLd).replace(/</g, "\\u003c")}
+        </script>
       </body>
     </html>
   );
