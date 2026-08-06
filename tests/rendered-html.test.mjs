@@ -41,6 +41,8 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
     wrangler,
     headers,
     deployWorkflow,
+    qualityWorkflow,
+    lighthouseBudget,
   ] = await Promise.all([
     source("app/page.tsx"),
     source("app/PortfolioApp.tsx"),
@@ -73,6 +75,8 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
     source("wrangler.jsonc"),
     source("public/_headers"),
     source(".github/workflows/cloudflare-deploy.yml"),
+    source(".github/workflows/quality-audit.yml"),
+    source("scripts/assert-lighthouse.mjs"),
   ]);
 
   assert.match(homePage, /PortfolioApp/);
@@ -81,6 +85,7 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(page, /ProjectPicture/);
   assert.match(page, /className="hero-picture"/);
   assert.match(page, /portada-chico-bn\.webp/);
+  assert.match(page, /sizes="\(max-width: 760px\) 98vw, 48vw"/);
   assert.match(page, />DESORDEN</);
   assert.match(page, /LazyVisualLayoutEditor/);
   assert.match(page, /requestIdleCallback/);
@@ -181,14 +186,23 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(worker, /X-Robots-Tag/);
   assert.match(worker, /env\.IMAGES/);
   assert.match(worker, /env\.ASSETS/);
+  assert.match(worker, /FALLBACK_CACHE_CONTROL = "no-store"/);
+  assert.match(worker, /TRANSFORM_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=2592000"/);
   assert.match(wrangler, /"binding": "IMAGES"/);
 
-  assert.match(headers, /\/_image\/\*/);
-  assert.match(headers, /max-age=31536000, immutable/);
+  assert.match(headers, /\/_next\/static\/\*[\s\S]*max-age=31536000, immutable/);
+  assert.match(headers, /\/_image\/\*[\s\S]*max-age=604800, stale-while-revalidate=2592000/);
+  assert.match(headers, /\/media\/\*[\s\S]*max-age=604800, stale-while-revalidate=2592000/);
   assert.match(headers, /font-src 'self'/);
   assert.doesNotMatch(headers, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
 
   assert.match(packageJson, /"audit:prod"/);
   assert.match(deployWorkflow, /Audit production dependencies/);
   assert.match(deployWorkflow, /name: Lint/);
+  assert.match(qualityWorkflow, /Run Android and accessibility tests/);
+  assert.match(qualityWorkflow, /Enforce mobile Lighthouse budgets/);
+  assert.match(qualityWorkflow, /node scripts\/assert-lighthouse\.mjs/);
+  assert.match(lighthouseBudget, /LH_MIN_PERFORMANCE/);
+  assert.match(lighthouseBudget, /LH_MAX_LCP_MS/);
+  assert.match(lighthouseBudget, /LH_MAX_TBT_MS/);
 });
