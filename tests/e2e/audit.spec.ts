@@ -10,68 +10,51 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 });
 
-test("renders the DESORDEN hero with the unified display system", async ({ page }) => {
+test("renders the DESORDEN hero with a local condensed display font", async ({ page }) => {
   await expect(page.locator(".site-nav")).toHaveCount(0);
   await expect(page.locator(".contact-chatbot")).toHaveCount(0);
-  await expect(page.locator("#intro .outline-word")).toHaveCount(0);
   await expect(page.locator("#intro .display-name")).toHaveText("DESORDEN");
   await expect(page.locator("#intro .hero-services li")).toHaveCount(3);
   await expect(page.locator("[data-scene-counter]")).toHaveText("01 / 09");
   await expect(page.locator("[data-active-label]")).toHaveText("introducció");
-  await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(1);
-  await expect(page.locator(".hero-particle-portrait__fallback img")).toHaveCount(1);
+  await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(0);
+  await expect(page.locator(".hero-particle-portrait")).toHaveCount(0);
+  await expect(page.locator("#intro .hero-picture img")).toHaveCount(1);
 
   const title = page.locator("#intro .display-name");
   await expect(title).toHaveCSS("color", "rgb(245, 158, 11)");
-  await expect(title).toHaveCSS("text-align", "center");
+  await expect(title).toHaveCSS("text-align", "left");
   await expect(title).toHaveCSS("text-transform", "uppercase");
 
-  const portrait = page.locator(".hero-particle-portrait");
-  await expect(portrait).toHaveAttribute("data-renderer", "canvas2d");
-  await expect(portrait).toHaveAttribute("data-renderer-status", "ready");
-  await expect.poll(async () => Number.parseInt(
-    await portrait.getAttribute("data-particle-count") ?? "0",
-    10,
-  )).toBeGreaterThan(300);
+  const fontFamily = await title.evaluate((element) => getComputedStyle(element).fontFamily);
+  expect(fontFamily).toMatch(/Impact|Haettenschweiler|Arial Narrow/i);
 });
 
-test("disintegrates in the hero, fades in block two and rebuilds in reverse", async ({ page }) => {
+test("moves and fades the complete hero scene in a single gesture", async ({ page }) => {
   const hero = page.locator("#intro");
   const pitch = page.locator("#pitch");
-  const shell = page.locator(".site-shell");
-  const portrait = page.locator(".hero-particle-portrait");
-  const fallback = page.locator(".hero-particle-portrait__fallback");
+  const image = page.locator("#intro .hero-picture");
 
-  await page.keyboard.press("ArrowDown");
   await expect(hero).toHaveAttribute("data-state", "current");
-  await expect(pitch).toHaveAttribute("data-state", "future");
-  await expect(portrait).toHaveAttribute("data-scene-index", "0");
-  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-  await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
+  await expect(image).toBeVisible();
 
   await page.keyboard.press("ArrowDown");
   await expect(hero).toHaveAttribute("data-state", "past");
   await expect(pitch).toHaveAttribute("data-state", "current");
-  await expect(portrait).toHaveAttribute("data-scene-index", "1");
-  await expect.poll(async () => Number.parseFloat(await portrait.evaluate((element) =>
+
+  await expect.poll(async () => Number.parseFloat(await hero.evaluate((element) =>
     getComputedStyle(element).opacity,
-  )), { timeout: 1_500 }).toBeLessThanOrEqual(0.01);
+  )), { timeout: 1_500 }).toBeLessThanOrEqual(0.05);
+
+  const pastTransform = await hero.evaluate((element) => getComputedStyle(element).transform);
+  expect(pastTransform).not.toBe("none");
 
   await page.keyboard.press("ArrowUp");
   await expect(hero).toHaveAttribute("data-state", "current");
   await expect(pitch).toHaveAttribute("data-state", "future");
-  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-
-  await page.waitForTimeout(180);
-  await expect.poll(async () => shell.evaluate((element) =>
-    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "1"),
-  )).toBeLessThan(0.99);
-
-  await expect.poll(async () => shell.evaluate((element) =>
-    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "1"),
-  ), { timeout: 2_000 }).toBe(0);
-  await expect(portrait).toHaveAttribute("data-render-source", "html");
-  await expect(fallback).toHaveCSS("opacity", "1");
+  await expect.poll(async () => Number.parseFloat(await hero.evaluate((element) =>
+    getComputedStyle(element).opacity,
+  )), { timeout: 1_500 }).toBeGreaterThanOrEqual(0.95);
 });
 
 test("uses Catalan metadata and keeps keyboard focus inside the active scene", async ({ page }) => {
