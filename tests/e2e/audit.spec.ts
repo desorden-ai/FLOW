@@ -10,16 +10,21 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 });
 
-test("renders the reference hero without a top menu or floating WhatsApp assistant", async ({ page }) => {
+test("renders the DESORDEN hero with the unified display system", async ({ page }) => {
   await expect(page.locator(".site-nav")).toHaveCount(0);
   await expect(page.locator(".contact-chatbot")).toHaveCount(0);
-  await expect(page.locator("#intro .outline-word")).toHaveText("EL TEU");
-  await expect(page.locator("#intro .display-name")).toHaveText("PARTNER");
+  await expect(page.locator("#intro .outline-word")).toHaveCount(0);
+  await expect(page.locator("#intro .display-name")).toHaveText("DESORDEN");
   await expect(page.locator("#intro .hero-services li")).toHaveCount(3);
   await expect(page.locator("[data-scene-counter]")).toHaveText("01 / 09");
   await expect(page.locator("[data-active-label]")).toHaveText("introducció");
   await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(1);
   await expect(page.locator(".hero-particle-portrait__fallback img")).toHaveCount(1);
+
+  const title = page.locator("#intro .display-name");
+  await expect(title).toHaveCSS("color", "rgb(245, 158, 11)");
+  await expect(title).toHaveCSS("text-align", "center");
+  await expect(title).toHaveCSS("text-transform", "uppercase");
 
   const portrait = page.locator(".hero-particle-portrait");
   await expect(portrait).toHaveAttribute("data-renderer", "canvas2d");
@@ -30,7 +35,7 @@ test("renders the reference hero without a top menu or floating WhatsApp assista
   )).toBeGreaterThan(300);
 });
 
-test("opens block two on the first gesture and rebuilds the portrait in reverse", async ({ page }) => {
+test("disintegrates in the hero, fades in block two and rebuilds in reverse", async ({ page }) => {
   const hero = page.locator("#intro");
   const pitch = page.locator("#pitch");
   const shell = page.locator(".site-shell");
@@ -38,11 +43,19 @@ test("opens block two on the first gesture and rebuilds the portrait in reverse"
   const fallback = page.locator(".hero-particle-portrait__fallback");
 
   await page.keyboard.press("ArrowDown");
+  await expect(hero).toHaveAttribute("data-state", "current");
+  await expect(pitch).toHaveAttribute("data-state", "future");
+  await expect(portrait).toHaveAttribute("data-scene-index", "0");
+  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
+  await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
+
+  await page.keyboard.press("ArrowDown");
   await expect(hero).toHaveAttribute("data-state", "past");
   await expect(pitch).toHaveAttribute("data-state", "current");
-  await expect(portrait).toHaveAttribute("data-overlay", "pitch");
-  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
-  await expect(portrait).toHaveAttribute("data-particle-density-target", "0.820");
+  await expect(portrait).toHaveAttribute("data-scene-index", "1");
+  await expect.poll(async () => Number.parseFloat(await portrait.evaluate((element) =>
+    getComputedStyle(element).opacity,
+  )), { timeout: 1_500 }).toBeLessThanOrEqual(0.01);
 
   await page.keyboard.press("ArrowUp");
   await expect(hero).toHaveAttribute("data-state", "current");
