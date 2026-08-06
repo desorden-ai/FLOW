@@ -1,16 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { lazy, Suspense, useEffect } from "react";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
 import { ProjectPicture } from "../components/ProjectPicture";
 import { TextPrism3D } from "../components/TextPrism3D";
-
-const LazyVisualLayoutEditor = lazy(async () => {
-  const editorModule = await import("../components/VisualLayoutEditor");
-  return { default: editorModule.VisualLayoutEditor };
-});
 
 const scenes = [
   ["intro", "introducció", "intro"],
@@ -115,58 +109,9 @@ function SceneFrame({ index, name, label, children }: { index: number; name: str
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean }) {
-  useEffect(() => {
-    if (enableEditor) return;
-
-    const controller = new AbortController();
-    let timeoutId: number | null = null;
-    let idleId: number | null = null;
-
-    const loadPublishedContent = async () => {
-      try {
-        const response = await fetch("/api/publish", {
-          signal: controller.signal,
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) return;
-
-        const payload: unknown = await response.json();
-        if (!isRecord(payload)) return;
-
-        const editorModel = await import("../lib/editor-model");
-        const published = editorModel.parseStoredEditorDocument(payload.published);
-        if (published) editorModel.applyEditorDocument(published.data, false);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error("Unable to load published editor data", error);
-      }
-    };
-
-    if ("requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(() => void loadPublishedContent(), { timeout: 2_500 });
-    } else {
-      timeoutId = window.setTimeout(() => void loadPublishedContent(), 900);
-    }
-
-    return () => {
-      controller.abort();
-      if (idleId !== null) window.cancelIdleCallback(idleId);
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
-  }, [enableEditor]);
-
+export function PortfolioApp() {
   return (
     <PortfolioController sceneCount={scenes.length}>
-      {enableEditor && (
-        <Suspense fallback={null}>
-          <LazyVisualLayoutEditor />
-        </Suspense>
-      )}
       <p
         style={visuallyHiddenStyle}
         aria-live="polite"
@@ -191,19 +136,18 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
               width={768}
               height={1028}
               className="hero-picture"
-              canvasSelector="hero-image"
               sizes="(max-width: 760px) 98vw, 48vw"
               eager
             />
             <header className="intro-heading">
-              <h1 className="display-name hero-brand-title" data-canvas-selector="hero-brand-title">DESORDEN</h1>
-              <p className="micro-label" data-canvas-selector="hero-partner-label">
+              <h1 className="display-name hero-brand-title">DESORDEN</h1>
+              <p className="micro-label">
                 ( TECNOLÒGIC I CREATIU )
               </p>
               <ul className="hero-services" aria-label="Serveis principals">
-                <li data-canvas-selector="hero-service-1">Contingut visual per a xarxes socials</li>
-                <li data-canvas-selector="hero-service-2">Vídeo amb IA per visibilitzar marques i comerços</li>
-                <li data-canvas-selector="hero-service-3">Creació d&apos;una identitat visual coherent</li>
+                <li>Contingut visual per a xarxes socials</li>
+                <li>Vídeo amb IA per visibilitzar marques i comerços</li>
+                <li>Creació d&apos;una identitat visual coherent</li>
               </ul>
             </header>
           </div>
@@ -211,9 +155,9 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
 
         <SceneFrame index={1} name="pitch" label="proposta">
           <header className="center-copy pitch-copy">
-            <p className="eyebrow" data-canvas-selector="pitch-eyebrow">Els nostres pilars</p>
-            <h1 id="entity-title" data-canvas-selector="pitch-title">Tot l&apos;arsenal que el teu negoci necessita, en un sol lloc.</h1>
-            <p data-canvas-selector="pitch-desc">Estratègia, identitat, web, automatització, contingut vertical, campanyes i producció aèria coordinats sota una mateixa direcció.</p>
+            <p className="eyebrow">Els nostres pilars</p>
+            <h1 id="entity-title">Tot l&apos;arsenal que el teu negoci necessita, en un sol lloc.</h1>
+            <p>Estratègia, identitat, web, automatització, contingut vertical, campanyes i producció aèria coordinats sota una mateixa direcció.</p>
             <TextPrism3D />
           </header>
         </SceneFrame>
@@ -224,11 +168,11 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
 
         <SceneFrame index={3} name="experience" label="serveis">
           <div className="experience-panel">
-            <p className="ghost-statement" data-canvas-selector="exp-ghost">SERVEIS</p>
-            <h2 data-canvas-selector="exp-title">Què fem</h2>
+            <p className="ghost-statement">SERVEIS</p>
+            <h2>Què fem</h2>
             <div className="experience-list">
-              {services.map((service, index) => (
-                <div className="experience-row" id={service.id} key={service.title} data-canvas-selector={`exp-row-${index}`}>
+              {services.map((service) => (
+                <div className="experience-row" id={service.id} key={service.title}>
                   <div><strong>{service.title}</strong><span>{service.description}</span></div>
                   <time>{service.tag}</time>
                 </div>
@@ -239,24 +183,24 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
 
         <SceneFrame index={4} name="about" label="sobre nosaltres">
           <div className="about-panel">
-            <h2 data-canvas-selector="about-title">Benvinguts a Desorden.</h2>
-            <ul>{personalNotes.map((note, index) => <li key={note} data-canvas-selector={`about-note-${index}`}>✦ <span>{note}</span></li>)}</ul>
-            <p className="about-meta" data-canvas-selector="about-meta"><a href="/sobre-nosaltres">Conèixer la nostra filosofia →</a></p>
+            <h2>Benvinguts a Desorden.</h2>
+            <ul>{personalNotes.map((note) => <li key={note}>✦ <span>{note}</span></li>)}</ul>
+            <p className="about-meta"><a href="/sobre-nosaltres">Conèixer la nostra filosofia →</a></p>
           </div>
         </SceneFrame>
 
         <SceneFrame index={5} name="cases" label="casos d'èxit">
           <div className="case-panel">
-            <p className="eyebrow" data-canvas-selector="cases-eyebrow">Casos d&apos;èxit</p>
+            <p className="eyebrow">Casos d&apos;èxit</p>
             <div className="case-list">
-              {cases.map(([number, title], index) => <button type="button" key={number} data-modal-open={title} data-canvas-selector={`case-btn-${index}`}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
+              {cases.map(([number, title]) => <button type="button" key={number} data-modal-open={title}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
             </div>
           </div>
         </SceneFrame>
 
         {mediaItems.map(([number, title, meta], mediaIndex) => (
           <SceneFrame index={mediaIndex + 6} name="media" label="projectes destacats" key={number}>
-            <button type="button" className="media-card" data-modal-open={title} data-canvas-selector={`media-card-${mediaIndex}`}>
+            <button type="button" className="media-card" data-modal-open={title}>
               <ImagePlaceholder number={number} className="media-placeholder" label={`Imatge destacada: ${title}`} />
               <span className="media-title">{title}</span>
               <small>{meta} · OBRIR □</small>
@@ -267,11 +211,11 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         <SceneFrame index={8} name="contact" label="contacte">
           <div className="contact-mark" aria-hidden="true"><i /><i /><i /></div>
           <div className="contact-copy">
-            <h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2>
-            <p className="contact-email" data-canvas-selector="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p>
-            <p className="contact-place" data-canvas-selector="contact-place">CATALUNYA · ESPANYA</p>
-            <p className="contact-name" data-canvas-selector="contact-name">AGÈNCIA DESORDEN</p>
-            <p data-canvas-selector="contact-desc">Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p>
+            <h2>FEM UN CAFÈ?</h2>
+            <p className="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p>
+            <p className="contact-place">CATALUNYA · ESPANYA</p>
+            <p className="contact-name">AGÈNCIA DESORDEN</p>
+            <p>Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p>
           </div>
         </SceneFrame>
       </div>
@@ -288,9 +232,9 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       <div className="modal-backdrop" data-modal role="presentation" hidden>
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1}>
           <button type="button" className="modal-close" data-modal-close aria-label="Tanca">×</button>
-          <p className="eyebrow" data-canvas-selector="modal-eyebrow">Detall del servei</p>
-          <h2 id="modal-title" data-modal-title data-canvas-selector="modal-title">Detall del projecte</h2>
-          <p data-canvas-selector="modal-desc">Descobreix el context, les decisions, la producció i els resultats de cada projecte DESORDEN.</p>
+          <p className="eyebrow">Detall del servei</p>
+          <h2 id="modal-title" data-modal-title>Detall del projecte</h2>
+          <p>Descobreix el context, les decisions, la producció i els resultats de cada projecte DESORDEN.</p>
         </div>
       </div>
 
