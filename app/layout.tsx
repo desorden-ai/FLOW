@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
 import { SiteNavigation } from "../components/SiteNavigation";
@@ -61,6 +62,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="ca">
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <Script id="three-vendor" src="/api/vendor?library=three" strategy="beforeInteractive" />
+        <Script id="gsap-vendor" src="/api/vendor?library=gsap" strategy="beforeInteractive" />
+        <Script id="scroll-trigger-vendor" src="/api/vendor?library=scroll-trigger" strategy="beforeInteractive" />
       </head>
       <body>
         <SiteNavigation />
