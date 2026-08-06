@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type FormEvent,
 } from "react";
 import type { InstagramAuditResult } from "../../lib/instagram-audit";
@@ -22,11 +21,11 @@ type ApiError = {
 
 const WHATSAPP_NUMBER = "34640925788";
 const LOADING_STEPS = [
-  "Validant el perfil públic",
-  "Consultant les mètriques disponibles",
-  "Calculant interacció i pes del vídeo",
-  "Revisant els canals de conversió",
-  "Generant recomanacions accionables",
+  "Perfil públic",
+  "Interacció",
+  "Vídeo vertical",
+  "Conversió",
+  "Diagnòstic",
 ] as const;
 
 const numberFormatter = new Intl.NumberFormat("ca-ES");
@@ -40,7 +39,7 @@ function wait(milliseconds: number) {
 }
 
 function formatPercentage(value: number | null): string {
-  return value === null ? "No disponible" : `${percentFormatter.format(value)}%`;
+  return value === null ? "—" : `${percentFormatter.format(value)}%`;
 }
 
 function metricLevel(
@@ -77,16 +76,16 @@ export function AuditClient() {
 
     document.documentElement.style.overflow = "auto";
     document.body.style.overflow = "auto";
-    document.body.classList.add("audit-page-active");
     document.documentElement.style.height = "auto";
     document.body.style.height = "auto";
+    document.body.classList.add("audit-page-active");
 
     return () => {
       document.documentElement.style.overflow = htmlOverflow;
       document.body.style.overflow = bodyOverflow;
-      document.body.classList.remove("audit-page-active");
       document.documentElement.style.height = htmlHeight;
       document.body.style.height = bodyHeight;
+      document.body.classList.remove("audit-page-active");
 
       if (timerRef.current !== null) window.clearInterval(timerRef.current);
     };
@@ -172,13 +171,14 @@ export function AuditClient() {
     }
   };
 
-  const restart = () => {
+  const restart = (clearUsername = false) => {
     stopProgressTimer();
     setView("idle");
     setResult(null);
     setErrorMessage("");
     setProgress(0);
     setVisibleSteps(0);
+    if (clearUsername) setUsername("");
   };
 
   const sendLead = (event: FormEvent<HTMLFormElement>) => {
@@ -202,33 +202,34 @@ export function AuditClient() {
 
   return (
     <main className="audit-page">
-      <div className="audit-grid" aria-hidden="true" />
-      <div className="audit-glow audit-glow--one" aria-hidden="true" />
-      <div className="audit-glow audit-glow--two" aria-hidden="true" />
-
       <header className="audit-header">
         <Link className="audit-brand" href="/" aria-label="DESORDEN, tornar a l’inici">
-          <span className="audit-brand__mark"><i>DES</i><i>OR</i><i>DEN</i></span>
+          <span className="audit-brand__mark">
+            <i>DES</i><i>OR</i><i>DEN</i>
+          </span>
           <span className="audit-brand__lab">AUDIT LAB / 01</span>
         </Link>
-        <Link className="audit-back" href="/">Tornar a la web <span aria-hidden="true">↗</span></Link>
+        <Link className="audit-back" href="/">TORNAR A LA WEB <span aria-hidden="true">↗</span></Link>
       </header>
 
       <section className="audit-shell" aria-labelledby="audit-title">
         {view === "idle" && (
           <div className="audit-intro">
-            <div className="audit-kicker"><span /> EINA DE DIAGNÒSTIC AMB DADES PÚBLIQUES</div>
+            <span className="audit-index">01 / INSTAGRAM</span>
             <h1 id="audit-title">
-              El teu Instagram
-              <strong>converteix o només es veu?</strong>
+              <span>AUDITA EL TEU</span>
+              <strong>PERFIL</strong>
             </h1>
-            <p className="audit-lead">
-              Analitzem fins a 12 publicacions recents per detectar interacció,
-              pes del vídeo vertical i capacitat de conversió.
-            </p>
+            <p className="audit-subline">( DADES PÚBLIQUES / RESULTAT EN VIU )</p>
+
+            <ul className="audit-benefits" aria-label="Contingut de l’auditoria">
+              <li>Interacció real</li>
+              <li>Pes dels Reels</li>
+              <li>Capacitat de conversió</li>
+            </ul>
 
             <form className="audit-search" onSubmit={runAudit}>
-              <label htmlFor="instagram-username">Usuari o URL d’Instagram</label>
+              <label htmlFor="instagram-username">PERFIL D’INSTAGRAM</label>
               <div className="audit-search__row">
                 <span aria-hidden="true">@</span>
                 <input
@@ -243,24 +244,20 @@ export function AuditClient() {
                   placeholder="el_teu_usuari"
                   required
                 />
-                <button type="submit">Analitzar perfil <b aria-hidden="true">→</b></button>
+                <button type="submit">ANALITZAR <b aria-hidden="true">↗</b></button>
               </div>
             </form>
-
-            <div className="audit-proof" aria-label="Característiques de l’auditoria">
-              <span><b>01</b>Dades públiques</span>
-              <span><b>02</b>Sense contrasenya</span>
-              <span><b>03</b>Resultat accionable</span>
-            </div>
           </div>
         )}
 
         {view === "loading" && (
           <section className="audit-console" aria-live="polite" aria-label="Auditoria en procés">
-            <div className="audit-console__top">
-              <span><i /> ANALITZANT @{username.replace(/^@/, "")}</span>
-              <b>{progress}%</b>
+            <span className="audit-index">02 / PROCESSANT</span>
+            <div className="audit-console__headline">
+              <h2>ANALITZANT</h2>
+              <strong>{progress}%</strong>
             </div>
+            <p>@{username.replace(/^@/, "")}</p>
             <div className="audit-progress" aria-hidden="true">
               <span style={{ width: `${progress}%` }} />
             </div>
@@ -273,18 +270,17 @@ export function AuditClient() {
                 </li>
               ))}
             </ol>
-            <p>La consulta pot trigar fins a un minut segons la disponibilitat del proveïdor.</p>
           </section>
         )}
 
         {view === "error" && (
           <section className="audit-error" role="alert">
-            <span className="audit-error__code">AUDIT / ERROR</span>
-            <h2>No s’ha pogut completar l’anàlisi.</h2>
+            <span className="audit-index">AUDIT / ERROR</span>
+            <h2>NO S’HA POGUT COMPLETAR.</h2>
             <p>{errorMessage}</p>
-            <div>
-              <button type="button" onClick={restart}>Revisar l’usuari</button>
-              <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Comprovar a Instagram ↗</a>
+            <div className="audit-error__actions">
+              <button type="button" onClick={() => restart(false)}>REVISAR L’USUARI</button>
+              <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">INSTAGRAM ↗</a>
             </div>
           </section>
         )}
@@ -293,52 +289,42 @@ export function AuditClient() {
           <div className="audit-results" data-status={result.status}>
             <section className="audit-summary">
               <div>
-                <span className="audit-section-label">RESULTAT / @{result.username}</span>
-                <h1>{result.statusLabel}</h1>
-                <p>
-                  Diagnòstic calculat sobre <b>{result.postsAnalyzed}</b> publicacions
-                  públiques disponibles.
-                </p>
-                <span className="audit-source">
-                  {result.source === "cache" ? "DADA EN CACHÉ · MÀX. 6 H" : "DADA CONSULTADA EN VIU"}
-                </span>
+                <span className="audit-index">03 / RESULTAT</span>
+                <h1>@{result.username}</h1>
+                <p>{result.statusLabel}</p>
+                <small>
+                  {result.postsAnalyzed} publicacions · {result.source === "cache" ? "caché" : "en viu"}
+                </small>
               </div>
-              <div
-                className="audit-score"
-                style={{ "--score": `${result.score * 3.6}deg` } as CSSProperties}
-                aria-label={`Puntuació ${result.score} sobre 100`}
-              >
-                <div><strong>{result.score}</strong><span>/100</span></div>
+              <div className="audit-score" aria-label={`Puntuació ${result.score} sobre 100`}>
+                <strong>{result.score}</strong>
+                <span>/100</span>
               </div>
             </section>
 
             <section className="audit-metrics" aria-label="Mètriques del perfil">
-              <article data-level={engagementLevel}>
+              <article className="audit-metric audit-metric--accent" data-level={engagementLevel}>
                 <header><span>01 / INTERACCIÓ</span><b>{metricLabel(engagementLevel)}</b></header>
                 <strong>{formatPercentage(result.engagementRate)}</strong>
-                <p>Mitjana de likes i comentaris per publicació respecte als seguidors.</p>
               </article>
-              <article data-level={videoLevel}>
-                <header><span>02 / VÍDEO</span><b>{metricLabel(videoLevel)}</b></header>
+              <article className="audit-metric" data-level={videoLevel}>
+                <header><span>02 / REELS</span><b>{metricLabel(videoLevel)}</b></header>
                 <strong>{formatPercentage(result.videoRatio)}</strong>
-                <p>Pes del vídeo i els Reels dins de la mostra de publicacions recents.</p>
               </article>
-              <article data-level={result.hasCta ? "good" : "low"}>
-                <header><span>03 / CONVERSIÓ</span><b>{result.hasCta ? "ACTIU" : "FALTA CTA"}</b></header>
-                <strong>{result.hasCta ? "Enllaç detectat" : "Sense enllaç"}</strong>
-                <p>Presència d’un canal extern a la bio per transformar visites en contactes.</p>
+              <article className="audit-metric" data-level={result.hasCta ? "good" : "low"}>
+                <header><span>03 / CTA</span><b>{result.hasCta ? "ACTIU" : "FALTA"}</b></header>
+                <strong>{result.hasCta ? "SÍ" : "NO"}</strong>
               </article>
-              <article data-level="neutral">
-                <header><span>04 / AUDIÈNCIA</span><b>PÚBLIC</b></header>
+              <article className="audit-metric" data-level="neutral">
+                <header><span>04 / SEGUIDORS</span><b>PÚBLIC</b></header>
                 <strong>{numberFormatter.format(result.followers)}</strong>
-                <p>Seguidors indicats pel perfil públic en el moment de la consulta.</p>
               </article>
             </section>
 
             <section className="audit-recommendations">
               <div>
-                <span className="audit-section-label">PRIORITATS / SEGÜENT CICLE</span>
-                <h2>Què canviaria ara.</h2>
+                <span className="audit-index">04 / PRIORITATS</span>
+                <h2>3 CANVIS.</h2>
               </div>
               <ol>
                 {result.recommendations.map((recommendation, index) => (
@@ -352,15 +338,11 @@ export function AuditClient() {
 
             <section className="audit-conversion">
               <div>
-                <span className="audit-section-label">AUDITORIA COMPLETA</span>
-                <h2>3 idees de Reels per al teu negoci.</h2>
-                <p>
-                  Envia el resultat per WhatsApp i rep una proposta inicial adaptada
-                  al perfil, sense formularis opacs ni promeses automàtiques.
-                </p>
+                <span className="audit-index">SEGÜENT PAS</span>
+                <h2>3 IDEES DE REELS.</h2>
               </div>
               <form onSubmit={sendLead}>
-                <label htmlFor="lead-contact">Nom i contacte</label>
+                <label htmlFor="lead-contact">NOM I CONTACTE</label>
                 <input
                   id="lead-contact"
                   name="contact"
@@ -372,23 +354,22 @@ export function AuditClient() {
                 />
                 <label className="audit-consent">
                   <input type="checkbox" required />
-                  <span>Accepto iniciar una conversa amb DESORDEN per WhatsApp.</span>
+                  <span>Accepto obrir una conversa per WhatsApp.</span>
                 </label>
-                <button type="submit">Enviar diagnòstic per WhatsApp <span aria-hidden="true">↗</span></button>
+                <button type="submit">ENVIAR PER WHATSAPP <span aria-hidden="true">↗</span></button>
               </form>
             </section>
 
-            <button className="audit-restart" type="button" onClick={restart}>← Auditar un altre perfil</button>
+            <button className="audit-restart" type="button" onClick={() => restart(true)}>
+              ← AUDITAR UN ALTRE PERFIL
+            </button>
           </div>
         )}
       </section>
 
       <footer className="audit-footer">
         <span>DESORDEN © 2026</span>
-        <p>
-          Eina independent basada en dades públiques. No està afiliada, patrocinada
-          ni validada per Instagram o Meta.
-        </p>
+        <p>Dades públiques · Eina independent de Meta.</p>
       </footer>
     </main>
   );
