@@ -1,13 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-test("maps the WebGL mesh to the rendered portrait box and recalculates on resize", async ({ page }) => {
+test("maps Canvas 2D particles to the rendered portrait and recalculates on resize", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 
   const portrait = page.locator(".hero-particle-portrait");
   const fallbackLayer = page.locator(".hero-particle-portrait__fallback");
   const canvas = page.locator("[data-hero-particle-canvas]");
 
-  await expect(portrait).toHaveAttribute("data-webgl", "ready");
+  await expect(portrait).toHaveAttribute("data-renderer", "canvas2d");
+  await expect(portrait).toHaveAttribute("data-renderer-status", "ready");
   await expect(portrait).toHaveAttribute("data-render-source", "html");
   await expect(canvas).toHaveCSS("opacity", "0");
   await expect(fallbackLayer).toHaveCSS("opacity", "1");
@@ -25,36 +26,37 @@ test("maps the WebGL mesh to the rendered portrait box and recalculates on resiz
         width: rect.width,
         height: rect.height,
       },
-      mesh: {
+      particles: {
         left: Number.parseFloat(wrapper.dataset.meshLeft ?? "NaN"),
         top: Number.parseFloat(wrapper.dataset.meshTop ?? "NaN"),
         width: Number.parseFloat(wrapper.dataset.meshWidth ?? "NaN"),
         height: Number.parseFloat(wrapper.dataset.meshHeight ?? "NaN"),
       },
-      textureAspect: Number.parseFloat(wrapper.dataset.textureAspect ?? "NaN"),
-      renderedAspect: Number.parseFloat(wrapper.dataset.renderedAspect ?? "NaN"),
+      particleCount: Number.parseInt(wrapper.dataset.particleCount ?? "0", 10),
+      step: Number.parseInt(wrapper.dataset.particleStep ?? "0", 10),
     };
   });
 
   const expectAligned = (alignment: Awaited<ReturnType<typeof readAlignment>>) => {
-    expect(Math.abs(alignment.rect.left - alignment.mesh.left)).toBeLessThan(0.75);
-    expect(Math.abs(alignment.rect.top - alignment.mesh.top)).toBeLessThan(0.75);
-    expect(Math.abs(alignment.rect.width - alignment.mesh.width)).toBeLessThan(0.75);
-    expect(Math.abs(alignment.rect.height - alignment.mesh.height)).toBeLessThan(0.75);
-    expect(Math.abs(alignment.textureAspect - alignment.renderedAspect)).toBeLessThan(0.01);
+    expect(Math.abs(alignment.rect.left - alignment.particles.left)).toBeLessThan(0.75);
+    expect(Math.abs(alignment.rect.top - alignment.particles.top)).toBeLessThan(0.75);
+    expect(Math.abs(alignment.rect.width - alignment.particles.width)).toBeLessThan(0.75);
+    expect(Math.abs(alignment.rect.height - alignment.particles.height)).toBeLessThan(0.75);
+    expect(alignment.particleCount).toBeGreaterThan(1000);
+    expect(alignment.step).toBe(6);
   };
 
   expectAligned(await readAlignment());
 
   await page.keyboard.press("ArrowDown");
-  await expect(portrait).toHaveAttribute("data-render-source", "webgl");
+  await expect(portrait).toHaveAttribute("data-render-source", "canvas2d");
   await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
   await expect(canvas).toHaveCSS("opacity", "1");
   await expect.poll(async () => Number.parseFloat(await fallbackLayer.evaluate((element) =>
     getComputedStyle(element).opacity,
-  ))).toBeLessThanOrEqual(0.2);
+  ))).toBeLessThanOrEqual(0.05);
 
   await page.setViewportSize({ width: 430, height: 932 });
-  await expect.poll(async () => (await readAlignment()).mesh.width).toBeGreaterThan(400);
+  await expect.poll(async () => (await readAlignment()).particles.width).toBeGreaterThan(400);
   expectAligned(await readAlignment());
 });
