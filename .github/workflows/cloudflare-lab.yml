@@ -4,6 +4,8 @@ run-name: Deploy FLOW Lab · ${{ github.sha }}
 on:
   push:
     branches: [lab/visual-3d]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +18,7 @@ concurrency:
 
 jobs:
   deploy-lab:
+    if: github.ref == 'refs/heads/lab/visual-3d' || github.head_ref == 'lab/visual-3d'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
