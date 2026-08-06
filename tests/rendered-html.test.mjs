@@ -85,6 +85,20 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
     assertMissing("components/ReelToastSequence.tsx"),
     assertMissing("components/ReelToastSequence.module.css"),
     assertMissing("app/api/vendor/route.ts"),
+    assertMissing("app/editor/page.tsx"),
+    assertMissing("app/editor/editor.css"),
+    assertMissing("app/editor/position-controls.css"),
+    assertMissing("components/VisualLayoutEditor.tsx"),
+    assertMissing("components/EditorPositionControls.tsx"),
+    assertMissing("lib/editor-model.ts"),
+    assertMissing("lib/editor-server.ts"),
+    assertMissing("lib/editor-position.ts"),
+    assertMissing("app/api/auth/route.ts"),
+    assertMissing("app/api/draft/route.ts"),
+    assertMissing("app/api/publish/route.ts"),
+    assertMissing("tests/editor-position.test.mjs"),
+    assertMissing("fix-sizes.sh"),
+    assertMissing("fix-braces.sh"),
   ]);
 
   assert.match(homePage, /PortfolioApp/);
@@ -95,9 +109,12 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(page, /portada-chico-bn\.webp/);
   assert.match(page, /sizes="\(max-width: 760px\) 98vw, 48vw"/);
   assert.match(page, />DESORDEN</);
-  assert.match(page, /LazyVisualLayoutEditor/);
-  assert.match(page, /requestIdleCallback/);
-  assert.match(page, /import\("\.\.\/lib\/editor-model"\)/);
+  assert.doesNotMatch(page, /VisualLayoutEditor/);
+  assert.doesNotMatch(page, /requestIdleCallback/);
+  assert.doesNotMatch(page, /editor-model/);
+  assert.doesNotMatch(page, /\/api\/publish/);
+  assert.doesNotMatch(page, /enableEditor/);
+  assert.doesNotMatch(page, /data-canvas-selector/);
   assert.doesNotMatch(page, /HeroParticlePortrait/);
   assert.doesNotMatch(page, /data-hero-particle-canvas/);
   assert.doesNotMatch(page, /hero-particle-portrait/);
@@ -143,6 +160,8 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(picture, /image\/avif/);
   assert.match(picture, /image\/webp/);
   assert.match(picture, /fetchPriority/);
+  assert.doesNotMatch(picture, /canvasSelector/);
+  assert.doesNotMatch(picture, /data-canvas-selector/);
 
   assert.match(controller, /^"use client"/);
   assert.match(modal, /getFocusableElements/);
@@ -163,6 +182,7 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.doesNotMatch(pushNotificationsCss, /border:\s*1px solid #f59e0b/);
 
   assert.match(siteNavigation, /pathname === "\/"/);
+  assert.doesNotMatch(siteNavigation, /\/editor/);
   assert.match(siteNavigation, /IA i Automatització/);
   assert.match(commercialCss, /\.commercial-grid--three/);
   assert.match(contactForm, /createPortal/);
@@ -185,6 +205,7 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(sitemap, /\/ajuts/);
   assert.match(sitemap, /\/preus/);
   assert.match(sitemap, /\/sobre-nosaltres/);
+  assert.doesNotMatch(sitemap, /\/editor/);
 
   assert.match(worker, /Content-Security-Policy/);
   assert.match(worker, /X-Robots-Tag/);
@@ -203,6 +224,7 @@ test("keeps the public portfolio lean, accessible and deployable", async () => {
   assert.match(packageJson, /"audit:prod"/);
   assert.match(deployWorkflow, /Audit production dependencies/);
   assert.match(deployWorkflow, /name: Lint/);
+  assert.doesNotMatch(deployWorkflow, /EDITOR_PASSWORD|EDITOR_SESSION_SECRET|editor-secrets\.json/);
   assert.match(qualityWorkflow, /Run Android and accessibility tests/);
   assert.match(qualityWorkflow, /Enforce mobile Lighthouse budgets/);
   assert.match(qualityWorkflow, /node scripts\/assert-lighthouse\.mjs/);
