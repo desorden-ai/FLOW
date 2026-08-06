@@ -66,11 +66,11 @@ export function HeroParticleSequenceFix() {
       if (!layer) return;
 
       layer.dataset.phase = "hero-particles";
-      layer.dataset.renderSource = "webgl";
+      layer.dataset.renderSource = "canvas2d";
       layer.style.setProperty("--hero-layer-opacity", "1");
-      layer.style.setProperty("--hero-fallback-opacity", "0.14");
+      layer.style.setProperty("--hero-fallback-opacity", "0");
       layer.style.setProperty("--hero-canvas-opacity", "1");
-      layer.style.setProperty("--hero-veil-opacity", "0.58");
+      layer.style.setProperty("--hero-veil-opacity", "0.12");
     };
 
     const applyPitchVisuals = () => {
@@ -80,7 +80,7 @@ export function HeroParticleSequenceFix() {
 
       layer.dataset.overlay = "pitch";
       layer.dataset.phase = "pitch-particles";
-      layer.dataset.renderSource = "webgl";
+      layer.dataset.renderSource = "canvas2d";
       layer.dataset.sceneIndex = "1";
       layer.style.setProperty("--hero-layer-opacity", "1");
       layer.style.setProperty("--hero-fallback-opacity", "0");
@@ -95,7 +95,7 @@ export function HeroParticleSequenceFix() {
 
       layer.dataset.overlay = "leaving";
       layer.dataset.phase = "block-3-fade";
-      layer.dataset.renderSource = "webgl";
+      layer.dataset.renderSource = "canvas2d";
       layer.dataset.sceneIndex = "2";
       layer.style.setProperty("--hero-layer-opacity", "1");
       layer.style.setProperty("--hero-fallback-opacity", "0");
@@ -105,6 +105,7 @@ export function HeroParticleSequenceFix() {
       hideTimer = window.setTimeout(() => {
         layer.dataset.overlay = "hidden";
         layer.dataset.phase = "hidden";
+        layer.dataset.renderSource = "hidden";
         layer.style.setProperty("--hero-layer-opacity", "0");
         layer.style.setProperty("--hero-canvas-opacity", "0");
         hideTimer = null;
