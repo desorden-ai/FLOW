@@ -39,72 +39,40 @@ function isolateBackgroundElements(root: HTMLElement, modalBackdrop: HTMLElement
   return state;
 }
 
-function handleTabKey(event: KeyboardEvent, modalBackdrop: HTMLElement) {
-  if (event.key !== "Tab") return;
-
-  const modal = modalBackdrop.querySelector<HTMLElement>("[role='dialog']");
-  if (!modal) return;
-
-  const focusable = getFocusableElements(modal);
-  if (focusable.length === 0) {
-    event.preventDefault();
-    modal.focus();
-    return;
-  }
-
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  const active = document.activeElement;
-
-  if (event.shiftKey && active === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && active === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
-function handleModalClick(
-  event: MouseEvent,
-  root: HTMLElement,
-  openModal: (title: string, trigger?: HTMLElement | null) => void,
-  closeModal: () => void
-) {
-  const target = event.target as HTMLElement;
-  const modalButton = target.closest<HTMLElement>("[data-modal-open]");
-  const modalBackdrop = root.querySelector<HTMLElement>("[data-modal]");
-
-  if (modalButton) {
-    openModal(modalButton.dataset.modalOpen ?? "Detall del projecte", modalButton);
-    return;
-  }
-
-  if (target.closest("[data-modal-close]") || target === modalBackdrop) {
-    closeModal();
-  }
-}
-
-function handleModalKeyDown(
-  event: KeyboardEvent,
-  root: HTMLElement,
-  closeModal: () => void
-) {
-  const modalBackdrop = root.querySelector<HTMLElement>("[data-modal]");
-  if (!modalBackdrop || modalBackdrop.hidden) return;
-
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeModal();
-    return;
-  }
-
-  handleTabKey(event, modalBackdrop);
-}
-
 export function usePortfolioModal(rootRef: RefObject<HTMLElement | null>) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const backgroundStateRef = useRef<BackgroundState[]>([]);
+
+  const modalBackdropRef = useRef<HTMLElement | null>(null);
+  const modalRef = useRef<HTMLElement | null>(null);
+  const modalTitleRef = useRef<HTMLElement | null>(null);
+
+  const getModalElements = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return null;
+
+    let backdrop = modalBackdropRef.current;
+    if (!backdrop || !backdrop.isConnected || !root.contains(backdrop)) {
+      backdrop = root.querySelector<HTMLElement>("[data-modal]");
+      modalBackdropRef.current = backdrop;
+    }
+
+    if (!backdrop) return null;
+
+    let modal = modalRef.current;
+    if (!modal || !modal.isConnected || !backdrop.contains(modal)) {
+      modal = backdrop.querySelector<HTMLElement>("[role='dialog']");
+      modalRef.current = modal;
+    }
+
+    let title = modalTitleRef.current;
+    if (!title || !title.isConnected || !backdrop.contains(title)) {
+      title = backdrop.querySelector<HTMLElement>("[data-modal-title]");
+      modalTitleRef.current = title;
+    }
+
+    return { backdrop, modal, title };
+  }, [rootRef]);
 
   const restoreBackground = useCallback(() => {
     restoreBackgroundElements(backgroundStateRef.current);
@@ -112,48 +80,99 @@ export function usePortfolioModal(rootRef: RefObject<HTMLElement | null>) {
   }, []);
 
   const closeModal = useCallback(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const modalBackdrop = root.querySelector<HTMLElement>("[data-modal]");
+    const elements = getModalElements();
+    if (!elements) return;
+    const { backdrop } = elements;
 
-    if (!modalBackdrop || modalBackdrop.hidden) return;
+    if (backdrop.hidden) return;
 
-    modalBackdrop.hidden = true;
+    backdrop.hidden = true;
     document.body.classList.remove("modal-open");
     restoreBackground();
 
     const trigger = triggerRef.current;
     triggerRef.current = null;
     if (trigger?.isConnected) trigger.focus();
-  }, [rootRef, restoreBackground]);
+  }, [getModalElements, restoreBackground]);
 
   const openModal = useCallback((title: string, trigger?: HTMLElement | null) => {
     const root = rootRef.current;
     if (!root) return;
-    const modalBackdrop = root.querySelector<HTMLElement>("[data-modal]");
-    const modal = modalBackdrop?.querySelector<HTMLElement>("[role='dialog']");
-    const modalTitle = modalBackdrop?.querySelector<HTMLElement>("[data-modal-title]");
+    const elements = getModalElements();
+    if (!elements) return;
+    const { backdrop, modal, title: modalTitle } = elements;
 
-    if (!modalBackdrop || !modal || !modalTitle) return;
+    if (!modal || !modalTitle) return;
 
-    triggerRef.current = trigger ?? document.activeElement as HTMLElement | null;
+    triggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
     modalTitle.textContent = title;
 
-    backgroundStateRef.current = isolateBackgroundElements(root, modalBackdrop);
+    backgroundStateRef.current = isolateBackgroundElements(root, backdrop);
 
-    modalBackdrop.hidden = false;
+    backdrop.hidden = false;
     document.body.classList.add("modal-open");
 
     const focusable = getFocusableElements(modal);
     (focusable[0] ?? modal).focus();
-  }, [rootRef]);
+  }, [rootRef, getModalElements]);
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
 
-    const onClick = (event: MouseEvent) => handleModalClick(event, root, openModal, closeModal);
-    const onKeyDown = (event: KeyboardEvent) => handleModalKeyDown(event, root, closeModal);
+    const onClick = (event: MouseEvent) => {
+      const elements = getModalElements();
+      if (!elements) return;
+      const { backdrop } = elements;
+
+      const target = event.target as HTMLElement;
+      const modalButton = target.closest<HTMLElement>("[data-modal-open]");
+
+      if (modalButton) {
+        openModal(modalButton.dataset.modalOpen ?? "Detall del projecte", modalButton);
+        return;
+      }
+
+      if (target.closest("[data-modal-close]") || target === backdrop) {
+        closeModal();
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const elements = getModalElements();
+      if (!elements) return;
+      const { backdrop, modal } = elements;
+
+      if (backdrop.hidden) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      if (!modal) return;
+
+      const focusable = getFocusableElements(modal);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
 
     root.addEventListener("click", onClick);
     window.addEventListener("keydown", onKeyDown);
@@ -164,7 +183,7 @@ export function usePortfolioModal(rootRef: RefObject<HTMLElement | null>) {
       document.body.classList.remove("modal-open");
       restoreBackground();
     };
-  }, [rootRef, closeModal, openModal, restoreBackground]);
+  }, [rootRef, closeModal, openModal, restoreBackground, getModalElements]);
 
   return { closeModal, openModal };
 }
