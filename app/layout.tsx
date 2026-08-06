@@ -13,6 +13,7 @@ import "./video-layout-restore.css";
 import "./commercial-pages.css";
 import "./commercial-a11y-fixes.css";
 import "./hero-particles.css";
+import "./hero-particles-a11y.css";
 
 const SITE_URL = "https://www.desorden.cat";
 const SITE_DESCRIPTION =
