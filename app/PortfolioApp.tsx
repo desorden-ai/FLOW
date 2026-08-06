@@ -8,8 +8,8 @@ import { ProjectPicture } from "../components/ProjectPicture";
 import { TextPrism3D } from "../components/TextPrism3D";
 
 const LazyVisualLayoutEditor = lazy(async () => {
-  const module = await import("../components/VisualLayoutEditor");
-  return { default: module.VisualLayoutEditor };
+  const mod = await import("../components/VisualLayoutEditor");
+  return { default: mod.VisualLayoutEditor };
 });
 
 const scenes = [
@@ -39,25 +39,29 @@ const services = [
   {
     id: "disseny-web",
     title: "Disseny Web & Branding",
-    description: "Creem identitats visuals trencadores i plataformes e-commerce ultraràpides, accessibles i preparades per vendre.",
+    description:
+      "Creem identitats visuals trencadores i plataformes e-commerce ultraràpides, accessibles i preparades per vendre.",
     tag: "Web · Branding",
   },
   {
     id: "drons",
     title: "Producció Dron 4K",
-    description: "Imatges aèries per a empresa, indústria i promoció. Planifiquem l'operació i coordinem la documentació aplicable.",
+    description:
+      "Imatges aèries per a empresa, indústria i promoció. Planifiquem l'operació i coordinem la documentació aplicable.",
     tag: "UAS · Audiovisual",
   },
   {
     id: "ia-automatitzacio",
     title: "IA i Automatització",
-    description: "Automatitzem processos repetitius amb n8n i integrem intel·ligència artificial en fluxos, continguts i experiències digitals.",
+    description:
+      "Automatitzem processos repetitius amb n8n i integrem intel·ligència artificial en fluxos, continguts i experiències digitals.",
     tag: "IA · n8n",
   },
   {
     id: "social-media",
     title: "Social Media i Contingut",
-    description: "Estratègia, campanyes Ads i producció vertical per transformar visibilitat en demanda que es noti al negoci.",
+    description:
+      "Estratègia, campanyes Ads i producció vertical per transformar visibilitat en demanda que es noti al negoci.",
     tag: "Vertical · Ads",
   },
 ];
@@ -76,8 +80,16 @@ const cases = [
 ];
 
 const mediaItems = [
-  ["14", "Seguiment d'obra industrial i civil", "Dron 4K · Planificació · Edició"],
-  ["15", "Campanyes visuals per a turisme i immobiliari", "Web · Vídeo vertical · Dron"],
+  [
+    "14",
+    "Seguiment d'obra industrial i civil",
+    "Dron 4K · Planificació · Edició",
+  ],
+  [
+    "15",
+    "Campanyes visuals per a turisme i immobiliari",
+    "Web · Vídeo vertical · Dron",
+  ],
 ];
 
 const visuallyHiddenStyle = {
@@ -92,11 +104,37 @@ const visuallyHiddenStyle = {
   border: 0,
 } as const;
 
-function ImagePlaceholder({ number, className = "", label }: { number: string; className?: string; label?: string }) {
-  return <span className={`image-placeholder ${className}`.trim()} aria-label={label ?? `Imatge substituïble ${number}`} role="img">{number}</span>;
+function ImagePlaceholder({
+  number,
+  className = "",
+  label,
+}: {
+  number: string;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <span
+      className={`image-placeholder ${className}`.trim()}
+      aria-label={label ?? `Imatge substituïble ${number}`}
+      role="img"
+    >
+      {number}
+    </span>
+  );
 }
 
-function SceneFrame({ index, name, label, children }: { index: number; name: string; label: string; children: ReactNode }) {
+function SceneFrame({
+  index,
+  name,
+  label,
+  children,
+}: {
+  index: number;
+  name: string;
+  label: string;
+  children: ReactNode;
+}) {
   const isInitialScene = index === 0;
 
   return (
@@ -119,7 +157,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean }) {
+function usePublishedContent(enableEditor: boolean) {
   useEffect(() => {
     if (enableEditor) return;
 
@@ -139,16 +177,21 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
         if (!isRecord(payload)) return;
 
         const editorModel = await import("../lib/editor-model");
-        const published = editorModel.parseStoredEditorDocument(payload.published);
+        const published = editorModel.parseStoredEditorDocument(
+          payload.published,
+        );
         if (published) editorModel.applyEditorDocument(published.data, false);
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
         console.error("Unable to load published editor data", error);
       }
     };
 
     if ("requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(() => void loadPublishedContent(), { timeout: 2_500 });
+      idleId = window.requestIdleCallback(() => void loadPublishedContent(), {
+        timeout: 2_500,
+      });
     } else {
       timeoutId = window.setTimeout(() => void loadPublishedContent(), 900);
     }
@@ -159,6 +202,311 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
       if (timeoutId !== null) window.clearTimeout(timeoutId);
     };
   }, [enableEditor]);
+}
+
+function VisuallyHiddenIntro() {
+  return (
+    <p
+      style={visuallyHiddenStyle}
+      aria-live="polite"
+      aria-atomic="true"
+      data-live-scene-label
+    >
+      introducció
+    </p>
+  );
+}
+function MediaMarquee() {
+  return (
+    <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
+      <p
+        className="media-marquee__track"
+        data-text="DESORDEN ✦ DESORDEN ✦ DESORDEN ✦ "
+      >
+        DESORDEN ✦ DESORDEN ✦ DESORDEN ✦
+      </p>
+    </div>
+  );
+}
+function IntroScene() {
+  return (
+    <SceneFrame index={0} name="intro" label="introducció">
+      <div className="intro-layout">
+        <ProjectPicture
+          file="media/hero/portada-chico-bn.webp"
+          alt="Perfil en blanc i negre del creador de DESORDEN"
+          width={768}
+          height={1028}
+          className="hero-picture"
+          canvasSelector="hero-image"
+          sizes="(max-width: 760px) 64vw, 48vw"
+          eager
+        />
+        <header className="intro-heading">
+          <h1
+            className="display-name hero-brand-title"
+            data-canvas-selector="hero-brand-title"
+          >
+            DESORDEN
+          </h1>
+          <p className="micro-label" data-canvas-selector="hero-partner-label">
+            ( TECNOLÒGIC I CREATIU )
+          </p>
+          <ul className="hero-services" aria-label="Serveis principals">
+            <li data-canvas-selector="hero-service-1">
+              Contingut visual per a xarxes socials
+            </li>
+            <li data-canvas-selector="hero-service-2">
+              Vídeo amb IA per visibilitzar marques i comerços
+            </li>
+            <li data-canvas-selector="hero-service-3">
+              Creació d&apos;una identitat visual coherent
+            </li>
+          </ul>
+        </header>
+      </div>
+    </SceneFrame>
+  );
+}
+function PitchScene() {
+  return (
+    <SceneFrame index={1} name="pitch" label="proposta">
+      <header className="center-copy pitch-copy">
+        <p className="eyebrow" data-canvas-selector="pitch-eyebrow">
+          Els nostres pilars
+        </p>
+        <h1 id="entity-title" data-canvas-selector="pitch-title">
+          Tot l&apos;arsenal que el teu negoci necessita, en un sol lloc.
+        </h1>
+        <p data-canvas-selector="pitch-desc">
+          Estratègia, identitat, web, automatització, contingut vertical,
+          campanyes i producció aèria coordinats sota una mateixa direcció.
+        </p>
+        <TextPrism3D />
+      </header>
+    </SceneFrame>
+  );
+}
+function PartnersScene() {
+  return (
+    <SceneFrame index={2} name="partners" label="autoritat">
+      <LogoTunnel />
+    </SceneFrame>
+  );
+}
+function ExperienceScene() {
+  return (
+    <SceneFrame index={3} name="experience" label="serveis">
+      <div className="experience-panel">
+        <p className="ghost-statement" data-canvas-selector="exp-ghost">
+          SERVEIS
+        </p>
+        <h2 data-canvas-selector="exp-title">Què fem</h2>
+        <div className="experience-list">
+          {services.map((service, index) => (
+            <div
+              className="experience-row"
+              id={service.id}
+              key={service.title}
+              data-canvas-selector={`exp-row-${index}`}
+            >
+              <div>
+                <strong>{service.title}</strong>
+                <span>{service.description}</span>
+              </div>
+              <time>{service.tag}</time>
+            </div>
+          ))}
+        </div>
+      </div>
+    </SceneFrame>
+  );
+}
+function AboutScene() {
+  return (
+    <SceneFrame index={4} name="about" label="sobre nosaltres">
+      <div className="about-panel">
+        <h2 data-canvas-selector="about-title">Benvinguts a Desorden.</h2>
+        <ul>
+          {personalNotes.map((note, index) => (
+            <li key={note} data-canvas-selector={`about-note-${index}`}>
+              ✦ <span>{note}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="about-meta" data-canvas-selector="about-meta">
+          <a href="/sobre-nosaltres">Conèixer la nostra filosofia →</a>
+        </p>
+      </div>
+    </SceneFrame>
+  );
+}
+function CasesScene() {
+  return (
+    <SceneFrame index={5} name="cases" label="casos d'èxit">
+      <div className="case-panel">
+        <p className="eyebrow" data-canvas-selector="cases-eyebrow">
+          Casos d&apos;èxit
+        </p>
+        <div className="case-list">
+          {cases.map(([number, title], index) => (
+            <button
+              type="button"
+              key={number}
+              data-modal-open={title}
+              data-canvas-selector={`case-btn-${index}`}
+            >
+              <b>{number}.</b>
+              <span>{title}</span>
+              <i>↗</i>
+            </button>
+          ))}
+        </div>
+      </div>
+    </SceneFrame>
+  );
+}
+function MediaScenes() {
+  return (
+    <>
+      {mediaItems.map(([number, title, meta], mediaIndex) => (
+        <SceneFrame
+          index={mediaIndex + 6}
+          name="media"
+          label="projectes destacats"
+          key={number}
+        >
+          <button
+            type="button"
+            className="media-card"
+            data-modal-open={title}
+            data-canvas-selector={`media-card-${mediaIndex}`}
+          >
+            <ImagePlaceholder
+              number={number}
+              className="media-placeholder"
+              label={`Imatge destacada: ${title}`}
+            />
+            <span className="media-title">{title}</span>
+            <small>{meta} · OBRIR □</small>
+          </button>
+        </SceneFrame>
+      ))}
+    </>
+  );
+}
+function ContactScene() {
+  return (
+    <SceneFrame index={8} name="contact" label="contacte">
+      <div className="contact-mark" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="contact-copy">
+        <h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2>
+        <p className="contact-email" data-canvas-selector="contact-email">
+          <a href="mailto:hola@desorden.cat">hola@desorden.cat</a>
+        </p>
+        <p className="contact-place" data-canvas-selector="contact-place">
+          CATALUNYA · ESPANYA
+        </p>
+        <p className="contact-name" data-canvas-selector="contact-name">
+          AGÈNCIA DESORDEN
+        </p>
+        <p data-canvas-selector="contact-desc">
+          Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes
+          impossibles.
+        </p>
+      </div>
+    </SceneFrame>
+  );
+}
+function FixedUI() {
+  return (
+    <div className="fixed-ui">
+      <p className="scene-counter" data-scene-counter>
+        01 / 09
+      </p>
+      <div className="progress-rail" aria-hidden="true">
+        <i data-progress-bar />
+      </div>
+      <nav className="section-navigation" aria-label="Seccions de DESORDEN">
+        <ol data-section-menu hidden>
+          {navigation.map(([label, index]) => (
+            <li key={label}>
+              <button type="button" data-go={index}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ol>
+        <button
+          type="button"
+          className="section-toggle"
+          data-menu-toggle
+          aria-expanded="false"
+        >
+          <span>Secció</span>
+          <b data-active-label>introducció</b>
+          <i />
+        </button>
+      </nav>
+    </div>
+  );
+}
+function ModalBackdrop() {
+  return (
+    <div className="modal-backdrop" data-modal role="presentation" hidden>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex={-1}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          data-modal-close
+          aria-label="Tanca"
+        >
+          ×
+        </button>
+        <p className="eyebrow" data-canvas-selector="modal-eyebrow">
+          Detall del servei
+        </p>
+        <h2
+          id="modal-title"
+          data-modal-title
+          data-canvas-selector="modal-title"
+        >
+          Detall del projecte
+        </h2>
+        <p data-canvas-selector="modal-desc">
+          Descobreix el context, les decisions, la producció i els resultats de
+          cada projecte DESORDEN.
+        </p>
+      </div>
+    </div>
+  );
+}
+function BackgroundEffects() {
+  return (
+    <>
+      <div className="grain" aria-hidden="true" />
+      <div className="vignette" aria-hidden="true" />
+    </>
+  );
+}
+
+export function PortfolioApp({
+  enableEditor = false,
+}: {
+  enableEditor?: boolean;
+}) {
+  usePublishedContent(enableEditor);
 
   return (
     <PortfolioController sceneCount={scenes.length}>
@@ -167,134 +515,33 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
           <LazyVisualLayoutEditor />
         </Suspense>
       )}
-      <p
-        style={visuallyHiddenStyle}
-        aria-live="polite"
-        aria-atomic="true"
-        data-live-scene-label
-      >
-        introducció
-      </p>
+      <VisuallyHiddenIntro />
 
-      <div className="media-marquee" data-media-marquee hidden aria-hidden="true">
-        <p className="media-marquee__track" data-text="DESORDEN ✦ DESORDEN ✦ DESORDEN ✦ ">
-          DESORDEN ✦ DESORDEN ✦ DESORDEN ✦
-        </p>
-      </div>
+      <MediaMarquee />
 
       <div className="scene-deck">
-        <SceneFrame index={0} name="intro" label="introducció">
-          <div className="intro-layout">
-            <ProjectPicture
-              file="media/hero/portada-chico-bn.webp"
-              alt="Perfil en blanc i negre del creador de DESORDEN"
-              width={768}
-              height={1028}
-              className="hero-picture"
-              canvasSelector="hero-image"
-              sizes="(max-width: 760px) 64vw, 48vw"
-              eager
-            />
-            <header className="intro-heading">
-              <h1 className="display-name hero-brand-title" data-canvas-selector="hero-brand-title">DESORDEN</h1>
-              <p className="micro-label" data-canvas-selector="hero-partner-label">
-                ( TECNOLÒGIC I CREATIU )
-              </p>
-              <ul className="hero-services" aria-label="Serveis principals">
-                <li data-canvas-selector="hero-service-1">Contingut visual per a xarxes socials</li>
-                <li data-canvas-selector="hero-service-2">Vídeo amb IA per visibilitzar marques i comerços</li>
-                <li data-canvas-selector="hero-service-3">Creació d&apos;una identitat visual coherent</li>
-              </ul>
-            </header>
-          </div>
-        </SceneFrame>
+        <IntroScene />
 
-        <SceneFrame index={1} name="pitch" label="proposta">
-          <header className="center-copy pitch-copy">
-            <p className="eyebrow" data-canvas-selector="pitch-eyebrow">Els nostres pilars</p>
-            <h1 id="entity-title" data-canvas-selector="pitch-title">Tot l&apos;arsenal que el teu negoci necessita, en un sol lloc.</h1>
-            <p data-canvas-selector="pitch-desc">Estratègia, identitat, web, automatització, contingut vertical, campanyes i producció aèria coordinats sota una mateixa direcció.</p>
-            <TextPrism3D />
-          </header>
-        </SceneFrame>
+        <PitchScene />
 
-        <SceneFrame index={2} name="partners" label="autoritat">
-          <LogoTunnel />
-        </SceneFrame>
+        <PartnersScene />
 
-        <SceneFrame index={3} name="experience" label="serveis">
-          <div className="experience-panel">
-            <p className="ghost-statement" data-canvas-selector="exp-ghost">SERVEIS</p>
-            <h2 data-canvas-selector="exp-title">Què fem</h2>
-            <div className="experience-list">
-              {services.map((service, index) => (
-                <div className="experience-row" id={service.id} key={service.title} data-canvas-selector={`exp-row-${index}`}>
-                  <div><strong>{service.title}</strong><span>{service.description}</span></div>
-                  <time>{service.tag}</time>
-                </div>
-              ))}
-            </div>
-          </div>
-        </SceneFrame>
+        <ExperienceScene />
 
-        <SceneFrame index={4} name="about" label="sobre nosaltres">
-          <div className="about-panel">
-            <h2 data-canvas-selector="about-title">Benvinguts a Desorden.</h2>
-            <ul>{personalNotes.map((note, index) => <li key={note} data-canvas-selector={`about-note-${index}`}>✦ <span>{note}</span></li>)}</ul>
-            <p className="about-meta" data-canvas-selector="about-meta"><a href="/sobre-nosaltres">Conèixer la nostra filosofia →</a></p>
-          </div>
-        </SceneFrame>
+        <AboutScene />
 
-        <SceneFrame index={5} name="cases" label="casos d'èxit">
-          <div className="case-panel">
-            <p className="eyebrow" data-canvas-selector="cases-eyebrow">Casos d&apos;èxit</p>
-            <div className="case-list">
-              {cases.map(([number, title], index) => <button type="button" key={number} data-modal-open={title} data-canvas-selector={`case-btn-${index}`}><b>{number}.</b><span>{title}</span><i>↗</i></button>)}
-            </div>
-          </div>
-        </SceneFrame>
+        <CasesScene />
 
-        {mediaItems.map(([number, title, meta], mediaIndex) => (
-          <SceneFrame index={mediaIndex + 6} name="media" label="projectes destacats" key={number}>
-            <button type="button" className="media-card" data-modal-open={title} data-canvas-selector={`media-card-${mediaIndex}`}>
-              <ImagePlaceholder number={number} className="media-placeholder" label={`Imatge destacada: ${title}`} />
-              <span className="media-title">{title}</span>
-              <small>{meta} · OBRIR □</small>
-            </button>
-          </SceneFrame>
-        ))}
+        <MediaScenes />
 
-        <SceneFrame index={8} name="contact" label="contacte">
-          <div className="contact-mark" aria-hidden="true"><i /><i /><i /></div>
-          <div className="contact-copy">
-            <h2 data-canvas-selector="contact-title">FEM UN CAFÈ?</h2>
-            <p className="contact-email" data-canvas-selector="contact-email"><a href="mailto:hola@desorden.cat">hola@desorden.cat</a></p>
-            <p className="contact-place" data-canvas-selector="contact-place">CATALUNYA · ESPANYA</p>
-            <p className="contact-name" data-canvas-selector="contact-name">AGÈNCIA DESORDEN</p>
-            <p data-canvas-selector="contact-desc">Explica&apos;ns on ets i on vols arribar. Ens encanten els reptes impossibles.</p>
-          </div>
-        </SceneFrame>
+        <ContactScene />
       </div>
 
-      <div className="fixed-ui">
-        <p className="scene-counter" data-scene-counter>01 / 09</p>
-        <div className="progress-rail" aria-hidden="true"><i data-progress-bar /></div>
-        <nav className="section-navigation" aria-label="Seccions de DESORDEN">
-          <ol data-section-menu hidden>{navigation.map(([label, index]) => <li key={label}><button type="button" data-go={index}><span>{String(index + 1).padStart(2, "0")}</span>{label}</button></li>)}</ol>
-          <button type="button" className="section-toggle" data-menu-toggle aria-expanded="false"><span>Secció</span><b data-active-label>introducció</b><i /></button>
-        </nav>
-      </div>
+      <FixedUI />
 
-      <div className="modal-backdrop" data-modal role="presentation" hidden>
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1}>
-          <button type="button" className="modal-close" data-modal-close aria-label="Tanca">×</button>
-          <p className="eyebrow" data-canvas-selector="modal-eyebrow">Detall del servei</p>
-          <h2 id="modal-title" data-modal-title data-canvas-selector="modal-title">Detall del projecte</h2>
-          <p data-canvas-selector="modal-desc">Descobreix el context, les decisions, la producció i els resultats de cada projecte DESORDEN.</p>
-        </div>
-      </div>
+      <ModalBackdrop />
 
-      <div className="grain" aria-hidden="true" /><div className="vignette" aria-hidden="true" />
+      <BackgroundEffects />
     </PortfolioController>
   );
 }
