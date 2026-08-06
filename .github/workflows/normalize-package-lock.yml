@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/main-runtime-cleanup
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
