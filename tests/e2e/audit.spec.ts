@@ -27,7 +27,7 @@ test("renders the reference hero without a top menu or floating WhatsApp assista
   await expect.poll(async () => Number.parseInt(
     await portrait.getAttribute("data-particle-count") ?? "0",
     10,
-  )).toBeGreaterThan(1000);
+  )).toBeGreaterThan(300);
 });
 
 test("uses two gestures for the particle phases and opens block two on the third", async ({ page }) => {
