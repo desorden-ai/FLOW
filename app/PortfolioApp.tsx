@@ -8,8 +8,8 @@ import { ProjectPicture } from "../components/ProjectPicture";
 import { TextPrism3D } from "../components/TextPrism3D";
 
 const LazyVisualLayoutEditor = lazy(async () => {
-  const module = await import("../components/VisualLayoutEditor");
-  return { default: module.VisualLayoutEditor };
+  const mod = await import("../components/VisualLayoutEditor");
+  return { default: mod.VisualLayoutEditor };
 });
 
 const scenes = [
