@@ -10,6 +10,10 @@ const MOBILE_MAX_DPR = 1.5;
 const DESKTOP_MAX_DPR = 2;
 const MIN_ALPHA = 24;
 const MIN_LUMINANCE = 14;
+const PARTICLE_SPEED_MULTIPLIER = 1.1;
+const PARTICLE_TRANSITION_SMOOTHING = 0.1045;
+const SCENE_PARTICLE_DENSITIES = [1, 0.82, 0.68, 0.55, 0.43, 0.33, 0.24, 0.16, 0.09] as const;
+const SCENE_DEPTHS = [0, 0.16, 0.22, 0.28, 0.34, 0.4, 0.46, 0.52, 0.58] as const;
 const subscribeToHydration = () => () => undefined;
 
 type HeroProgressDetail = {
@@ -31,6 +35,7 @@ type Particle = {
   phase: number;
   speed: number;
   size: number;
+  retention: number;
   red: number;
   green: number;
   blue: number;
@@ -41,9 +46,11 @@ type AnimationState = {
   disperse: number;
   depth: number;
   fade: number;
+  density: number;
   targetDisperse: number;
   targetDepth: number;
   targetFade: number;
+  targetDensity: number;
 };
 
 type BuildResult = {
@@ -89,6 +96,16 @@ function getSampleStep() {
 function getCanvasPixelRatio() {
   const maximum = isMobileViewport() ? MOBILE_MAX_DPR : DESKTOP_MAX_DPR;
   return Math.min(window.devicePixelRatio || 1, maximum);
+}
+
+function getSceneDensity(sceneIndex: number) {
+  const index = Math.max(0, Math.min(SCENE_PARTICLE_DENSITIES.length - 1, sceneIndex));
+  return SCENE_PARTICLE_DENSITIES[index];
+}
+
+function getSceneDepth(sceneIndex: number) {
+  const index = Math.max(0, Math.min(SCENE_DEPTHS.length - 1, sceneIndex));
+  return SCENE_DEPTHS[index];
 }
 
 function waitForRenderedImage(image: HTMLImageElement, signal: AbortSignal) {
@@ -166,7 +183,6 @@ function loadReadableImage(source: string, signal: AbortSignal) {
     image.addEventListener("load", handleLoad, { once: true });
     image.addEventListener("error", handleError, { once: true });
 
-    // Debe ser la última asignación: primero crossOrigin, después src.
     image.src = source;
 
     if (image.complete && image.naturalWidth > 0) {
@@ -242,7 +258,6 @@ function createParticles(
       const alphaByte = pixels[pixelIndex + 3];
       const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
 
-      // El fondo negro no necesita partículas: ya coincide con el fondo de la web.
       if (alphaByte < MIN_ALPHA || luminance < MIN_LUMINANCE) continue;
 
       const normalizedX = (x - centerX) / Math.max(1, centerX);
@@ -261,6 +276,7 @@ function createParticles(
         phase: random() * Math.PI * 2,
         speed: 0.55 + random() * 1.35,
         size: step * (0.9 + random() * 0.22),
+        retention: random(),
         red,
         green,
         blue,
@@ -306,9 +322,11 @@ export function HeroParticlePortrait({
       disperse: 0,
       depth: 0,
       fade: 0,
+      density: 1,
       targetDisperse: 0,
       targetDepth: 0,
       targetFade: 0,
+      targetDensity: 1,
     };
 
     let particles: Particle[] = [];
@@ -317,14 +335,15 @@ export function HeroParticlePortrait({
     let buildVersion = 0;
     let resizeObserver: ResizeObserver | null = null;
     let destroyed = false;
+    let renderedFrames = 0;
     let viewport = resizeCanvas(canvas, context);
 
     const getActiveSceneIndex = () => {
       const scenes = Array.from(shell.querySelectorAll<HTMLElement>("[data-scene]"));
-      return scenes.findIndex((scene) => scene.dataset.state === "current");
+      return Math.max(0, scenes.findIndex((scene) => scene.dataset.state === "current"));
     };
 
-    const setLayerMode = (mode: "html" | "canvas2d" | "hidden") => {
+    const setLayerMode = (mode: "html" | "canvas2d") => {
       wrapper.dataset.renderSource = mode;
 
       if (mode === "html") {
@@ -334,28 +353,29 @@ export function HeroParticlePortrait({
         return;
       }
 
-      if (mode === "canvas2d") {
-        wrapper.style.setProperty("--hero-layer-opacity", "1");
-        wrapper.style.setProperty("--hero-fallback-opacity", "0");
-        wrapper.style.setProperty("--hero-canvas-opacity", "1");
-        return;
-      }
-
-      wrapper.style.setProperty("--hero-layer-opacity", "0");
+      wrapper.style.setProperty("--hero-layer-opacity", "1");
       wrapper.style.setProperty("--hero-fallback-opacity", "0");
-      wrapper.style.setProperty("--hero-canvas-opacity", "0");
+      wrapper.style.setProperty("--hero-canvas-opacity", "1");
+    };
+
+    const publishDensityTarget = (density: number) => {
+      wrapper.dataset.particleDensityTarget = density.toFixed(3);
+      wrapper.dataset.visibleParticleTarget = String(
+        Math.max(1, Math.round(particles.length * density)),
+      );
     };
 
     const updateTargets = (sceneIndex: number, progress: number) => {
       wrapper.dataset.sceneIndex = String(sceneIndex);
 
-      if (sceneIndex <= 0) {
+      if (sceneIndex === 0) {
         const disperse = clamp(progress / 0.5);
         const idle = progress <= 0.001;
 
         state.targetDisperse = disperse;
         state.targetDepth = 0;
         state.targetFade = 0;
+        state.targetDensity = 1;
         wrapper.dataset.overlay = "hero";
         wrapper.dataset.phase = idle ? "idle" : "hero-particles";
         wrapper.dataset.particleMotion = idle ? "idle" : "dispersing";
@@ -363,47 +383,27 @@ export function HeroParticlePortrait({
         wrapper.dataset.depthTarget = "0.000";
         wrapper.dataset.fadeTarget = "0.000";
         wrapper.style.setProperty("--hero-veil-opacity", idle ? "1" : "0.12");
+        publishDensityTarget(1);
         setLayerMode(idle || particles.length === 0 ? "html" : "canvas2d");
         return;
       }
 
-      if (sceneIndex === 1) {
-        state.targetDisperse = 1;
-        state.targetDepth = 0.16;
-        state.targetFade = 0;
-        wrapper.dataset.overlay = "pitch";
-        wrapper.dataset.phase = "pitch-particles";
-        wrapper.dataset.particleMotion = "over-pitch";
-        wrapper.dataset.disperseTarget = "1.000";
-        wrapper.dataset.depthTarget = "0.160";
-        wrapper.dataset.fadeTarget = "0.000";
-        wrapper.style.setProperty("--hero-veil-opacity", "0");
-        setLayerMode(particles.length === 0 ? "html" : "canvas2d");
-        return;
-      }
-
-      if (sceneIndex === 2) {
-        state.targetDisperse = 1;
-        state.targetDepth = 1;
-        state.targetFade = 1;
-        wrapper.dataset.overlay = "leaving";
-        wrapper.dataset.phase = "block-3-fade";
-        wrapper.dataset.particleMotion = "depth-fade";
-        wrapper.dataset.disperseTarget = "1.000";
-        wrapper.dataset.depthTarget = "1.000";
-        wrapper.dataset.fadeTarget = "1.000";
-        wrapper.style.setProperty("--hero-veil-opacity", "0");
-        setLayerMode(particles.length === 0 ? "hidden" : "canvas2d");
-        return;
-      }
+      const density = getSceneDensity(sceneIndex);
+      const depth = getSceneDepth(sceneIndex);
 
       state.targetDisperse = 1;
-      state.targetDepth = 1;
-      state.targetFade = 1;
-      wrapper.dataset.overlay = "hidden";
-      wrapper.dataset.phase = "hidden";
-      wrapper.dataset.particleMotion = "hidden";
-      setLayerMode("hidden");
+      state.targetDepth = depth;
+      state.targetFade = 0;
+      state.targetDensity = density;
+      wrapper.dataset.overlay = sceneIndex === 1 ? "pitch" : `scene-${sceneIndex + 1}`;
+      wrapper.dataset.phase = sceneIndex === 1 ? "pitch-particles" : `scene-${sceneIndex + 1}-particles`;
+      wrapper.dataset.particleMotion = sceneIndex === 1 ? "over-pitch" : "persistent-reduction";
+      wrapper.dataset.disperseTarget = "1.000";
+      wrapper.dataset.depthTarget = depth.toFixed(3);
+      wrapper.dataset.fadeTarget = "0.000";
+      wrapper.style.setProperty("--hero-veil-opacity", "0");
+      publishDensityTarget(density);
+      setLayerMode(particles.length === 0 ? "html" : "canvas2d");
     };
 
     const handleHeroProgress = (event: Event) => {
@@ -432,6 +432,7 @@ export function HeroParticlePortrait({
 
       wrapper.dataset.renderer = "canvas2d";
       wrapper.dataset.rendererStatus = "ready";
+      wrapper.dataset.particleSpeed = PARTICLE_SPEED_MULTIPLIER.toFixed(2);
       wrapper.dataset.particleStep = String(step);
       wrapper.dataset.particleCount = String(particles.length);
       wrapper.dataset.meshLeft = imageRect.left.toFixed(3);
@@ -466,29 +467,35 @@ export function HeroParticlePortrait({
       if (destroyed) return;
 
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const smoothing = reducedMotion ? 1 : 0.095;
+      const smoothing = reducedMotion ? 1 : PARTICLE_TRANSITION_SMOOTHING;
       state.disperse += (state.targetDisperse - state.disperse) * smoothing;
       state.depth += (state.targetDepth - state.depth) * smoothing;
       state.fade += (state.targetFade - state.fade) * smoothing;
+      state.density += (state.targetDensity - state.density) * smoothing;
 
       context.clearRect(0, 0, viewport.width, viewport.height);
 
       const shouldDraw =
         particles.length > 0 &&
         (state.disperse > 0.001 || state.targetDisperse > 0.001) &&
-        state.fade < 0.999;
+        state.density > 0.001;
+
+      let visibleParticleCount = 0;
 
       if (shouldDraw) {
         const disperse = easeOutCubic(state.disperse);
         const depth = easeInCubic(state.depth);
         const fade = clamp(state.fade);
-        const seconds = timestamp / 1000;
+        const density = clamp(state.density);
+        const seconds = (timestamp / 1000) * PARTICLE_SPEED_MULTIPLIER;
         const viewportCenterX = viewport.width / 2;
         const viewportCenterY = viewport.height / 2;
 
         context.globalCompositeOperation = "source-over";
 
         for (const particle of particles) {
+          if (particle.retention > density) continue;
+
           const flutterX = Math.cos(seconds * particle.speed + particle.phase);
           const flutterY = Math.sin(seconds * particle.speed * 0.82 + particle.phase);
           const depthExpansionX =
@@ -517,6 +524,7 @@ export function HeroParticlePortrait({
 
           if (alpha <= 0.003) continue;
 
+          visibleParticleCount += 1;
           context.globalAlpha = alpha;
           context.fillStyle = `rgb(${particle.red} ${particle.green} ${particle.blue})`;
           context.fillRect(x - size / 2, y - size / 2, size, size);
@@ -525,10 +533,10 @@ export function HeroParticlePortrait({
         context.globalAlpha = 1;
       }
 
-      if (state.fade > 0.985 && state.targetFade >= 1) {
-        wrapper.dataset.phase = "hidden";
-        wrapper.dataset.particleMotion = "hidden";
-        setLayerMode("hidden");
+      renderedFrames += 1;
+      if (renderedFrames % 4 === 0) {
+        wrapper.dataset.visibleParticleCount = String(visibleParticleCount);
+        wrapper.dataset.particleDensity = state.density.toFixed(3);
       }
 
       animationFrame = window.requestAnimationFrame(render);
@@ -545,7 +553,12 @@ export function HeroParticlePortrait({
 
     wrapper.dataset.renderer = "canvas2d";
     wrapper.dataset.rendererStatus = "loading";
+    wrapper.dataset.particleSpeed = PARTICLE_SPEED_MULTIPLIER.toFixed(2);
     wrapper.dataset.particleCount = "0";
+    wrapper.dataset.visibleParticleCount = "0";
+    wrapper.dataset.visibleParticleTarget = "0";
+    wrapper.dataset.particleDensity = "1.000";
+    wrapper.dataset.particleDensityTarget = "1.000";
     wrapper.dataset.particleStep = String(getSampleStep());
     setLayerMode("html");
     scheduleRebuild();
@@ -578,7 +591,12 @@ export function HeroParticlePortrait({
       data-overlay="hero"
       data-render-source="html"
       data-particle-motion="idle"
+      data-particle-speed="1.10"
       data-particle-count="0"
+      data-visible-particle-count="0"
+      data-visible-particle-target="0"
+      data-particle-density="1.000"
+      data-particle-density-target="1.000"
       data-particle-step={MOBILE_SAMPLE_STEP}
       aria-hidden="true"
     >

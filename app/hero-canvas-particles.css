@@ -15,7 +15,11 @@
   pointer-events: none;
 }
 
-/* La fotografía es el LCP y la única capa visible en scroll 0. */
+/* La fotografía es el LCP y permanece detrás del contenido de portada. */
+.hero-particle-portrait[data-render-source="html"] {
+  z-index: 2;
+}
+
 .hero-particle-portrait__fallback {
   z-index: 1 !important;
   opacity: var(--hero-fallback-opacity, 1) !important;
@@ -34,7 +38,7 @@
   visibility: hidden;
   background: transparent;
   filter: none !important;
-  mix-blend-mode: normal !important;
+  mix-blend-mode: screen !important;
   transform: translateZ(0);
   transition:
     opacity 90ms linear,
@@ -42,7 +46,12 @@
   will-change: opacity;
 }
 
-/* Primer gesto: se oculta la foto y el canvas pasa exactamente al frente. */
+/* Primer gesto: se oculta la foto y la nube pasa por encima de todas las escenas. */
+.hero-particle-portrait[data-render-source="canvas2d"] {
+  z-index: 4;
+  background: transparent !important;
+}
+
 .hero-particle-portrait[data-render-source="canvas2d"] .hero-particle-portrait__fallback {
   opacity: 0 !important;
   visibility: hidden;
@@ -66,26 +75,7 @@
 }
 
 .hero-particle-portrait[data-render-source="html"] .hero-particle-portrait__canvas,
-.hero-particle-portrait[data-render-source="hidden"] .hero-particle-portrait__canvas,
 .hero-particle-portrait[data-renderer-status="fallback"] .hero-particle-portrait__canvas {
-  opacity: 0 !important;
-  visibility: hidden;
-}
-
-/* La nube queda sobre el fondo del bloque 2; su texto conserva prioridad. */
-.hero-particle-portrait[data-overlay="pitch"],
-.hero-particle-portrait[data-overlay="leaving"] {
-  z-index: 3;
-  background: transparent !important;
-}
-
-.scene-pitch .pitch-copy {
-  position: relative;
-  z-index: 4;
-}
-
-.hero-particle-portrait[data-render-source="hidden"],
-.hero-particle-portrait[data-overlay="hidden"] {
   opacity: 0 !important;
   visibility: hidden;
 }

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ContactWhatsAppForm } from "../components/ContactWhatsAppForm";
-import { HeroParticleSequenceFix } from "../components/HeroParticleSequenceFix";
 import { SiteNavigation } from "../components/SiteNavigation";
 import { SocialProofPushNotifications } from "../components/SocialProofPushNotifications";
 import "./globals.css";
@@ -14,7 +13,6 @@ import "./commercial-pages.css";
 import "./commercial-a11y-fixes.css";
 import "./hero-particles.css";
 import "./hero-dom-webgl-alignment.css";
-import "./hero-particle-sequence-fix.css";
 import "./hero-particles-a11y.css";
 import "./hero-canvas-particles.css";
 
@@ -70,7 +68,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         <SiteNavigation />
         {children}
-        <HeroParticleSequenceFix />
         <ContactWhatsAppForm />
         <SocialProofPushNotifications heroSelector="#intro" />
         <script

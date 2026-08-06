@@ -107,6 +107,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(layout, /SiteNavigation/);
   assert.match(layout, /hero-particles\.css/);
   assert.match(layout, /hero-canvas-particles\.css/);
+  assert.doesNotMatch(layout, /HeroParticleSequenceFix/);
+  assert.doesNotMatch(layout, /hero-particle-sequence-fix\.css/);
   assert.doesNotMatch(layout, /\/api\/vendor\?library=three/);
   assert.doesNotMatch(layout, /\/api\/vendor\?library=gsap/);
   assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
@@ -118,6 +120,11 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroPortrait, /^"use client"/);
   assert.match(heroPortrait, /const MOBILE_SAMPLE_STEP = 6/);
   assert.match(heroPortrait, /const DESKTOP_SAMPLE_STEP = 3/);
+  assert.match(heroPortrait, /SCENE_PARTICLE_DENSITIES = \[1, 0\.82, 0\.68, 0\.55, 0\.43, 0\.33, 0\.24, 0\.16, 0\.09\]/);
+  assert.match(heroPortrait, /retention: random\(\)/);
+  assert.match(heroPortrait, /particle\.retention > density/);
+  assert.match(heroPortrait, /data-particle-density-target/);
+  assert.match(heroPortrait, /data-visible-particle-count/);
   assert.match(heroPortrait, /image\.complete && image\.naturalWidth > 0/);
   assert.match(heroPortrait, /image\.crossOrigin = "anonymous"/);
   assert.match(heroPortrait, /image\.src = source/);
@@ -151,7 +158,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroCss, /prefers-reduced-motion/);
 
   assert.match(heroCanvasCss, /data-render-source="canvas2d"/);
-  assert.match(heroCanvasCss, /z-index:\s*2/);
+  assert.match(heroCanvasCss, /z-index:\s*4/);
+  assert.match(heroCanvasCss, /mix-blend-mode:\s*screen/);
   assert.match(heroCanvasCss, /opacity:\s*0 !important/);
   assert.match(heroCanvasCss, /opacity:\s*1 !important/);
   assert.match(heroCanvasCss, /visibility:\s*hidden/);
@@ -171,6 +179,8 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(pushNotifications, /@rozalenmusic/);
   assert.match(pushNotifications, /VISIBLE_DURATION_MS = 4_000/);
   assert.match(pushNotificationsCss, /\.push-toast-layer/);
+  assert.match(pushNotificationsCss, /border:\s*1px solid #737373/);
+  assert.doesNotMatch(pushNotificationsCss, /border:\s*1px solid #f59e0b/);
   assert.match(pushNotificationsCss, /pointer-events: none/);
   assert.match(pushNotificationsCss, /prefers-reduced-motion/);
 
@@ -216,10 +226,11 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(navigation, /scene\.inert = !isCurrent/);
   assert.match(navigation, /data-live-scene-label/);
   assert.match(navigation, /desorden:hero-progress/);
-  assert.match(navigation, /HERO_PHASE_ONE_PROGRESS = 0\.5/);
-  assert.match(navigation, /HERO_HANDOFF_PROGRESS = 0\.72/);
+  assert.match(navigation, /HERO_REBUILD_DURATION_MS = 1_050/);
+  assert.match(navigation, /setHeroParticleProgress\(1\);[\s\S]*updateScene\(1\)/);
+  assert.match(navigation, /updateScene\(HERO_PARTICLE_INDEX, \{ heroProgress: 1 \}\)/);
+  assert.match(navigation, /rebuildHeroPortrait\(\)/);
   assert.match(navigation, /sceneIndex: active/);
-  assert.match(navigation, /updateScene\(1\)/);
   assert.match(navigation, /desorden:block-3-progress/);
   assert.match(navigation, /Number\.isFinite/);
 

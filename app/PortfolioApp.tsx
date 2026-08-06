@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { HeroParticlePortrait } from "../components/HeroParticlePortrait";
 import { LogoTunnel } from "../components/LogoTunnel";
 import { PortfolioController } from "../components/PortfolioController";
+import { TextPrism3D } from "../components/TextPrism3D";
 import { VisualLayoutEditor } from "../components/VisualLayoutEditor";
 import {
   applyEditorDocument,
@@ -187,6 +188,7 @@ export function PortfolioApp({ enableEditor = false }: { enableEditor?: boolean 
             <p className="eyebrow" data-canvas-selector="pitch-eyebrow">Els nostres pilars</p>
             <h1 id="entity-title" data-canvas-selector="pitch-title">Tot l&apos;arsenal que el teu negoci necessita, en un sol lloc.</h1>
             <p data-canvas-selector="pitch-desc">Estratègia, identitat, web, automatització, contingut vertical, campanyes i producció aèria coordinats sota una mateixa direcció.</p>
+            <TextPrism3D />
           </header>
         </SceneFrame>
 
