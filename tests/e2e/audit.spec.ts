@@ -10,6 +10,32 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 });
 
+test("renders the reference hero without a top menu or floating WhatsApp assistant", async ({ page }) => {
+  await expect(page.locator(".site-nav")).toHaveCount(0);
+  await expect(page.locator(".contact-chatbot")).toHaveCount(0);
+  await expect(page.locator("#intro .outline-word")).toHaveText("EL TEU");
+  await expect(page.locator("#intro .display-name")).toHaveText("PARTNER");
+  await expect(page.locator("#intro .hero-services li")).toHaveCount(3);
+  await expect(page.locator("[data-scene-counter]")).toHaveText("01 / 09");
+  await expect(page.locator("[data-active-label]")).toHaveText("introducció");
+  await expect(page.locator("[data-hero-particle-canvas]")).toHaveCount(1);
+  await expect(page.locator(".hero-particle-portrait__fallback img")).toHaveCount(1);
+});
+
+test("uses the first scroll gestures to animate the portrait before changing scene", async ({ page }) => {
+  const hero = page.locator("#intro");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(hero).toHaveAttribute("data-state", "current");
+
+  const progress = await page.locator(".site-shell").evaluate((element) =>
+    Number.parseFloat((element as HTMLElement).style.getPropertyValue("--hero-particle-progress") || "0"),
+  );
+
+  expect(progress).toBeGreaterThan(0);
+  expect(progress).toBeLessThan(1);
+});
+
 test("uses Catalan metadata and keeps keyboard focus inside the active scene", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "ca");
 
