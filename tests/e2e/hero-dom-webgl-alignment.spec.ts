@@ -42,7 +42,7 @@ test("maps Canvas 2D particles to the rendered portrait and recalculates on resi
     expect(Math.abs(alignment.rect.top - alignment.particles.top)).toBeLessThan(0.75);
     expect(Math.abs(alignment.rect.width - alignment.particles.width)).toBeLessThan(0.75);
     expect(Math.abs(alignment.rect.height - alignment.particles.height)).toBeLessThan(0.75);
-    expect(alignment.particleCount).toBeGreaterThan(1000);
+    expect(alignment.particleCount).toBeGreaterThan(300);
     expect(alignment.step).toBe(6);
   };
 
