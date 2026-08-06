@@ -1,9 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-async function wheelDown(page: Parameters<typeof test>[0] extends never ? never : never) {
-  void page;
-}
-
 test("keeps particles visible on the first gesture, overlays block two on the second and hides them in block three", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
 
