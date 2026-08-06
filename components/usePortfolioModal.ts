@@ -6,7 +6,7 @@ type BackgroundState = {
   ariaHidden: string | null;
 };
 
-function getFocusableElements(container: HTMLElement) {
+export function getFocusableElements(container: HTMLElement) {
   return Array.from(
     container.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -14,7 +14,7 @@ function getFocusableElements(container: HTMLElement) {
   ).filter((element) => !element.hidden && !element.closest("[hidden]"));
 }
 
-function restoreBackgroundElements(state: BackgroundState[]) {
+export function restoreBackgroundElements(state: BackgroundState[]) {
   state.forEach(({ element, inert, ariaHidden }) => {
     element.inert = inert;
     if (ariaHidden === null) element.removeAttribute("aria-hidden");
@@ -22,7 +22,7 @@ function restoreBackgroundElements(state: BackgroundState[]) {
   });
 }
 
-function isolateBackgroundElements(root: HTMLElement, modalBackdrop: HTMLElement): BackgroundState[] {
+export function isolateBackgroundElements(root: HTMLElement, modalBackdrop: HTMLElement): BackgroundState[] {
   const state = Array.from(root.children)
     .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== modalBackdrop)
     .map((element) => ({
@@ -39,7 +39,7 @@ function isolateBackgroundElements(root: HTMLElement, modalBackdrop: HTMLElement
   return state;
 }
 
-function handleTabKey(event: KeyboardEvent, modalBackdrop: HTMLElement) {
+export function handleTabKey(event: KeyboardEvent, modalBackdrop: HTMLElement) {
   if (event.key !== "Tab") return;
 
   const modal = modalBackdrop.querySelector<HTMLElement>("[role='dialog']");
@@ -65,7 +65,7 @@ function handleTabKey(event: KeyboardEvent, modalBackdrop: HTMLElement) {
   }
 }
 
-function handleModalClick(
+export function handleModalClick(
   event: MouseEvent,
   root: HTMLElement,
   openModal: (title: string, trigger?: HTMLElement | null) => void,
@@ -85,7 +85,7 @@ function handleModalClick(
   }
 }
 
-function handleModalKeyDown(
+export function handleModalKeyDown(
   event: KeyboardEvent,
   root: HTMLElement,
   closeModal: () => void
