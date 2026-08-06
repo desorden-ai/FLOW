@@ -8,24 +8,29 @@ const workflows = [
   ".github/workflows/cloudflare-deploy.yml",
 ];
 
-const IMMUTABLE_ACTION =
-  /^\s*uses:\s+[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}(?:\s+#.*)?$/;
-
-test("pins every third-party GitHub Action to an immutable commit SHA", async () => {
+test("keeps CI/CD compatible with the repository-owned-actions policy", async () => {
   for (const workflow of workflows) {
     const content = await readFile(new URL(workflow, root), "utf8");
-    const actionLines = content
-      .split("\n")
-      .filter((line) => /^\s*uses:\s+/.test(line));
 
-    assert.ok(actionLines.length > 0, `${workflow} should contain actions`);
+    assert.doesNotMatch(
+      content,
+      /^\s*uses:\s+/m,
+      `${workflow} must not invoke external or reusable GitHub Actions`,
+    );
 
-    for (const line of actionLines) {
-      assert.match(
-        line,
-        IMMUTABLE_ACTION,
-        `${workflow} contains a mutable or invalid action reference: ${line.trim()}`,
-      );
-    }
+    assert.match(content, /git fetch --no-tags --depth=1 origin/);
+    assert.match(content, /Select Node\.js 22 from runner toolcache/);
+    assert.match(content, /RUNNER_TOOL_CACHE\/node/);
   }
+});
+
+test("deploys with the project-pinned Wrangler CLI and GitHub REST API", async () => {
+  const deployWorkflow = await readFile(
+    new URL(".github/workflows/cloudflare-deploy.yml", root),
+    "utf8",
+  );
+
+  assert.match(deployWorkflow, /npx --no-install wrangler deploy/);
+  assert.match(deployWorkflow, /\/statuses\/\$\{GITHUB_SHA\}/);
+  assert.doesNotMatch(deployWorkflow, /wrangler-action|github-script/);
 });
