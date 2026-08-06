@@ -10,6 +10,8 @@ const MOBILE_MAX_DPR = 1.5;
 const DESKTOP_MAX_DPR = 2;
 const MIN_ALPHA = 24;
 const MIN_LUMINANCE = 14;
+const PARTICLE_SPEED_MULTIPLIER = 1.1;
+const PARTICLE_TRANSITION_SMOOTHING = 0.1045;
 const SCENE_PARTICLE_DENSITIES = [1, 0.82, 0.68, 0.55, 0.43, 0.33, 0.24, 0.16, 0.09] as const;
 const SCENE_DEPTHS = [0, 0.16, 0.22, 0.28, 0.34, 0.4, 0.46, 0.52, 0.58] as const;
 const subscribeToHydration = () => () => undefined;
@@ -430,6 +432,7 @@ export function HeroParticlePortrait({
 
       wrapper.dataset.renderer = "canvas2d";
       wrapper.dataset.rendererStatus = "ready";
+      wrapper.dataset.particleSpeed = PARTICLE_SPEED_MULTIPLIER.toFixed(2);
       wrapper.dataset.particleStep = String(step);
       wrapper.dataset.particleCount = String(particles.length);
       wrapper.dataset.meshLeft = imageRect.left.toFixed(3);
@@ -464,7 +467,7 @@ export function HeroParticlePortrait({
       if (destroyed) return;
 
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const smoothing = reducedMotion ? 1 : 0.095;
+      const smoothing = reducedMotion ? 1 : PARTICLE_TRANSITION_SMOOTHING;
       state.disperse += (state.targetDisperse - state.disperse) * smoothing;
       state.depth += (state.targetDepth - state.depth) * smoothing;
       state.fade += (state.targetFade - state.fade) * smoothing;
@@ -484,7 +487,7 @@ export function HeroParticlePortrait({
         const depth = easeInCubic(state.depth);
         const fade = clamp(state.fade);
         const density = clamp(state.density);
-        const seconds = timestamp / 1000;
+        const seconds = (timestamp / 1000) * PARTICLE_SPEED_MULTIPLIER;
         const viewportCenterX = viewport.width / 2;
         const viewportCenterY = viewport.height / 2;
 
@@ -550,6 +553,7 @@ export function HeroParticlePortrait({
 
     wrapper.dataset.renderer = "canvas2d";
     wrapper.dataset.rendererStatus = "loading";
+    wrapper.dataset.particleSpeed = PARTICLE_SPEED_MULTIPLIER.toFixed(2);
     wrapper.dataset.particleCount = "0";
     wrapper.dataset.visibleParticleCount = "0";
     wrapper.dataset.visibleParticleTarget = "0";
@@ -587,6 +591,7 @@ export function HeroParticlePortrait({
       data-overlay="hero"
       data-render-source="html"
       data-particle-motion="idle"
+      data-particle-speed="1.10"
       data-particle-count="0"
       data-visible-particle-count="0"
       data-visible-particle-target="0"
