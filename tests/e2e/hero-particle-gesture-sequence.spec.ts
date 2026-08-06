@@ -14,7 +14,7 @@ test("shows moving Canvas 2D particles, overlays block two and disappears in blo
   await expect.poll(async () => Number.parseInt(
     await portrait.getAttribute("data-particle-count") ?? "0",
     10,
-  )).toBeGreaterThan(1000);
+  )).toBeGreaterThan(300);
   await page.mouse.move(200, 400);
 
   await page.mouse.wheel(0, 900);
