@@ -9,18 +9,26 @@ if (!reportFile) {
 
 const report = JSON.parse(await readFile(reportFile, "utf8"));
 
+function budget(name, value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid Lighthouse budget for ${name}: ${value}`);
+  }
+  return parsed;
+}
+
 // Defaults preserve the last approved mobile baseline while blocking measurable regressions.
 const categoryBudgets = {
-  performance: Number(process.env.LH_MIN_PERFORMANCE ?? 0.75),
-  accessibility: Number(process.env.LH_MIN_ACCESSIBILITY ?? 0.95),
-  "best-practices": Number(process.env.LH_MIN_BEST_PRACTICES ?? 0.95),
-  seo: Number(process.env.LH_MIN_SEO ?? 0.95),
+  performance: budget("performance", process.env.LH_MIN_PERFORMANCE ?? 0.75),
+  accessibility: budget("accessibility", process.env.LH_MIN_ACCESSIBILITY ?? 0.95),
+  "best-practices": budget("best-practices", process.env.LH_MIN_BEST_PRACTICES ?? 0.95),
+  seo: budget("seo", process.env.LH_MIN_SEO ?? 0.95),
 };
 
 const metricBudgets = {
-  "largest-contentful-paint": Number(process.env.LH_MAX_LCP_MS ?? 3_000),
-  "cumulative-layout-shift": Number(process.env.LH_MAX_CLS ?? 0.1),
-  "total-blocking-time": Number(process.env.LH_MAX_TBT_MS ?? 900),
+  "largest-contentful-paint": budget("largest-contentful-paint", process.env.LH_MAX_LCP_MS ?? 3_000),
+  "cumulative-layout-shift": budget("cumulative-layout-shift", process.env.LH_MAX_CLS ?? 0.1),
+  "total-blocking-time": budget("total-blocking-time", process.env.LH_MAX_TBT_MS ?? 900),
 };
 
 const failures = [];
