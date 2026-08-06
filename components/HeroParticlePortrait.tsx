@@ -13,6 +13,7 @@ const HERO_HANDOFF_PROGRESS = 0.72;
 const CAMERA_Z = 7.2;
 const MOBILE_FOV = 42;
 const DESKTOP_FOV = 38;
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const subscribeToHydration = () => () => undefined;
 
 const vertexShader = `
@@ -34,29 +35,38 @@ const vertexShader = `
   void main() {
     float phaseOne = smoothstep(0.0, 1.0, uDisperse);
     float phaseTwo = smoothstep(0.0, 1.0, uDepth);
-    float acceleratedDepth = pow(phaseTwo, 1.65);
+    float acceleratedDepth = pow(phaseTwo, 1.72);
 
-    // La geometría base ocupa exactamente el rectángulo normalizado -0.5..0.5.
-    // La escala y posición DOM -> WebGL se aplican en el Points Mesh desde JavaScript.
     vec3 transformed = position;
+    float radialLength = max(length(position.xy), 0.0001);
+    vec2 radialDirection = position.xy / radialLength;
 
-    float flutter = sin((uTime * 0.9) + (aSeed * 31.4159)) * 0.018 * phaseOne;
-    transformed += aScatter * phaseOne;
-    transformed.xy += vec2(
-      cos((aSeed * 41.0) + uTime),
-      sin((aSeed * 29.0) + uTime * 0.82)
-    ) * flutter;
+    float slowNoise = sin(
+      uTime * (0.72 + aSeed * 1.35) +
+      aSeed * 42.0
+    );
+    vec2 orbitalNoise = vec2(
+      cos(uTime * 0.82 + aSeed * 51.0),
+      sin(uTime * 0.68 + aSeed * 37.0)
+    );
 
-    // Segunda fase: el polvo acelera hacia cámara y se abre lateralmente.
-    transformed.z += aDepth * acceleratedDepth * 6.35;
-    transformed.xy += aScatter.xy * acceleratedDepth * 1.65;
+    // Fase 1: separación radial claramente perceptible y polvo flotante continuo.
+    transformed.xy += aScatter.xy * phaseOne;
+    transformed.xy += radialDirection * (0.055 + aSeed * 0.18) * phaseOne;
+    transformed.xy += orbitalNoise * (0.032 + slowNoise * 0.018) * phaseOne;
+    transformed.z += aScatter.z * phaseOne * 0.58;
+
+    // Fase 2: las partículas aceleran hacia cámara y se expanden alrededor del bloque 2.
+    transformed.z += (0.75 + aDepth * 5.85) * acceleratedDepth;
+    transformed.xy += aScatter.xy * acceleratedDepth * 1.9;
+    transformed.xy += radialDirection * acceleratedDepth * 0.28;
 
     vec4 modelPosition = modelViewMatrix * vec4(transformed, 1.0);
-    float perspective = clamp(${CAMERA_Z.toFixed(1)} / max(0.72, -modelPosition.z), 0.82, 7.5);
-    float solidCoverage = mix(1.18, 0.82, phaseOne);
-    float depthExpansion = 1.0 + acceleratedDepth * 1.45;
+    float perspective = clamp(${CAMERA_Z.toFixed(1)} / max(0.66, -modelPosition.z), 0.78, 8.2);
+    float solidCoverage = mix(1.18, 0.34, phaseOne) * (1.0 + acceleratedDepth * 0.88);
 
-    gl_PointSize = uPointSize * perspective * solidCoverage * depthExpansion;
+    // Al dispersarse, cada punto se hace pequeño para revelar huecos y movimiento real.
+    gl_PointSize = uPointSize * perspective * solidCoverage;
     gl_Position = projectionMatrix * modelPosition;
 
     vUv = aUv;
@@ -81,25 +91,31 @@ const fragmentShader = `
     );
     vec2 sampleUv = vUv + cellOffset;
 
-    // Evita que el borde de los Points replique píxeles fuera de la fotografía.
     if (
       sampleUv.x < 0.0 || sampleUv.x > 1.0 ||
       sampleUv.y < 0.0 || sampleUv.y > 1.0
     ) discard;
 
     vec4 sampledColor = texture2D(uTexture, sampleUv);
+    float luminance = dot(sampledColor.rgb, vec3(0.2126, 0.7152, 0.0722));
 
     float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
-    float roundMask = smoothstep(0.52, 0.12, distanceToCenter);
-    float particleMask = mix(1.0, roundMask, smoothstep(0.02, 0.22, vDisperse));
+    float circularParticle = smoothstep(0.51, 0.11, distanceToCenter);
+    float brightPixel = smoothstep(0.018, 0.48, luminance);
 
-    float luminance = dot(sampledColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    float dustVisibility = mix(1.0, smoothstep(0.025, 0.42, luminance), vDisperse);
-    float alpha = sampledColor.a * particleMask * dustVisibility * (1.0 - vFade);
+    // Conserva parte de los medios tonos para que la nube no desaparezca al primer gesto.
+    float dustVisibility = mix(1.0, max(0.2, brightPixel), smoothstep(0.06, 0.58, vDisperse));
+    float alpha = sampledColor.a * circularParticle * dustVisibility * (1.0 - vFade);
 
-    if (alpha < 0.003) discard;
+    if (alpha < 0.004) discard;
 
-    gl_FragColor = vec4(sampledColor.rgb, alpha);
+    vec3 dustColor = mix(
+      sampledColor.rgb,
+      vec3(mix(luminance, 1.0, 0.38)),
+      vDisperse * 0.42
+    );
+
+    gl_FragColor = vec4(dustColor, alpha);
   }
 `;
 
@@ -120,45 +136,37 @@ type UniformMap = {
   uPointSize: UniformNumber;
   uTime: UniformNumber;
 };
-
 type VectorLike = {
   x: number;
   y: number;
   z: number;
   set(x: number, y: number, z: number): void;
 };
-
 type ScaleLike = {
   set(x: number, y: number, z: number): void;
 };
-
 type BufferGeometryLike = {
   setAttribute(name: string, attribute: unknown): void;
   dispose(): void;
 };
-
 type MaterialLike = {
   uniforms: UniformMap;
   dispose(): void;
 };
-
 type PointsLike = {
   position: VectorLike;
   scale: ScaleLike;
   frustumCulled: boolean;
 };
-
 type SceneLike = {
   add(object: unknown): void;
 };
-
 type CameraLike = {
   aspect: number;
   fov: number;
   position: VectorLike;
   updateProjectionMatrix(): void;
 };
-
 type RendererLike = {
   setClearColor(color: number, alpha: number): void;
   setPixelRatio(value: number): void;
@@ -166,7 +174,6 @@ type RendererLike = {
   render(scene: SceneLike, camera: CameraLike): void;
   dispose(): void;
 };
-
 type ThreeLike = {
   Scene: new () => SceneLike;
   PerspectiveCamera: new (
@@ -189,29 +196,22 @@ type ThreeLike = {
   LinearFilter?: unknown;
   SRGBColorSpace?: unknown;
 };
-
 type TweenLike = { kill(): void };
 type GsapLike = {
   registerPlugin(plugin: unknown): void;
   to(target: object, variables: Record<string, unknown>): TweenLike;
 };
-
-type ScrollTriggerInstanceLike = { kill(): void };
 type ScrollTriggerLike = {
-  create(options: Record<string, unknown>): ScrollTriggerInstanceLike;
   refresh(): void;
 };
-
 type HeroProgressDetail = {
   progress: number;
   active: boolean;
   sceneIndex: number;
 };
-
 type HeroParticlePortraitProps = {
   imageUrl?: string;
 };
-
 type MeshSyncContext = {
   wrapper: HTMLElement;
   image: HTMLImageElement;
@@ -332,10 +332,9 @@ function createPortraitGrid() {
       const uvOffset = index * 2;
       const u = (x + 0.5) / GRID_WIDTH;
       const v = 1 - (y + 0.5) / GRID_HEIGHT;
-      const seed = random();
       const angle = random() * Math.PI * 2;
-      const radius = 0.025 + random() * 0.28;
-      const verticalDrift = (random() - 0.5) * 0.24;
+      const radius = 0.1 + random() * 0.58;
+      const verticalDrift = (random() - 0.5) * 0.52;
 
       positions[positionOffset] = u - 0.5;
       positions[positionOffset + 1] = v - 0.5;
@@ -346,10 +345,10 @@ function createPortraitGrid() {
 
       scatters[positionOffset] = Math.cos(angle) * radius;
       scatters[positionOffset + 1] = Math.sin(angle) * radius + verticalDrift;
-      scatters[positionOffset + 2] = (random() - 0.5) * 1.45;
+      scatters[positionOffset + 2] = (random() - 0.5) * 2.4;
 
-      depths[index] = 0.38 + random() * 0.72;
-      seeds[index] = seed;
+      depths[index] = 0.32 + random() * 0.88;
+      seeds[index] = random();
     }
   }
 
@@ -405,21 +404,19 @@ function syncMeshToImage({
 
   const cellWidthCss = imageRect.width / GRID_WIDTH;
   const cellHeightCss = imageRect.height / GRID_HEIGHT;
-  material.uniforms.uPointSize.value = Math.max(1.35, Math.max(cellWidthCss, cellHeightCss) * pixelRatio * 1.12);
+  material.uniforms.uPointSize.value = Math.max(
+    1.45,
+    Math.max(cellWidthCss, cellHeightCss) * pixelRatio * 1.22,
+  );
 
-  const textureAspect = image.naturalWidth / Math.max(1, image.naturalHeight);
-  const renderedAspect = imageRect.width / imageRect.height;
-
-  wrapper.dataset.textureAspect = textureAspect.toFixed(6);
-  wrapper.dataset.renderedAspect = renderedAspect.toFixed(6);
+  wrapper.dataset.textureAspect = (
+    image.naturalWidth / Math.max(1, image.naturalHeight)
+  ).toFixed(6);
+  wrapper.dataset.renderedAspect = (imageRect.width / imageRect.height).toFixed(6);
   wrapper.dataset.meshLeft = imageRect.left.toFixed(3);
   wrapper.dataset.meshTop = imageRect.top.toFixed(3);
   wrapper.dataset.meshWidth = imageRect.width.toFixed(3);
   wrapper.dataset.meshHeight = imageRect.height.toFixed(3);
-  wrapper.dataset.meshWorldX = worldX.toFixed(6);
-  wrapper.dataset.meshWorldY = worldY.toFixed(6);
-  wrapper.dataset.meshWorldWidth = meshWidth.toFixed(6);
-  wrapper.dataset.meshWorldHeight = meshHeight.toFixed(6);
 
   return true;
 }
@@ -446,11 +443,10 @@ export function HeroParticlePortrait({
       ".hero-particle-portrait__fallback img",
     );
 
-    if (!wrapper || !canvas || !hero || !fallbackImage) return;
+    if (!wrapper || !canvas || !shell || !hero || !fallbackImage) return;
 
     const abortController = new AbortController();
     const tweens = new Set<TweenLike>();
-    let scrollTriggerInstance: ScrollTriggerInstanceLike | null = null;
     let geometry: BufferGeometryLike | null = null;
     let material: MaterialLike | null = null;
     let texture: TextureLike | null = null;
@@ -537,11 +533,24 @@ export function HeroParticlePortrait({
       scene.add(particles);
 
       const heroCopy = hero.querySelector<HTMLElement>(".intro-heading");
+      const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches;
 
       const addTween = (tween: TweenLike) => {
         tweens.add(tween);
         return tween;
       };
+
+      const tweenUniform = (
+        uniform: UniformNumber,
+        value: number,
+        duration: number,
+        ease: string,
+      ) => addTween(gsap.to(uniform, {
+        value,
+        duration: reducedMotion ? 0 : duration,
+        ease,
+        overwrite: true,
+      }));
 
       const scheduleMeshSync = () => {
         window.cancelAnimationFrame(syncFrame);
@@ -559,124 +568,128 @@ export function HeroParticlePortrait({
         });
       };
 
-      const setLayerVariables = (progress: number) => {
-        const webglHandoff = clamp(progress / 0.025);
-        const veilOpacity = 1 - clamp((progress - 0.48) / 0.52);
-
-        wrapper.style.setProperty("--hero-fallback-opacity", String(1 - webglHandoff));
-        wrapper.style.setProperty("--hero-canvas-opacity", String(webglHandoff));
-        wrapper.style.setProperty("--hero-veil-opacity", String(veilOpacity));
-        wrapper.dataset.renderSource = webglHandoff > 0 ? "webgl" : "html";
+      const getActiveSceneIndex = () => {
+        const scenes = Array.from(shell.querySelectorAll<HTMLElement>("[data-scene]"));
+        return scenes.findIndex((sceneElement) => sceneElement.dataset.state === "current");
       };
 
-      const applyProgress = (rawProgress: number, immediate = false) => {
-        const progress = clamp(rawProgress);
-        const phaseOne = clamp(progress * 2);
-        const phaseTwo = clamp((progress - 0.5) * 2);
-        const duration = immediate ? 0 : 0.48;
+      const setLayerVisibility = (
+        fallbackOpacity: number,
+        canvasOpacity: number,
+        veilOpacity: number,
+      ) => {
+        wrapper.style.setProperty("--hero-fallback-opacity", String(fallbackOpacity));
+        wrapper.style.setProperty("--hero-canvas-opacity", String(canvasOpacity));
+        wrapper.style.setProperty("--hero-veil-opacity", String(veilOpacity));
+        wrapper.dataset.renderSource = canvasOpacity > 0 ? "webgl" : "html";
+      };
 
-        hero.style.setProperty("--hero-particle-progress", String(progress));
-        wrapper.dataset.progress = progress.toFixed(3);
-        setLayerVariables(progress);
+      const applyHeroState = (progress: number, immediate = false) => {
+        const disperse = clamp(progress / 0.5);
+        const duration = immediate ? 0 : 0.92;
+        const isIdle = progress <= 0.001;
 
-        addTween(gsap.to(uniforms.uDisperse, {
-          value: phaseOne,
-          duration,
-          ease: "power3.out",
-          overwrite: true,
-        }));
-        addTween(gsap.to(uniforms.uDepth, {
-          value: phaseTwo,
-          duration,
-          ease: "power2.inOut",
-          overwrite: true,
-        }));
-        addTween(gsap.to(uniforms.uFade, {
-          value: phaseTwo,
-          duration,
-          ease: "power2.inOut",
-          overwrite: true,
-        }));
+        wrapper.dataset.overlay = "hero";
+        wrapper.dataset.phase = isIdle ? "idle" : "hero-particles";
+        wrapper.dataset.particleMotion = isIdle ? "idle" : "dispersing";
+        wrapper.dataset.disperseTarget = disperse.toFixed(3);
+        wrapper.dataset.depthTarget = "0.000";
+        wrapper.dataset.fadeTarget = "0.000";
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        setLayerVisibility(isIdle ? 1 : 0.16, isIdle ? 0 : 1, isIdle ? 1 : 0.46);
+
+        tweenUniform(uniforms.uDisperse, disperse, duration, "power3.out");
+        tweenUniform(uniforms.uDepth, 0, duration * 0.65, "power2.out");
+        tweenUniform(uniforms.uFade, 0, duration * 0.55, "power2.out");
 
         if (heroCopy) {
           addTween(gsap.to(heroCopy, {
-            opacity: 1 - phaseTwo,
-            y: phaseTwo * -28,
-            duration,
+            opacity: 1,
+            y: 0,
+            duration: reducedMotion || immediate ? 0 : 0.45,
             ease: "power2.out",
             overwrite: true,
           }));
         }
       };
 
-      const completeHandoffOverPitch = () => {
-        wrapper.dataset.overlay = "pitch";
-        wrapper.style.setProperty("--hero-layer-opacity", "1");
-        wrapper.style.setProperty("--hero-fallback-opacity", "0");
-        wrapper.style.setProperty("--hero-canvas-opacity", "1");
-        wrapper.style.setProperty("--hero-veil-opacity", "0");
-        wrapper.dataset.renderSource = "webgl";
+      const applyPitchState = () => {
+        const pitchDepth = clamp((HERO_HANDOFF_PROGRESS - 0.5) * 0.55);
 
-        addTween(gsap.to(uniforms.uDisperse, {
-          value: 1,
-          duration: 0.55,
-          ease: "power2.out",
-          overwrite: true,
-        }));
-        addTween(gsap.to(uniforms.uDepth, {
-          value: 1,
-          duration: 1.45,
-          delay: 0.12,
-          ease: "power3.in",
-          overwrite: true,
-        }));
-        addTween(gsap.to(uniforms.uFade, {
-          value: 1,
-          duration: 1.55,
-          delay: 0.18,
-          ease: "power2.inOut",
-          overwrite: true,
-        }));
+        wrapper.dataset.overlay = "pitch";
+        wrapper.dataset.phase = "pitch-particles";
+        wrapper.dataset.particleMotion = "over-pitch";
+        wrapper.dataset.disperseTarget = "1.000";
+        wrapper.dataset.depthTarget = pitchDepth.toFixed(3);
+        wrapper.dataset.fadeTarget = "0.000";
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        setLayerVisibility(0, 1, 0);
+
+        tweenUniform(uniforms.uDisperse, 1, 0.72, "power2.out");
+        tweenUniform(uniforms.uDepth, pitchDepth, 0.82, "power2.inOut");
+        tweenUniform(uniforms.uFade, 0, 0.25, "power2.out");
+
+        if (heroCopy) {
+          addTween(gsap.to(heroCopy, {
+            opacity: 0,
+            y: -24,
+            duration: reducedMotion ? 0 : 0.46,
+            ease: "power2.out",
+            overwrite: true,
+          }));
+        }
+      };
+
+      const applyBlockThreeState = () => {
+        wrapper.dataset.overlay = "leaving";
+        wrapper.dataset.phase = "block-3-fade";
+        wrapper.dataset.particleMotion = "depth-fade";
+        wrapper.dataset.disperseTarget = "1.000";
+        wrapper.dataset.depthTarget = "1.000";
+        wrapper.dataset.fadeTarget = "1.000";
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        setLayerVisibility(0, 1, 0);
+
+        tweenUniform(uniforms.uDisperse, 1, 0.25, "power2.out");
+        tweenUniform(uniforms.uDepth, 1, 1.42, "power3.in");
+        tweenUniform(uniforms.uFade, 1, 1.55, "power2.inOut");
+      };
+
+      const hideParticleLayer = () => {
+        wrapper.dataset.overlay = "hidden";
+        wrapper.dataset.phase = "hidden";
+        wrapper.dataset.particleMotion = "hidden";
+        wrapper.style.setProperty("--hero-layer-opacity", "0");
+        setLayerVisibility(0, 0, 0);
+        tweenUniform(uniforms.uFade, 1, 0, "none");
       };
 
       const handleHeroProgress = (event: Event) => {
         const detail = (event as CustomEvent<HeroProgressDetail>).detail;
         if (!detail) return;
 
-        wrapper.dataset.sceneIndex = String(detail.sceneIndex);
+        const activeSceneIndex = getActiveSceneIndex();
+        wrapper.dataset.sceneIndex = String(activeSceneIndex);
 
-        if (detail.sceneIndex === 0) {
-          wrapper.dataset.overlay = "hero";
-          wrapper.style.setProperty("--hero-layer-opacity", "1");
-          applyProgress(detail.progress);
+        if (activeSceneIndex <= 0) {
+          applyHeroState(clamp(detail.progress));
           return;
         }
 
-        if (detail.sceneIndex === 1) {
-          applyProgress(Math.max(detail.progress, HERO_HANDOFF_PROGRESS));
-          completeHandoffOverPitch();
+        if (activeSceneIndex === 1) {
+          applyPitchState();
           return;
         }
 
-        wrapper.dataset.overlay = "hidden";
-        wrapper.style.setProperty("--hero-layer-opacity", "0");
-        applyProgress(1, true);
+        if (activeSceneIndex === 2) {
+          applyBlockThreeState();
+          return;
+        }
+
+        hideParticleLayer();
       };
 
       shell.addEventListener("desorden:hero-progress", handleHeroProgress);
-
-      if (!shell) {
-        scrollTriggerInstance = ScrollTrigger.create({
-          trigger: hero,
-          start: "top top",
-          end: "+=200%",
-          scrub: 0.65,
-          onUpdate: (self: unknown) => {
-            const progress = (self as { progress?: number }).progress ?? 0;
-            applyProgress(progress);
-          },
-        });
-      }
 
       const handleResize = () => scheduleMeshSync();
       window.addEventListener("resize", handleResize, { passive: true });
@@ -690,10 +703,16 @@ export function HeroParticlePortrait({
       wrapper.dataset.webgl = "ready";
       wrapper.dataset.particleCount = String(PARTICLE_COUNT);
       scheduleMeshSync();
-      applyProgress(
-        Number.parseFloat(shell.style.getPropertyValue("--hero-particle-progress") || "0"),
-        true,
+
+      const initialSceneIndex = getActiveSceneIndex();
+      const initialProgress = Number.parseFloat(
+        shell.style.getPropertyValue("--hero-particle-progress") || "0",
       );
+
+      if (initialSceneIndex === 1) applyPitchState();
+      else if (initialSceneIndex === 2) applyBlockThreeState();
+      else if (initialSceneIndex > 2) hideParticleLayer();
+      else applyHeroState(initialProgress, true);
 
       const startedAt = performance.now();
       const renderFrame = (now: number) => {
@@ -723,6 +742,7 @@ export function HeroParticlePortrait({
       console.error("Unable to initialize hero particle portrait", error);
       wrapper.dataset.webgl = "fallback";
       wrapper.dataset.renderSource = "html";
+      wrapper.dataset.particleMotion = "fallback";
       wrapper.style.setProperty("--hero-fallback-opacity", "1");
       wrapper.style.setProperty("--hero-canvas-opacity", "0");
     });
@@ -732,7 +752,6 @@ export function HeroParticlePortrait({
       abortController.abort();
       window.cancelAnimationFrame(animationFrame);
       window.cancelAnimationFrame(syncFrame);
-      scrollTriggerInstance?.kill();
       tweens.forEach((tween) => tween.kill());
       resizeObserver?.disconnect();
       geometry?.dispose();
@@ -751,6 +770,7 @@ export function HeroParticlePortrait({
       data-webgl="loading"
       data-overlay="hero"
       data-render-source="html"
+      data-particle-motion="idle"
       data-particle-count={PARTICLE_COUNT}
       aria-hidden="true"
     >
@@ -763,7 +783,11 @@ export function HeroParticlePortrait({
         sizes="(max-width: 760px) 113vw, 62vw"
         eager
       />
-      <canvas ref={canvasRef} className="hero-particle-portrait__canvas" data-hero-particle-canvas />
+      <canvas
+        ref={canvasRef}
+        className="hero-particle-portrait__canvas"
+        data-hero-particle-canvas
+      />
       <span className="hero-particle-portrait__veil" />
     </div>
   );

@@ -63,14 +63,19 @@ test("uses Catalan metadata and keeps keyboard focus inside the active scene", a
   }
 });
 
-test("shows the first social proof notification after leaving the hero", async ({ page }) => {
+test("shows the first social proof notification with the DESORDEN theme", async ({ page }) => {
   await goToScene(page, 1);
 
   const notification = page.locator('[data-push-notification="rosalia-like"]');
-  await expect(notification).toBeVisible();
+  const toast = notification.locator(".push-toast");
+
+  await expect(toast).toHaveClass(/push-toast--visible/, { timeout: 2_500 });
+  await expect(toast).toBeVisible();
   await expect(notification).toContainText("@rosalia.vt");
   await expect(notification).toContainText("li ha agradat el teu reel");
-  await expect(notification.locator(".push-toast")).toHaveClass(/push-toast--visible/);
+  await expect(toast).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await expect(toast).toHaveCSS("border-top-color", "rgb(245, 158, 11)");
+  await expect(toast).toHaveCSS("border-right-color", "rgb(245, 158, 11)");
 });
 
 test("traps modal focus, closes with Escape and restores the trigger", async ({ page }) => {
