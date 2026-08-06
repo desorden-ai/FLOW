@@ -3,272 +3,67 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { ProjectPicture } from "./ProjectPicture";
 
-const THREE_VENDOR = "/api/vendor?library=three";
-const GSAP_VENDOR = "/api/vendor?library=gsap";
-const SCROLL_TRIGGER_VENDOR = "/api/vendor?library=scroll-trigger";
-const GRID_WIDTH = 200;
-const GRID_HEIGHT = 300;
-const PARTICLE_COUNT = GRID_WIDTH * GRID_HEIGHT;
-const HERO_HANDOFF_PROGRESS = 0.72;
-const CAMERA_Z = 7.2;
-const MOBILE_FOV = 42;
-const DESKTOP_FOV = 38;
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+const MOBILE_BREAKPOINT = 768;
+const MOBILE_SAMPLE_STEP = 6;
+const DESKTOP_SAMPLE_STEP = 3;
+const MOBILE_MAX_DPR = 1.5;
+const DESKTOP_MAX_DPR = 2;
+const MIN_ALPHA = 24;
+const MIN_LUMINANCE = 14;
 const subscribeToHydration = () => () => undefined;
 
-const vertexShader = `
-  attribute vec2 aUv;
-  attribute vec3 aScatter;
-  attribute float aDepth;
-  attribute float aSeed;
-
-  uniform float uDisperse;
-  uniform float uDepth;
-  uniform float uFade;
-  uniform float uPointSize;
-  uniform float uTime;
-
-  varying vec2 vUv;
-  varying float vDisperse;
-  varying float vFade;
-
-  void main() {
-    float phaseOne = smoothstep(0.0, 1.0, uDisperse);
-    float phaseTwo = smoothstep(0.0, 1.0, uDepth);
-    float acceleratedDepth = pow(phaseTwo, 1.72);
-
-    vec3 transformed = position;
-    float radialLength = max(length(position.xy), 0.0001);
-    vec2 radialDirection = position.xy / radialLength;
-
-    float slowNoise = sin(
-      uTime * (0.72 + aSeed * 1.35) +
-      aSeed * 42.0
-    );
-    vec2 orbitalNoise = vec2(
-      cos(uTime * 0.82 + aSeed * 51.0),
-      sin(uTime * 0.68 + aSeed * 37.0)
-    );
-
-    // Fase 1: separación radial claramente perceptible y polvo flotante continuo.
-    transformed.xy += aScatter.xy * phaseOne;
-    transformed.xy += radialDirection * (0.055 + aSeed * 0.18) * phaseOne;
-    transformed.xy += orbitalNoise * (0.032 + slowNoise * 0.018) * phaseOne;
-    transformed.z += aScatter.z * phaseOne * 0.58;
-
-    // Fase 2: las partículas aceleran hacia cámara y se expanden alrededor del bloque 2.
-    transformed.z += (0.75 + aDepth * 5.85) * acceleratedDepth;
-    transformed.xy += aScatter.xy * acceleratedDepth * 1.9;
-    transformed.xy += radialDirection * acceleratedDepth * 0.28;
-
-    vec4 modelPosition = modelViewMatrix * vec4(transformed, 1.0);
-    float perspective = clamp(${CAMERA_Z.toFixed(1)} / max(0.66, -modelPosition.z), 0.78, 8.2);
-    float solidCoverage = mix(1.18, 0.34, phaseOne) * (1.0 + acceleratedDepth * 0.88);
-
-    // Al dispersarse, cada punto se hace pequeño para revelar huecos y movimiento real.
-    gl_PointSize = uPointSize * perspective * solidCoverage;
-    gl_Position = projectionMatrix * modelPosition;
-
-    vUv = aUv;
-    vDisperse = phaseOne;
-    vFade = clamp(uFade, 0.0, 1.0);
-  }
-`;
-
-const fragmentShader = `
-  precision highp float;
-
-  uniform sampler2D uTexture;
-
-  varying vec2 vUv;
-  varying float vDisperse;
-  varying float vFade;
-
-  void main() {
-    vec2 cellOffset = vec2(
-      (gl_PointCoord.x - 0.5) / ${GRID_WIDTH.toFixed(1)},
-      (gl_PointCoord.y - 0.5) / ${GRID_HEIGHT.toFixed(1)}
-    );
-    vec2 sampleUv = vUv + cellOffset;
-
-    if (
-      sampleUv.x < 0.0 || sampleUv.x > 1.0 ||
-      sampleUv.y < 0.0 || sampleUv.y > 1.0
-    ) discard;
-
-    vec4 sampledColor = texture2D(uTexture, sampleUv);
-    float luminance = dot(sampledColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-
-    float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
-    float circularParticle = smoothstep(0.51, 0.11, distanceToCenter);
-    float brightPixel = smoothstep(0.018, 0.48, luminance);
-
-    // Conserva parte de los medios tonos para que la nube no desaparezca al primer gesto.
-    float dustVisibility = mix(1.0, max(0.2, brightPixel), smoothstep(0.06, 0.58, vDisperse));
-    float alpha = sampledColor.a * circularParticle * dustVisibility * (1.0 - vFade);
-
-    if (alpha < 0.004) discard;
-
-    vec3 dustColor = mix(
-      sampledColor.rgb,
-      vec3(mix(luminance, 1.0, 0.38)),
-      vDisperse * 0.42
-    );
-
-    gl_FragColor = vec4(dustColor, alpha);
-  }
-`;
-
-type UniformNumber = { value: number };
-type TextureLike = {
-  needsUpdate: boolean;
-  generateMipmaps: boolean;
-  minFilter?: unknown;
-  magFilter?: unknown;
-  colorSpace?: unknown;
-  dispose(): void;
-};
-type UniformMap = {
-  uTexture: { value: TextureLike };
-  uDisperse: UniformNumber;
-  uDepth: UniformNumber;
-  uFade: UniformNumber;
-  uPointSize: UniformNumber;
-  uTime: UniformNumber;
-};
-type VectorLike = {
-  x: number;
-  y: number;
-  z: number;
-  set(x: number, y: number, z: number): void;
-};
-type ScaleLike = {
-  set(x: number, y: number, z: number): void;
-};
-type BufferGeometryLike = {
-  setAttribute(name: string, attribute: unknown): void;
-  dispose(): void;
-};
-type MaterialLike = {
-  uniforms: UniformMap;
-  dispose(): void;
-};
-type PointsLike = {
-  position: VectorLike;
-  scale: ScaleLike;
-  frustumCulled: boolean;
-};
-type SceneLike = {
-  add(object: unknown): void;
-};
-type CameraLike = {
-  aspect: number;
-  fov: number;
-  position: VectorLike;
-  updateProjectionMatrix(): void;
-};
-type RendererLike = {
-  setClearColor(color: number, alpha: number): void;
-  setPixelRatio(value: number): void;
-  setSize(width: number, height: number, updateStyle?: boolean): void;
-  render(scene: SceneLike, camera: CameraLike): void;
-  dispose(): void;
-};
-type ThreeLike = {
-  Scene: new () => SceneLike;
-  PerspectiveCamera: new (
-    fieldOfView: number,
-    aspect: number,
-    near: number,
-    far: number,
-  ) => CameraLike;
-  WebGLRenderer: new (options: {
-    canvas: HTMLCanvasElement;
-    alpha: boolean;
-    antialias: boolean;
-    powerPreference: "high-performance";
-  }) => RendererLike;
-  BufferGeometry: new () => BufferGeometryLike;
-  Float32BufferAttribute: new (values: Float32Array, itemSize: number) => unknown;
-  ShaderMaterial: new (options: Record<string, unknown>) => MaterialLike;
-  Texture: new (image?: TexImageSource) => TextureLike;
-  Points: new (geometry: BufferGeometryLike, material: MaterialLike) => PointsLike;
-  LinearFilter?: unknown;
-  SRGBColorSpace?: unknown;
-};
-type TweenLike = { kill(): void };
-type GsapLike = {
-  registerPlugin(plugin: unknown): void;
-  to(target: object, variables: Record<string, unknown>): TweenLike;
-};
-type ScrollTriggerLike = {
-  refresh(): void;
-};
 type HeroProgressDetail = {
   progress: number;
   active: boolean;
   sceneIndex: number;
 };
+
 type HeroParticlePortraitProps = {
   imageUrl?: string;
 };
-type MeshSyncContext = {
-  wrapper: HTMLElement;
-  image: HTMLImageElement;
-  camera: CameraLike;
-  renderer: RendererLike;
-  material: MaterialLike;
-  particles: PointsLike;
+
+type Particle = {
+  originX: number;
+  originY: number;
+  velocityX: number;
+  velocityY: number;
+  depth: number;
+  phase: number;
+  speed: number;
+  size: number;
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
 };
 
-declare global {
-  interface Window {
-    THREE?: ThreeLike;
-    gsap?: GsapLike;
-    ScrollTrigger?: ScrollTriggerLike;
-  }
+type AnimationState = {
+  disperse: number;
+  depth: number;
+  fade: number;
+  targetDisperse: number;
+  targetDepth: number;
+  targetFade: number;
+};
+
+type BuildResult = {
+  particles: Particle[];
+  renderedWidth: number;
+  renderedHeight: number;
+  sourceAspect: number;
+};
+
+function clamp(value: number, minimum = 0, maximum = 1) {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
-const scriptPromises = new Map<string, Promise<void>>();
+function easeOutCubic(value: number) {
+  return 1 - Math.pow(1 - clamp(value), 3);
+}
 
-function loadScript(source: string, isReady: () => boolean) {
-  if (isReady()) return Promise.resolve();
-
-  const existingPromise = scriptPromises.get(source);
-  if (existingPromise) return existingPromise;
-
-  const promise = new Promise<void>((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${source}"]`);
-
-    const handleReady = () => {
-      if (isReady()) resolve();
-      else reject(new Error(`Library did not initialize: ${source}`));
-    };
-
-    if (existingScript) {
-      existingScript.addEventListener("load", handleReady, { once: true });
-      existingScript.addEventListener(
-        "error",
-        () => reject(new Error(`Unable to load ${source}`)),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = source;
-    script.async = true;
-    script.addEventListener("load", handleReady, { once: true });
-    script.addEventListener(
-      "error",
-      () => reject(new Error(`Unable to load ${source}`)),
-      { once: true },
-    );
-    document.head.append(script);
-  });
-
-  scriptPromises.set(source, promise);
-  return promise;
+function easeInCubic(value: number) {
+  const clamped = clamp(value);
+  return clamped * clamped * clamped;
 }
 
 function createSeededRandom(seed: number) {
@@ -283,11 +78,20 @@ function createSeededRandom(seed: number) {
   };
 }
 
-function clamp(value: number, minimum = 0, maximum = 1) {
-  return Math.max(minimum, Math.min(maximum, value));
+function isMobileViewport() {
+  return window.innerWidth < MOBILE_BREAKPOINT;
 }
 
-function waitForImage(image: HTMLImageElement, signal: AbortSignal) {
+function getSampleStep() {
+  return isMobileViewport() ? MOBILE_SAMPLE_STEP : DESKTOP_SAMPLE_STEP;
+}
+
+function getCanvasPixelRatio() {
+  const maximum = isMobileViewport() ? MOBILE_MAX_DPR : DESKTOP_MAX_DPR;
+  return Math.min(window.devicePixelRatio || 1, maximum);
+}
+
+function waitForRenderedImage(image: HTMLImageElement, signal: AbortSignal) {
   if (image.complete && image.naturalWidth > 0) {
     return image.decode().catch(() => undefined);
   }
@@ -298,14 +102,17 @@ function waitForImage(image: HTMLImageElement, signal: AbortSignal) {
       image.removeEventListener("load", handleLoad);
       image.removeEventListener("error", handleError);
     };
+
     const handleAbort = () => {
       cleanup();
       reject(new DOMException("Image loading aborted", "AbortError"));
     };
+
     const handleLoad = () => {
       cleanup();
       void image.decode().catch(() => undefined).finally(resolve);
     };
+
     const handleError = () => {
       cleanup();
       reject(new Error(`Unable to load hero image: ${image.currentSrc || image.src}`));
@@ -317,108 +124,157 @@ function waitForImage(image: HTMLImageElement, signal: AbortSignal) {
   });
 }
 
-function createPortraitGrid() {
-  const positions = new Float32Array(PARTICLE_COUNT * 3);
-  const uvs = new Float32Array(PARTICLE_COUNT * 2);
-  const scatters = new Float32Array(PARTICLE_COUNT * 3);
-  const depths = new Float32Array(PARTICLE_COUNT);
-  const seeds = new Float32Array(PARTICLE_COUNT);
-  const random = createSeededRandom(20260806);
+/**
+ * Carga una segunda copia de la imagen exclusivamente para leer sus píxeles.
+ * crossOrigin debe asignarse antes de src para evitar un canvas contaminado.
+ */
+function loadReadableImage(source: string, signal: AbortSignal) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
 
-  for (let y = 0; y < GRID_HEIGHT; y += 1) {
-    for (let x = 0; x < GRID_WIDTH; x += 1) {
-      const index = y * GRID_WIDTH + x;
-      const positionOffset = index * 3;
-      const uvOffset = index * 2;
-      const u = (x + 0.5) / GRID_WIDTH;
-      const v = 1 - (y + 0.5) / GRID_HEIGHT;
-      const angle = random() * Math.PI * 2;
-      const radius = 0.1 + random() * 0.58;
-      const verticalDrift = (random() - 0.5) * 0.52;
+    const cleanup = () => {
+      signal.removeEventListener("abort", handleAbort);
+      image.removeEventListener("load", handleLoad);
+      image.removeEventListener("error", handleError);
+    };
 
-      positions[positionOffset] = u - 0.5;
-      positions[positionOffset + 1] = v - 0.5;
-      positions[positionOffset + 2] = 0;
+    const handleAbort = () => {
+      cleanup();
+      image.src = "";
+      reject(new DOMException("Image loading aborted", "AbortError"));
+    };
 
-      uvs[uvOffset] = u;
-      uvs[uvOffset + 1] = v;
+    const finish = () => {
+      if (signal.aborted) {
+        handleAbort();
+        return;
+      }
 
-      scatters[positionOffset] = Math.cos(angle) * radius;
-      scatters[positionOffset + 1] = Math.sin(angle) * radius + verticalDrift;
-      scatters[positionOffset + 2] = (random() - 0.5) * 2.4;
+      cleanup();
+      void image.decode().catch(() => undefined).finally(() => resolve(image));
+    };
 
-      depths[index] = 0.32 + random() * 0.88;
-      seeds[index] = random();
+    const handleLoad = () => finish();
+    const handleError = () => {
+      cleanup();
+      reject(new Error(`The particle source cannot be read: ${source}`));
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    image.addEventListener("load", handleLoad, { once: true });
+    image.addEventListener("error", handleError, { once: true });
+
+    // Debe ser la última asignación: primero crossOrigin, después src.
+    image.src = source;
+
+    if (image.complete && image.naturalWidth > 0) {
+      queueMicrotask(finish);
+    }
+  });
+}
+
+function resizeCanvas(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
+  const width = Math.max(1, window.innerWidth);
+  const height = Math.max(1, window.innerHeight);
+  const pixelRatio = getCanvasPixelRatio();
+
+  canvas.width = Math.round(width * pixelRatio);
+  canvas.height = Math.round(height * pixelRatio);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+  return { width, height, pixelRatio };
+}
+
+function createParticles(
+  readableImage: HTMLImageElement,
+  imageRect: DOMRect,
+  step: number,
+): BuildResult {
+  const renderedWidth = Math.max(1, Math.round(imageRect.width));
+  const renderedHeight = Math.max(1, Math.round(imageRect.height));
+  const samplingCanvas = document.createElement("canvas");
+  samplingCanvas.width = renderedWidth;
+  samplingCanvas.height = renderedHeight;
+
+  const samplingContext = samplingCanvas.getContext("2d", {
+    alpha: true,
+    willReadFrequently: true,
+  });
+
+  if (!samplingContext) {
+    throw new Error("Canvas 2D is unavailable");
+  }
+
+  samplingContext.clearRect(0, 0, renderedWidth, renderedHeight);
+  samplingContext.drawImage(readableImage, 0, 0, renderedWidth, renderedHeight);
+
+  let pixels: Uint8ClampedArray;
+
+  try {
+    pixels = samplingContext.getImageData(0, 0, renderedWidth, renderedHeight).data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "SecurityError") {
+      throw new Error(
+        "Tainted canvas: the image server must allow anonymous CORS requests.",
+      );
+    }
+    throw error;
+  }
+
+  const particles: Particle[] = [];
+  const random = createSeededRandom(20260806 + renderedWidth + renderedHeight + step);
+  const mobile = isMobileViewport();
+  const minimumTravel = mobile ? 42 : 58;
+  const maximumTravel = mobile ? 138 : 210;
+  const centerX = renderedWidth / 2;
+  const centerY = renderedHeight / 2;
+
+  for (let y = Math.floor(step / 2); y < renderedHeight; y += step) {
+    for (let x = Math.floor(step / 2); x < renderedWidth; x += step) {
+      const pixelIndex = (y * renderedWidth + x) * 4;
+      const red = pixels[pixelIndex];
+      const green = pixels[pixelIndex + 1];
+      const blue = pixels[pixelIndex + 2];
+      const alphaByte = pixels[pixelIndex + 3];
+      const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+
+      // El fondo negro no necesita partículas: ya coincide con el fondo de la web.
+      if (alphaByte < MIN_ALPHA || luminance < MIN_LUMINANCE) continue;
+
+      const normalizedX = (x - centerX) / Math.max(1, centerX);
+      const normalizedY = (y - centerY) / Math.max(1, centerY);
+      const radialAngle = Math.atan2(normalizedY, normalizedX);
+      const angle = radialAngle + (random() - 0.5) * 1.45;
+      const travel = minimumTravel + random() * (maximumTravel - minimumTravel);
+      const verticalLift = (random() - 0.58) * (mobile ? 92 : 128);
+
+      particles.push({
+        originX: imageRect.left + x,
+        originY: imageRect.top + y,
+        velocityX: Math.cos(angle) * travel + normalizedX * travel * 0.42,
+        velocityY: Math.sin(angle) * travel + verticalLift,
+        depth: 0.35 + random() * 1.15,
+        phase: random() * Math.PI * 2,
+        speed: 0.55 + random() * 1.35,
+        size: step * (0.9 + random() * 0.22),
+        red,
+        green,
+        blue,
+        alpha: alphaByte / 255,
+      });
     }
   }
 
-  return { positions, uvs, scatters, depths, seeds };
-}
-
-function isMobileViewport() {
-  return window.matchMedia("(max-width: 760px)").matches;
-}
-
-function getRendererPixelRatio() {
-  return Math.min(window.devicePixelRatio || 1, isMobileViewport() ? 1.5 : 1.8);
-}
-
-function getWorldUnitsPerCssPixel(camera: CameraLike, viewportHeight: number) {
-  const fieldOfViewRadians = camera.fov * Math.PI / 180;
-  const visibleWorldHeight = 2 * Math.tan(fieldOfViewRadians / 2) * Math.abs(camera.position.z);
-  return visibleWorldHeight / Math.max(1, viewportHeight);
-}
-
-function syncMeshToImage({
-  wrapper,
-  image,
-  camera,
-  renderer,
-  material,
-  particles,
-}: MeshSyncContext) {
-  const viewportWidth = Math.max(1, window.innerWidth);
-  const viewportHeight = Math.max(1, window.innerHeight);
-  const imageRect = image.getBoundingClientRect();
-
-  if (imageRect.width <= 0 || imageRect.height <= 0) return false;
-
-  camera.fov = isMobileViewport() ? MOBILE_FOV : DESKTOP_FOV;
-  camera.aspect = viewportWidth / viewportHeight;
-  camera.updateProjectionMatrix();
-
-  const pixelRatio = getRendererPixelRatio();
-  renderer.setPixelRatio(pixelRatio);
-  renderer.setSize(viewportWidth, viewportHeight, false);
-
-  const worldUnitsPerCssPixel = getWorldUnitsPerCssPixel(camera, viewportHeight);
-  const meshWidth = imageRect.width * worldUnitsPerCssPixel;
-  const meshHeight = imageRect.height * worldUnitsPerCssPixel;
-  const centerX = imageRect.left + imageRect.width / 2;
-  const centerY = imageRect.top + imageRect.height / 2;
-  const worldX = (centerX - viewportWidth / 2) * worldUnitsPerCssPixel;
-  const worldY = (viewportHeight / 2 - centerY) * worldUnitsPerCssPixel;
-
-  particles.position.set(worldX, worldY, 0);
-  particles.scale.set(meshWidth, meshHeight, 1);
-
-  const cellWidthCss = imageRect.width / GRID_WIDTH;
-  const cellHeightCss = imageRect.height / GRID_HEIGHT;
-  material.uniforms.uPointSize.value = Math.max(
-    1.45,
-    Math.max(cellWidthCss, cellHeightCss) * pixelRatio * 1.22,
-  );
-
-  wrapper.dataset.textureAspect = (
-    image.naturalWidth / Math.max(1, image.naturalHeight)
-  ).toFixed(6);
-  wrapper.dataset.renderedAspect = (imageRect.width / imageRect.height).toFixed(6);
-  wrapper.dataset.meshLeft = imageRect.left.toFixed(3);
-  wrapper.dataset.meshTop = imageRect.top.toFixed(3);
-  wrapper.dataset.meshWidth = imageRect.width.toFixed(3);
-  wrapper.dataset.meshHeight = imageRect.height.toFixed(3);
-
-  return true;
+  return {
+    particles,
+    renderedWidth,
+    renderedHeight,
+    sourceAspect: readableImage.naturalWidth / Math.max(1, readableImage.naturalHeight),
+  };
 }
 
 export function HeroParticlePortrait({
@@ -438,326 +294,276 @@ export function HeroParticlePortrait({
     const wrapper = wrapperRef.current;
     const canvas = canvasRef.current;
     const shell = wrapper?.closest<HTMLElement>(".site-shell");
-    const hero = shell?.querySelector<HTMLElement>("#intro");
     const fallbackImage = wrapper?.querySelector<HTMLImageElement>(
       ".hero-particle-portrait__fallback img",
     );
+    const context = canvas?.getContext("2d", { alpha: true });
 
-    if (!wrapper || !canvas || !shell || !hero || !fallbackImage) return;
+    if (!wrapper || !canvas || !shell || !fallbackImage || !context) return;
 
     const abortController = new AbortController();
-    const tweens = new Set<TweenLike>();
-    let geometry: BufferGeometryLike | null = null;
-    let material: MaterialLike | null = null;
-    let texture: TextureLike | null = null;
-    let renderer: RendererLike | null = null;
-    let resizeObserver: ResizeObserver | null = null;
+    const state: AnimationState = {
+      disperse: 0,
+      depth: 0,
+      fade: 0,
+      targetDisperse: 0,
+      targetDepth: 0,
+      targetFade: 0,
+    };
+
+    let particles: Particle[] = [];
     let animationFrame = 0;
-    let syncFrame = 0;
+    let rebuildFrame = 0;
+    let buildVersion = 0;
+    let resizeObserver: ResizeObserver | null = null;
     let destroyed = false;
+    let viewport = resizeCanvas(canvas, context);
 
-    const initialize = async () => {
-      await Promise.all([
-        loadScript(THREE_VENDOR, () => Boolean(window.THREE)),
-        loadScript(GSAP_VENDOR, () => Boolean(window.gsap)),
-        waitForImage(fallbackImage, abortController.signal),
-      ]);
-      await loadScript(SCROLL_TRIGGER_VENDOR, () => Boolean(window.ScrollTrigger));
+    const getActiveSceneIndex = () => {
+      const scenes = Array.from(shell.querySelectorAll<HTMLElement>("[data-scene]"));
+      return scenes.findIndex((scene) => scene.dataset.state === "current");
+    };
 
-      if (abortController.signal.aborted || destroyed) return;
+    const setLayerMode = (mode: "html" | "canvas2d" | "hidden") => {
+      wrapper.dataset.renderSource = mode;
 
-      const THREE = window.THREE;
-      const gsap = window.gsap;
-      const ScrollTrigger = window.ScrollTrigger;
-
-      if (!THREE || !gsap || !ScrollTrigger) {
-        throw new Error("WebGL animation libraries are unavailable");
+      if (mode === "html") {
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        wrapper.style.setProperty("--hero-fallback-opacity", "1");
+        wrapper.style.setProperty("--hero-canvas-opacity", "0");
+        return;
       }
 
-      gsap.registerPlugin(ScrollTrigger);
-
-      const portraitGrid = createPortraitGrid();
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        isMobileViewport() ? MOBILE_FOV : DESKTOP_FOV,
-        window.innerWidth / Math.max(1, window.innerHeight),
-        0.1,
-        100,
-      );
-      camera.position.set(0, 0, CAMERA_Z);
-
-      renderer = new THREE.WebGLRenderer({
-        canvas,
-        alpha: true,
-        antialias: false,
-        powerPreference: "high-performance",
-      });
-      renderer.setClearColor(0x000000, 0);
-
-      texture = new THREE.Texture(fallbackImage);
-      texture.generateMipmaps = false;
-      if (THREE.LinearFilter) {
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
+      if (mode === "canvas2d") {
+        wrapper.style.setProperty("--hero-layer-opacity", "1");
+        wrapper.style.setProperty("--hero-fallback-opacity", "0");
+        wrapper.style.setProperty("--hero-canvas-opacity", "1");
+        return;
       }
-      if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
-      texture.needsUpdate = true;
 
-      geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.Float32BufferAttribute(portraitGrid.positions, 3));
-      geometry.setAttribute("aUv", new THREE.Float32BufferAttribute(portraitGrid.uvs, 2));
-      geometry.setAttribute("aScatter", new THREE.Float32BufferAttribute(portraitGrid.scatters, 3));
-      geometry.setAttribute("aDepth", new THREE.Float32BufferAttribute(portraitGrid.depths, 1));
-      geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(portraitGrid.seeds, 1));
+      wrapper.style.setProperty("--hero-layer-opacity", "0");
+      wrapper.style.setProperty("--hero-fallback-opacity", "0");
+      wrapper.style.setProperty("--hero-canvas-opacity", "0");
+    };
 
-      const uniforms: UniformMap = {
-        uTexture: { value: texture },
-        uDisperse: { value: 0 },
-        uDepth: { value: 0 },
-        uFade: { value: 0 },
-        uPointSize: { value: 1 },
-        uTime: { value: 0 },
-      };
+    const updateTargets = (sceneIndex: number, progress: number) => {
+      wrapper.dataset.sceneIndex = String(sceneIndex);
 
-      material = new THREE.ShaderMaterial({
-        uniforms,
-        vertexShader,
-        fragmentShader,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-      });
-
-      const particles = new THREE.Points(geometry, material);
-      particles.frustumCulled = false;
-      scene.add(particles);
-
-      const heroCopy = hero.querySelector<HTMLElement>(".intro-heading");
-      const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches;
-
-      const addTween = (tween: TweenLike) => {
-        tweens.add(tween);
-        return tween;
-      };
-
-      const tweenUniform = (
-        uniform: UniformNumber,
-        value: number,
-        duration: number,
-        ease: string,
-      ) => addTween(gsap.to(uniform, {
-        value,
-        duration: reducedMotion ? 0 : duration,
-        ease,
-        overwrite: true,
-      }));
-
-      const scheduleMeshSync = () => {
-        window.cancelAnimationFrame(syncFrame);
-        syncFrame = window.requestAnimationFrame(() => {
-          if (destroyed || !renderer || !material) return;
-          syncMeshToImage({
-            wrapper,
-            image: fallbackImage,
-            camera,
-            renderer,
-            material,
-            particles,
-          });
-          ScrollTrigger.refresh();
-        });
-      };
-
-      const getActiveSceneIndex = () => {
-        const scenes = Array.from(shell.querySelectorAll<HTMLElement>("[data-scene]"));
-        return scenes.findIndex((sceneElement) => sceneElement.dataset.state === "current");
-      };
-
-      const setLayerVisibility = (
-        fallbackOpacity: number,
-        canvasOpacity: number,
-        veilOpacity: number,
-      ) => {
-        wrapper.style.setProperty("--hero-fallback-opacity", String(fallbackOpacity));
-        wrapper.style.setProperty("--hero-canvas-opacity", String(canvasOpacity));
-        wrapper.style.setProperty("--hero-veil-opacity", String(veilOpacity));
-        wrapper.dataset.renderSource = canvasOpacity > 0 ? "webgl" : "html";
-      };
-
-      const applyHeroState = (progress: number, immediate = false) => {
+      if (sceneIndex <= 0) {
         const disperse = clamp(progress / 0.5);
-        const duration = immediate ? 0 : 0.92;
-        const isIdle = progress <= 0.001;
+        const idle = progress <= 0.001;
 
+        state.targetDisperse = disperse;
+        state.targetDepth = 0;
+        state.targetFade = 0;
         wrapper.dataset.overlay = "hero";
-        wrapper.dataset.phase = isIdle ? "idle" : "hero-particles";
-        wrapper.dataset.particleMotion = isIdle ? "idle" : "dispersing";
+        wrapper.dataset.phase = idle ? "idle" : "hero-particles";
+        wrapper.dataset.particleMotion = idle ? "idle" : "dispersing";
         wrapper.dataset.disperseTarget = disperse.toFixed(3);
         wrapper.dataset.depthTarget = "0.000";
         wrapper.dataset.fadeTarget = "0.000";
-        wrapper.style.setProperty("--hero-layer-opacity", "1");
-        setLayerVisibility(isIdle ? 1 : 0.16, isIdle ? 0 : 1, isIdle ? 1 : 0.46);
+        wrapper.style.setProperty("--hero-veil-opacity", idle ? "1" : "0.12");
+        setLayerMode(idle || particles.length === 0 ? "html" : "canvas2d");
+        return;
+      }
 
-        tweenUniform(uniforms.uDisperse, disperse, duration, "power3.out");
-        tweenUniform(uniforms.uDepth, 0, duration * 0.65, "power2.out");
-        tweenUniform(uniforms.uFade, 0, duration * 0.55, "power2.out");
-
-        if (heroCopy) {
-          addTween(gsap.to(heroCopy, {
-            opacity: 1,
-            y: 0,
-            duration: reducedMotion || immediate ? 0 : 0.45,
-            ease: "power2.out",
-            overwrite: true,
-          }));
-        }
-      };
-
-      const applyPitchState = () => {
-        const pitchDepth = clamp((HERO_HANDOFF_PROGRESS - 0.5) * 0.55);
-
+      if (sceneIndex === 1) {
+        state.targetDisperse = 1;
+        state.targetDepth = 0.16;
+        state.targetFade = 0;
         wrapper.dataset.overlay = "pitch";
         wrapper.dataset.phase = "pitch-particles";
         wrapper.dataset.particleMotion = "over-pitch";
         wrapper.dataset.disperseTarget = "1.000";
-        wrapper.dataset.depthTarget = pitchDepth.toFixed(3);
+        wrapper.dataset.depthTarget = "0.160";
         wrapper.dataset.fadeTarget = "0.000";
-        wrapper.style.setProperty("--hero-layer-opacity", "1");
-        setLayerVisibility(0, 1, 0);
+        wrapper.style.setProperty("--hero-veil-opacity", "0");
+        setLayerMode(particles.length === 0 ? "html" : "canvas2d");
+        return;
+      }
 
-        tweenUniform(uniforms.uDisperse, 1, 0.72, "power2.out");
-        tweenUniform(uniforms.uDepth, pitchDepth, 0.82, "power2.inOut");
-        tweenUniform(uniforms.uFade, 0, 0.25, "power2.out");
-
-        if (heroCopy) {
-          addTween(gsap.to(heroCopy, {
-            opacity: 0,
-            y: -24,
-            duration: reducedMotion ? 0 : 0.46,
-            ease: "power2.out",
-            overwrite: true,
-          }));
-        }
-      };
-
-      const applyBlockThreeState = () => {
+      if (sceneIndex === 2) {
+        state.targetDisperse = 1;
+        state.targetDepth = 1;
+        state.targetFade = 1;
         wrapper.dataset.overlay = "leaving";
         wrapper.dataset.phase = "block-3-fade";
         wrapper.dataset.particleMotion = "depth-fade";
         wrapper.dataset.disperseTarget = "1.000";
         wrapper.dataset.depthTarget = "1.000";
         wrapper.dataset.fadeTarget = "1.000";
-        wrapper.style.setProperty("--hero-layer-opacity", "1");
-        setLayerVisibility(0, 1, 0);
+        wrapper.style.setProperty("--hero-veil-opacity", "0");
+        setLayerMode(particles.length === 0 ? "hidden" : "canvas2d");
+        return;
+      }
 
-        tweenUniform(uniforms.uDisperse, 1, 0.25, "power2.out");
-        tweenUniform(uniforms.uDepth, 1, 1.42, "power3.in");
-        tweenUniform(uniforms.uFade, 1, 1.55, "power2.inOut");
-      };
+      state.targetDisperse = 1;
+      state.targetDepth = 1;
+      state.targetFade = 1;
+      wrapper.dataset.overlay = "hidden";
+      wrapper.dataset.phase = "hidden";
+      wrapper.dataset.particleMotion = "hidden";
+      setLayerMode("hidden");
+    };
 
-      const hideParticleLayer = () => {
-        wrapper.dataset.overlay = "hidden";
-        wrapper.dataset.phase = "hidden";
-        wrapper.dataset.particleMotion = "hidden";
-        wrapper.style.setProperty("--hero-layer-opacity", "0");
-        setLayerVisibility(0, 0, 0);
-        tweenUniform(uniforms.uFade, 1, 0, "none");
-      };
+    const handleHeroProgress = (event: Event) => {
+      const detail = (event as CustomEvent<HeroProgressDetail>).detail;
+      if (!detail) return;
+      updateTargets(getActiveSceneIndex(), clamp(detail.progress));
+    };
 
-      const handleHeroProgress = (event: Event) => {
-        const detail = (event as CustomEvent<HeroProgressDetail>).detail;
-        if (!detail) return;
+    const rebuildParticles = async () => {
+      const currentBuild = ++buildVersion;
 
-        const activeSceneIndex = getActiveSceneIndex();
-        wrapper.dataset.sceneIndex = String(activeSceneIndex);
+      await waitForRenderedImage(fallbackImage, abortController.signal);
+      if (destroyed || abortController.signal.aborted || currentBuild !== buildVersion) return;
 
-        if (activeSceneIndex <= 0) {
-          applyHeroState(clamp(detail.progress));
-          return;
-        }
+      const imageRect = fallbackImage.getBoundingClientRect();
+      if (imageRect.width <= 0 || imageRect.height <= 0) return;
 
-        if (activeSceneIndex === 1) {
-          applyPitchState();
-          return;
-        }
+      const source = fallbackImage.currentSrc || fallbackImage.src || imageUrl;
+      const readableImage = await loadReadableImage(source, abortController.signal);
+      if (destroyed || abortController.signal.aborted || currentBuild !== buildVersion) return;
 
-        if (activeSceneIndex === 2) {
-          applyBlockThreeState();
-          return;
-        }
+      viewport = resizeCanvas(canvas, context);
+      const step = getSampleStep();
+      const result = createParticles(readableImage, imageRect, step);
+      particles = result.particles;
 
-        hideParticleLayer();
-      };
+      wrapper.dataset.renderer = "canvas2d";
+      wrapper.dataset.rendererStatus = "ready";
+      wrapper.dataset.particleStep = String(step);
+      wrapper.dataset.particleCount = String(particles.length);
+      wrapper.dataset.meshLeft = imageRect.left.toFixed(3);
+      wrapper.dataset.meshTop = imageRect.top.toFixed(3);
+      wrapper.dataset.meshWidth = imageRect.width.toFixed(3);
+      wrapper.dataset.meshHeight = imageRect.height.toFixed(3);
+      wrapper.dataset.textureAspect = result.sourceAspect.toFixed(6);
+      wrapper.dataset.renderedAspect = (
+        result.renderedWidth / Math.max(1, result.renderedHeight)
+      ).toFixed(6);
 
-      shell.addEventListener("desorden:hero-progress", handleHeroProgress);
-
-      const handleResize = () => scheduleMeshSync();
-      window.addEventListener("resize", handleResize, { passive: true });
-      window.addEventListener("orientationchange", handleResize, { passive: true });
-      window.visualViewport?.addEventListener("resize", handleResize, { passive: true });
-
-      resizeObserver = new ResizeObserver(scheduleMeshSync);
-      resizeObserver.observe(fallbackImage);
-      resizeObserver.observe(wrapper);
-
-      wrapper.dataset.webgl = "ready";
-      wrapper.dataset.particleCount = String(PARTICLE_COUNT);
-      scheduleMeshSync();
-
-      const initialSceneIndex = getActiveSceneIndex();
       const initialProgress = Number.parseFloat(
         shell.style.getPropertyValue("--hero-particle-progress") || "0",
       );
-
-      if (initialSceneIndex === 1) applyPitchState();
-      else if (initialSceneIndex === 2) applyBlockThreeState();
-      else if (initialSceneIndex > 2) hideParticleLayer();
-      else applyHeroState(initialProgress, true);
-
-      const startedAt = performance.now();
-      const renderFrame = (now: number) => {
-        if (destroyed || !renderer || !material) return;
-        material.uniforms.uTime.value = (now - startedAt) / 1000;
-        renderer.render(scene, camera);
-        animationFrame = window.requestAnimationFrame(renderFrame);
-      };
-
-      animationFrame = window.requestAnimationFrame(renderFrame);
-
-      abortController.signal.addEventListener(
-        "abort",
-        () => {
-          shell.removeEventListener("desorden:hero-progress", handleHeroProgress);
-          window.removeEventListener("resize", handleResize);
-          window.removeEventListener("orientationchange", handleResize);
-          window.visualViewport?.removeEventListener("resize", handleResize);
-          resizeObserver?.disconnect();
-        },
-        { once: true },
-      );
+      updateTargets(getActiveSceneIndex(), clamp(initialProgress));
     };
 
-    void initialize().catch((error: unknown) => {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      console.error("Unable to initialize hero particle portrait", error);
-      wrapper.dataset.webgl = "fallback";
-      wrapper.dataset.renderSource = "html";
-      wrapper.dataset.particleMotion = "fallback";
-      wrapper.style.setProperty("--hero-fallback-opacity", "1");
-      wrapper.style.setProperty("--hero-canvas-opacity", "0");
-    });
+    const scheduleRebuild = () => {
+      window.cancelAnimationFrame(rebuildFrame);
+      rebuildFrame = window.requestAnimationFrame(() => {
+        void rebuildParticles().catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          console.error("Unable to build Canvas 2D hero particles", error);
+          wrapper.dataset.rendererStatus = "fallback";
+          wrapper.dataset.particleMotion = "fallback";
+          setLayerMode("html");
+        });
+      });
+    };
+
+    const render = (timestamp: number) => {
+      if (destroyed) return;
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const smoothing = reducedMotion ? 1 : 0.095;
+      state.disperse += (state.targetDisperse - state.disperse) * smoothing;
+      state.depth += (state.targetDepth - state.depth) * smoothing;
+      state.fade += (state.targetFade - state.fade) * smoothing;
+
+      context.clearRect(0, 0, viewport.width, viewport.height);
+
+      const shouldDraw =
+        particles.length > 0 &&
+        (state.disperse > 0.001 || state.targetDisperse > 0.001) &&
+        state.fade < 0.999;
+
+      if (shouldDraw) {
+        const disperse = easeOutCubic(state.disperse);
+        const depth = easeInCubic(state.depth);
+        const fade = clamp(state.fade);
+        const seconds = timestamp / 1000;
+        const viewportCenterX = viewport.width / 2;
+        const viewportCenterY = viewport.height / 2;
+
+        context.globalCompositeOperation = "source-over";
+
+        for (const particle of particles) {
+          const flutterX = Math.cos(seconds * particle.speed + particle.phase);
+          const flutterY = Math.sin(seconds * particle.speed * 0.82 + particle.phase);
+          const depthExpansionX =
+            (particle.originX - viewportCenterX) * depth * (0.5 + particle.depth * 0.72);
+          const depthExpansionY =
+            (particle.originY - viewportCenterY) * depth * (0.42 + particle.depth * 0.64);
+
+          const x =
+            particle.originX +
+            particle.velocityX * disperse +
+            flutterX * (4 + particle.depth * 9) * disperse +
+            depthExpansionX;
+          const y =
+            particle.originY +
+            particle.velocityY * disperse +
+            flutterY * (3 + particle.depth * 8) * disperse +
+            depthExpansionY;
+
+          const size = Math.max(
+            0.65,
+            particle.size *
+              (1 - disperse * 0.62) *
+              (1 + depth * (0.75 + particle.depth * 1.25)),
+          );
+          const alpha = particle.alpha * (1 - fade);
+
+          if (alpha <= 0.003) continue;
+
+          context.globalAlpha = alpha;
+          context.fillStyle = `rgb(${particle.red} ${particle.green} ${particle.blue})`;
+          context.fillRect(x - size / 2, y - size / 2, size, size);
+        }
+
+        context.globalAlpha = 1;
+      }
+
+      if (state.fade > 0.985 && state.targetFade >= 1) {
+        wrapper.dataset.phase = "hidden";
+        wrapper.dataset.particleMotion = "hidden";
+        setLayerMode("hidden");
+      }
+
+      animationFrame = window.requestAnimationFrame(render);
+    };
+
+    shell.addEventListener("desorden:hero-progress", handleHeroProgress);
+    window.addEventListener("resize", scheduleRebuild, { passive: true });
+    window.addEventListener("orientationchange", scheduleRebuild, { passive: true });
+    window.visualViewport?.addEventListener("resize", scheduleRebuild, { passive: true });
+
+    resizeObserver = new ResizeObserver(scheduleRebuild);
+    resizeObserver.observe(fallbackImage);
+    resizeObserver.observe(wrapper);
+
+    wrapper.dataset.renderer = "canvas2d";
+    wrapper.dataset.rendererStatus = "loading";
+    wrapper.dataset.particleCount = "0";
+    wrapper.dataset.particleStep = String(getSampleStep());
+    setLayerMode("html");
+    scheduleRebuild();
+    animationFrame = window.requestAnimationFrame(render);
 
     return () => {
       destroyed = true;
+      buildVersion += 1;
       abortController.abort();
-      window.cancelAnimationFrame(animationFrame);
-      window.cancelAnimationFrame(syncFrame);
-      tweens.forEach((tween) => tween.kill());
+      shell.removeEventListener("desorden:hero-progress", handleHeroProgress);
+      window.removeEventListener("resize", scheduleRebuild);
+      window.removeEventListener("orientationchange", scheduleRebuild);
+      window.visualViewport?.removeEventListener("resize", scheduleRebuild);
       resizeObserver?.disconnect();
-      geometry?.dispose();
-      material?.dispose();
-      texture?.dispose();
-      renderer?.dispose();
+      window.cancelAnimationFrame(animationFrame);
+      window.cancelAnimationFrame(rebuildFrame);
+      particles = [];
+      context.clearRect(0, 0, canvas.width, canvas.height);
     };
   }, [hydrated, imageUrl]);
 
@@ -767,11 +573,13 @@ export function HeroParticlePortrait({
     <div
       ref={wrapperRef}
       className="hero-particle-portrait"
-      data-webgl="loading"
+      data-renderer="canvas2d"
+      data-renderer-status="loading"
       data-overlay="hero"
       data-render-source="html"
       data-particle-motion="idle"
-      data-particle-count={PARTICLE_COUNT}
+      data-particle-count="0"
+      data-particle-step={MOBILE_SAMPLE_STEP}
       aria-hidden="true"
     >
       <ProjectPicture
