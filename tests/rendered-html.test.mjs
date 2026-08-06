@@ -22,6 +22,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     logoCss,
     heroPortrait,
     heroCss,
+    heroCanvasCss,
     vendorRoute,
     pushNotifications,
     pushNotificationsCss,
@@ -55,6 +56,7 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
     source("app/logo-tunnel.css"),
     source("components/HeroParticlePortrait.tsx"),
     source("app/hero-particles.css"),
+    source("app/hero-canvas-particles.css"),
     source("app/api/vendor/route.ts"),
     source("components/SocialProofPushNotifications.tsx"),
     source("app/push-notifications.css"),
@@ -104,36 +106,39 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(layout, /ProfessionalService/);
   assert.match(layout, /SiteNavigation/);
   assert.match(layout, /hero-particles\.css/);
-  assert.match(layout, /\/api\/vendor\?library=three/);
-  assert.match(layout, /\/api\/vendor\?library=gsap/);
-  assert.match(layout, /\/api\/vendor\?library=scroll-trigger/);
-  assert.match(layout, /strategy="beforeInteractive"/);
+  assert.match(layout, /hero-canvas-particles\.css/);
+  assert.doesNotMatch(layout, /\/api\/vendor\?library=three/);
+  assert.doesNotMatch(layout, /\/api\/vendor\?library=gsap/);
+  assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
   assert.match(layout, /push-notifications\.css/);
   assert.match(layout, /SocialProofPushNotifications/);
   assert.match(layout, /heroSelector="#intro"/);
   assert.doesNotMatch(layout, /Editable Portfolio Template/);
 
   assert.match(heroPortrait, /^"use client"/);
-  assert.match(heroPortrait, /ShaderMaterial/);
-  assert.match(heroPortrait, /vertexShader/);
-  assert.match(heroPortrait, /fragmentShader/);
-  assert.match(heroPortrait, /const GRID_WIDTH = 200/);
-  assert.match(heroPortrait, /const GRID_HEIGHT = 300/);
-  assert.match(heroPortrait, /const PARTICLE_COUNT = GRID_WIDTH \* GRID_HEIGHT/);
-  assert.match(heroPortrait, /attribute vec2 aUv/);
-  assert.match(heroPortrait, /uniform sampler2D uTexture/);
-  assert.match(heroPortrait, /texture2D\(uTexture, sampleUv\)/);
-  assert.match(heroPortrait, /uDisperse: \{ value: 0 \}/);
-  assert.match(heroPortrait, /uFade: \{ value: 0 \}/);
-  assert.match(heroPortrait, /gl_PointSize = uPointSize \* perspective \* solidCoverage/);
-  assert.match(heroPortrait, /wrapper\.dataset\.particleCount = String\(PARTICLE_COUNT\)/);
-  assert.match(heroPortrait, /HERO_HANDOFF_PROGRESS = 0\.72/);
-  assert.match(heroPortrait, /ScrollTrigger/);
+  assert.match(heroPortrait, /const MOBILE_SAMPLE_STEP = 6/);
+  assert.match(heroPortrait, /const DESKTOP_SAMPLE_STEP = 3/);
+  assert.match(heroPortrait, /image\.complete && image\.naturalWidth > 0/);
+  assert.match(heroPortrait, /image\.crossOrigin = "anonymous"/);
+  assert.match(heroPortrait, /image\.src = source/);
+  assert.ok(
+    heroPortrait.indexOf('image.crossOrigin = "anonymous"') <
+      heroPortrait.indexOf("image.src = source"),
+    "crossOrigin must be assigned before src",
+  );
+  assert.match(heroPortrait, /getImageData\(0, 0, renderedWidth, renderedHeight\)/);
+  assert.match(heroPortrait, /Tainted canvas/);
+  assert.match(heroPortrait, /const particles: Particle\[\] = \[\]/);
+  assert.match(heroPortrait, /requestAnimationFrame/);
+  assert.match(heroPortrait, /ResizeObserver/);
+  assert.match(heroPortrait, /orientationchange/);
+  assert.match(heroPortrait, /visualViewport/);
   assert.match(heroPortrait, /ProjectPicture/);
   assert.match(heroPortrait, /data-hero-particle-canvas/);
+  assert.match(heroPortrait, /data-renderer="canvas2d"/);
   assert.match(heroPortrait, /media\/hero\/portada-chico-bn\.webp/);
-  assert.match(heroPortrait, /requestAnimationFrame/);
   assert.match(heroPortrait, /prefers-reduced-motion|matchMedia/);
+  assert.doesNotMatch(heroPortrait, /ShaderMaterial|vertexShader|fragmentShader/);
 
   assert.match(heroCss, /\.hero-particle-portrait\s*\{/);
   assert.match(heroCss, /position:\s*fixed/);
@@ -144,6 +149,13 @@ test("is a mobile-first commercial portfolio with controlled hydration", async (
   assert.match(heroCss, /\.fixed-ui \.scene-counter/);
   assert.match(heroCss, /@media \(max-width: 760px\)/);
   assert.match(heroCss, /prefers-reduced-motion/);
+
+  assert.match(heroCanvasCss, /data-render-source="canvas2d"/);
+  assert.match(heroCanvasCss, /z-index:\s*2/);
+  assert.match(heroCanvasCss, /opacity:\s*0 !important/);
+  assert.match(heroCanvasCss, /opacity:\s*1 !important/);
+  assert.match(heroCanvasCss, /visibility:\s*hidden/);
+  assert.match(heroCanvasCss, /visibility:\s*visible/);
 
   assert.match(vendorRoute, /three@0\.152\.2/);
   assert.match(vendorRoute, /gsap@3\.12\.5/);
