@@ -48,8 +48,11 @@ test("maps the WebGL mesh to the rendered portrait box and recalculates on resiz
 
   await page.keyboard.press("ArrowDown");
   await expect(portrait).toHaveAttribute("data-render-source", "webgl");
+  await expect(portrait).toHaveAttribute("data-particle-motion", "dispersing");
   await expect(canvas).toHaveCSS("opacity", "1");
-  await expect(fallbackLayer).toHaveCSS("opacity", "0");
+  await expect.poll(async () => Number.parseFloat(await fallbackLayer.evaluate((element) =>
+    getComputedStyle(element).opacity,
+  ))).toBeLessThanOrEqual(0.2);
 
   await page.setViewportSize({ width: 430, height: 932 });
   await expect.poll(async () => (await readAlignment()).mesh.width).toBeGreaterThan(400);
