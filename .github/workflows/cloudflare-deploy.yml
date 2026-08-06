@@ -74,13 +74,21 @@ jobs:
 
           const path = "wrangler.jsonc";
           const config = JSON.parse(fs.readFileSync(path, "utf8"));
-          const binding = config.kv_namespaces?.find((entry) => entry.binding === "EDITOR_KV");
+          config.kv_namespaces ??= [];
 
-          if (!binding) {
-            throw new Error("Missing EDITOR_KV binding in wrangler.jsonc");
+          const existingBinding = config.kv_namespaces.find(
+            (entry) => entry.binding === "EDITOR_KV",
+          );
+
+          if (existingBinding) {
+            existingBinding.id = process.env.EDITOR_KV_ID;
+          } else {
+            config.kv_namespaces.push({
+              binding: "EDITOR_KV",
+              id: process.env.EDITOR_KV_ID,
+            });
           }
 
-          binding.id = process.env.EDITOR_KV_ID;
           fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
           NODE
 
