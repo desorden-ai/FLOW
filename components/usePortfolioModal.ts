@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 
-type BackgroundState = {
+export type BackgroundState = {
   element: HTMLElement;
   inert: boolean;
   ariaHidden: string | null;
