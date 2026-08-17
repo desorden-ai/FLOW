@@ -81,6 +81,22 @@ jobs:
           test -n "$EDITOR_KV_ID" || (echo "Missing EDITOR_KV_ID repository variable" && exit 1)
           [[ "$EDITOR_KV_ID" =~ ^[0-9a-fA-F]{32}$ ]] || (echo "EDITOR_KV_ID must be a 32-character Cloudflare KV namespace ID" && exit 1)
 
+      - name: Audit production dependencies
+        id: audit
+        run: npm run audit:prod
+
+      - name: Lint
+        id: lint
+        run: npm run lint
+
+      - name: Test
+        id: test
+        run: npm test
+
+      - name: Build
+        id: build
+        run: npm run build
+
       - name: Configure production KV binding
         id: binding
         env:
@@ -108,22 +124,6 @@ jobs:
 
           fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
           NODE
-
-      - name: Audit production dependencies
-        id: audit
-        run: npm run audit:prod
-
-      - name: Lint
-        id: lint
-        run: npm run lint
-
-      - name: Test
-        id: test
-        run: npm test
-
-      - name: Build
-        id: build
-        run: npm run build
 
       - name: Verify deployment package
         id: dry_run
