@@ -1,0 +1,108 @@
+/* DESORDEN — jerarquía tipográfica display
+   Override no destructivo cargado después del sistema visual existente. */
+
+:root {
+  --desorden-title-font: Anton, Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Narrow", sans-serif;
+  --desorden-section-title-size: clamp(2.9rem, 9vw, 6.8rem);
+}
+
+.site-shell {
+  font-weight: 400;
+}
+
+.site-shell .scene h1,
+.site-shell .scene h2,
+.site-shell .scene h3,
+.site-shell .display-name,
+.site-shell .hero-brand-title,
+.site-shell .media-title,
+.site-shell .contact-name,
+.site-shell .ghost-statement {
+  font-family: var(--desorden-title-font) !important;
+  font-weight: 900 !important;
+  font-synthesis: weight;
+  line-height: .88 !important;
+  letter-spacing: -.025em !important;
+  -webkit-text-stroke: .3px currentColor;
+}
+
+.site-shell .scene h1,
+.site-shell .scene h2 {
+  font-size: var(--desorden-section-title-size) !important;
+}
+
+.site-shell .scene h3 {
+  font-size: clamp(1.85rem, 4.8vw, 3.5rem) !important;
+}
+
+.site-shell .hero-brand-title {
+  font-size: clamp(7rem, 12.5vw, 11.5rem) !important;
+  line-height: .76 !important;
+  letter-spacing: -.045em !important;
+  -webkit-text-stroke: .55px currentColor;
+}
+
+.site-shell .pitch-copy > p:last-of-type,
+.site-shell .about-panel li,
+.site-shell .contact-copy > p:last-child,
+.site-shell .experience-row span,
+.site-shell .case-list span,
+.site-shell .contact-email,
+.site-shell .hero-services li {
+  font-weight: 400 !important;
+  font-size: clamp(1rem, 1.65vw, 1.35rem) !important;
+  line-height: 1.35 !important;
+}
+
+.site-shell .experience-row strong,
+.site-shell .section-toggle b,
+.site-shell .case-list b {
+  font-weight: 700 !important;
+}
+
+.site-shell .experience-row strong {
+  font-size: clamp(.95rem, 1.35vw, 1.15rem) !important;
+}
+
+.site-shell .media-title,
+.site-shell .contact-name {
+  font-size: clamp(2.3rem, 5.2vw, 5rem) !important;
+}
+
+.site-shell .eyebrow,
+.site-shell .micro-label,
+.site-shell .about-meta,
+.site-shell .media-card small,
+.site-shell .experience-row time,
+.site-shell .section-toggle span,
+.site-shell .scene-counter {
+  font-weight: 700 !important;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --desorden-section-title-size: clamp(2.65rem, 12vw, 4.5rem);
+  }
+
+  .site-shell .hero-brand-title {
+    width: 118% !important;
+    font-size: clamp(5rem, 23vw, 7.5rem) !important;
+    line-height: .74 !important;
+    letter-spacing: -.04em !important;
+  }
+
+  .site-shell .pitch-copy > p:last-of-type,
+  .site-shell .about-panel li,
+  .site-shell .contact-copy > p:last-child,
+  .site-shell .experience-row span,
+  .site-shell .case-list span,
+  .site-shell .contact-email,
+  .site-shell .hero-services li {
+    font-size: clamp(.94rem, 4vw, 1.08rem) !important;
+  }
+
+  .site-shell .media-title,
+  .site-shell .contact-name {
+    font-size: clamp(2.2rem, 10vw, 3.75rem) !important;
+  }
+}
