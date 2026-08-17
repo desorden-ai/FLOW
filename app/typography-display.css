@@ -1,9 +1,9 @@
-/* DESORDEN — jerarquía tipográfica display
+/* DESORDEN — tipografía de referencia: display condensada tipo Anton/Impact.
    Override no destructivo cargado después del sistema visual existente. */
 
 :root {
-  --desorden-title-font: Anton, Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Narrow", sans-serif;
-  --desorden-section-title-size: clamp(2.9rem, 9vw, 6.8rem);
+  --desorden-title-font: Impact, Haettenschweiler, "Arial Narrow Bold", "Roboto Condensed", "Arial Narrow", sans-serif;
+  --desorden-section-title-size: clamp(3rem, 9.5vw, 7.1rem);
 }
 
 .site-shell {
@@ -19,27 +19,42 @@
 .site-shell .contact-name,
 .site-shell .ghost-statement {
   font-family: var(--desorden-title-font) !important;
-  font-weight: 900 !important;
-  font-synthesis: weight;
-  line-height: .88 !important;
-  letter-spacing: -.025em !important;
-  -webkit-text-stroke: .3px currentColor;
+  font-weight: 400 !important;
+  font-synthesis: none !important;
+  line-height: .84 !important;
+  letter-spacing: .005em !important;
+  text-transform: uppercase !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
 }
 
 .site-shell .scene h1,
 .site-shell .scene h2 {
   font-size: var(--desorden-section-title-size) !important;
+  transform: scaleX(.9);
+  transform-origin: center center;
 }
 
 .site-shell .scene h3 {
-  font-size: clamp(1.85rem, 4.8vw, 3.5rem) !important;
+  font-size: clamp(1.9rem, 5vw, 3.7rem) !important;
+  transform: scaleX(.92);
+  transform-origin: center center;
 }
 
 .site-shell .hero-brand-title {
-  font-size: clamp(7rem, 12.5vw, 11.5rem) !important;
+  width: 124% !important;
+  font-size: clamp(7.4rem, 13.2vw, 12rem) !important;
   line-height: .76 !important;
-  letter-spacing: -.045em !important;
-  -webkit-text-stroke: .55px currentColor;
+  letter-spacing: .006em !important;
+  transform: scaleX(.82) !important;
+  transform-origin: left center !important;
+}
+
+.site-shell .media-title,
+.site-shell .contact-name {
+  font-size: clamp(2.45rem, 5.6vw, 5.35rem) !important;
+  transform: scaleX(.9);
+  transform-origin: center center;
 }
 
 .site-shell .pitch-copy > p:last-of-type,
@@ -64,11 +79,6 @@
   font-size: clamp(.95rem, 1.35vw, 1.15rem) !important;
 }
 
-.site-shell .media-title,
-.site-shell .contact-name {
-  font-size: clamp(2.3rem, 5.2vw, 5rem) !important;
-}
-
 .site-shell .eyebrow,
 .site-shell .micro-label,
 .site-shell .about-meta,
@@ -81,14 +91,20 @@
 
 @media (max-width: 760px) {
   :root {
-    --desorden-section-title-size: clamp(2.65rem, 12vw, 4.5rem);
+    --desorden-section-title-size: clamp(2.85rem, 13vw, 4.9rem);
+  }
+
+  .site-shell .scene h1,
+  .site-shell .scene h2 {
+    transform: scaleX(.88);
   }
 
   .site-shell .hero-brand-title {
-    width: 118% !important;
-    font-size: clamp(5rem, 23vw, 7.5rem) !important;
-    line-height: .74 !important;
-    letter-spacing: -.04em !important;
+    width: 128% !important;
+    font-size: clamp(5.4rem, 25vw, 8.1rem) !important;
+    line-height: .73 !important;
+    letter-spacing: .004em !important;
+    transform: scaleX(.80) !important;
   }
 
   .site-shell .pitch-copy > p:last-of-type,
@@ -103,6 +119,6 @@
 
   .site-shell .media-title,
   .site-shell .contact-name {
-    font-size: clamp(2.2rem, 10vw, 3.75rem) !important;
+    font-size: clamp(2.35rem, 10.8vw, 4rem) !important;
   }
 }
