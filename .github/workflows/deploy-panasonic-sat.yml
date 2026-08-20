@@ -1,0 +1,133 @@
+name: Deploy Panasonic SAT Cloudflare
+
+on:
+  push:
+    branches: [PANASONIC-SAT-CF]
+    paths:
+      - 'panasonic-sat/**'
+      - '.github/workflows/deploy-panasonic-sat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WORKER_NAME: panasonic-sat-servicepro
+      ACCESS_APP_NAME: Panasonic SAT ServicePro
+      ALLOWED_EMAIL: desorden.help@gmail.com
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Cloudflare authorization
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail-with-body --silent --show-error \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/workers.json
+          jq -e '.success == true' /tmp/workers.json >/dev/null
+
+      - name: Deploy Worker, Durable Object and Workers AI
+        id: deploy
+        working-directory: panasonic-sat
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.92.0 deploy 2>&1 | tee /tmp/panasonic-deploy.txt
+          URL="$(grep -Eo 'https://[^ ]+\.workers\.dev' /tmp/panasonic-deploy.txt | tail -1)"
+          test -n "$URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Worker URL: $URL"
+
+      - name: Verify application before Access lock
+        env:
+          APP_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error "$APP_URL/api/health" | tee /tmp/health.json
+          jq -e '.ok == true and .service == "panasonic-sat-servicepro"' /tmp/health.json >/dev/null
+
+      - name: Protect Worker with Cloudflare Access
+        env:
+          APP_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+
+          curl --fail-with-body --silent --show-error \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/workers.json
+
+          WORKER_ID="$(jq -r --arg name "$WORKER_NAME" '.result[] | select(.id == $name) | .tag' /tmp/workers.json | head -1)"
+          test -n "$WORKER_ID" && test "$WORKER_ID" != "null"
+          echo "Resolved immutable Worker ID: $WORKER_ID"
+
+          curl --fail-with-body --silent --show-error \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps?per_page=100" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/access-apps.json
+
+          OLD_IDS="$(jq -r --arg name "$ACCESS_APP_NAME" '.result[]? | select(.name == $name) | .id' /tmp/access-apps.json)"
+          for id in $OLD_IDS; do
+            curl --fail-with-body --silent --show-error \
+              -X DELETE \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$id" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/dev/null
+          done
+
+          jq -n \
+            --arg name "$ACCESS_APP_NAME" \
+            --arg worker "$WORKER_ID" \
+            --arg email "$ALLOWED_EMAIL" \
+            '{
+              type: "self_hosted",
+              name: $name,
+              destinations: [{type:"worker", worker_id:$worker}],
+              session_duration: "24h",
+              policies: [{
+                name: "Panasonic SAT owner only",
+                decision: "allow",
+                include: [{email:{email:$email}}]
+              }]
+            }' >/tmp/access-payload.json
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/access-payload.json >/tmp/access-result.json
+
+          jq -e '.success == true' /tmp/access-result.json >/dev/null
+          jq '{success, app_id:.result.id, name:.result.name}' /tmp/access-result.json
+
+          secured=0
+          for attempt in 1 2 3 4 5 6; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' "$APP_URL/")"
+            echo "Access propagation check $attempt: HTTP $code"
+            if [ "$code" != "200" ]; then secured=1; break; fi
+            sleep 5
+          done
+          test "$secured" = "1"
+
+      - name: Deployment summary
+        env:
+          APP_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          {
+            echo "## Panasonic SAT ServicePro"
+            echo ""
+            echo "- URL: $APP_URL"
+            echo "- Authorization: Cloudflare Access / OTP / $ALLOWED_EMAIL"
+            echo "- Database: Durable Objects (SQLite-backed)"
+            echo "- AI: Workers AI / Gemma 4 Vision"
+            echo "- Firebase: not used"
+            echo "- AppDeploy: not used"
+          } >> "$GITHUB_STEP_SUMMARY"
