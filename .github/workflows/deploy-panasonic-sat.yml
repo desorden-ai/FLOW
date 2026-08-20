@@ -29,6 +29,20 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
     steps:
+      - name: Mark deployment pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '{"state":"pending","context":"panasonic/cloudflare","description":"Deploying Panasonic SAT","target_url":"%s/%s/actions/runs/%s"}' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >/tmp/status.json
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --data-binary @/tmp/status.json >/dev/null
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -136,3 +150,21 @@ jobs:
             echo "- Firebase: not used"
             echo "- AppDeploy: not used"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish deployment result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          ACCESS_OUTCOME: ${{ steps.protect.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "${{ job.status }}" = "success" ]; then state=success; description="Panasonic SAT deployed and protected"; else state=failure; description="Panasonic SAT deployment needs repair"; fi
+          printf '{"state":"%s","context":"panasonic/cloudflare","description":"%s","target_url":"%s/%s/actions/runs/%s"}' "$state" "$description" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >/tmp/status-final.json
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --data-binary @/tmp/status-final.json >/dev/null
