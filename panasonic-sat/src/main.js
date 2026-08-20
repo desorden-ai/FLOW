@@ -38,7 +38,7 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Panasonic-Access-Jwt': accessJwt
+            'Authorization': `Bearer ${accessJwt}`
           },
           body: JSON.stringify({ image: data, mimeType })
         });
