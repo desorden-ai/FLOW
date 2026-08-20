@@ -17,3 +17,7 @@ La captura se redimensiona en el navegador, se envía a Workers AI para extracci
 ## Rama
 
 `PANASONIC-SAT-CF`
+
+## Deploy
+
+Controlado por `.github/workflows/deploy-panasonic-sat.yml` desde `main`.
