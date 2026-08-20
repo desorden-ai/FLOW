@@ -3,6 +3,8 @@ name: Panasonic SAT Deploy Command
 on:
   issues:
     types: [opened]
+  schedule:
+    - cron: '*/5 * * * *'
 
 permissions:
   contents: read
@@ -10,13 +12,14 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event.issue.user.login == 'desorden-ai' && github.event.issue.title == 'DEPLOY PANASONIC SAT CLOUDFLARE'
+    if: github.event_name == 'schedule' || (github.event.issue.user.login == 'desorden-ai' && github.event.issue.title == 'DEPLOY PANASONIC SAT CLOUDFLARE')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       WORKER_NAME: panasonic-sat-servicepro
       ACCESS_APP_NAME: Panasonic SAT ServicePro
       ALLOWED_EMAIL: desorden.help@gmail.com
+      DEPLOY_ISSUE: '57'
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -76,11 +79,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           APP_URL: ${{ steps.deploy.outputs.url }}
         run: |
-          gh issue comment "${{ github.event.issue.number }}" --repo "$GITHUB_REPOSITORY" --body "PANASONIC_DEPLOY_SUCCESS\nURL=$APP_URL\nAUTH=Cloudflare Access OTP / $ALLOWED_EMAIL\nDB=Durable Objects SQLite\nAI=Workers AI Gemma 4 Vision\nRUN=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue comment "$DEPLOY_ISSUE" --repo "$GITHUB_REPOSITORY" --body "PANASONIC_DEPLOY_SUCCESS\nURL=$APP_URL\nAUTH=Cloudflare Access OTP / $ALLOWED_EMAIL\nDB=Durable Objects SQLite\nAI=Workers AI Gemma 4 Vision\nRUN=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
       - name: Comment failure
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue comment "${{ github.event.issue.number }}" --repo "$GITHUB_REPOSITORY" --body "PANASONIC_DEPLOY_FAILURE\nRUN=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue comment "$DEPLOY_ISSUE" --repo "$GITHUB_REPOSITORY" --body "PANASONIC_DEPLOY_FAILURE\nRUN=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
