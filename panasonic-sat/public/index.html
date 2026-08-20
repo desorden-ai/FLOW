@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07172c" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Panasonic SAT ServicePro</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <span class="brand">PANASONIC</span>
+        <h1>SAT ServicePro</h1>
+      </div>
+      <div class="session">
+        <span id="sessionEmail">Acceso protegido</span>
+        <a href="https://servicepro.eu" target="_blank" rel="noreferrer">ServicePro ↗</a>
+      </div>
+    </header>
+
+    <main>
+      <section id="tab-trabajos" class="page active"></section>
+      <section id="tab-importar" class="page"></section>
+      <section id="tab-agenda" class="page"></section>
+      <section id="tab-facturas" class="page"></section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación">
+      <button data-tab="trabajos" class="active">▣<span>Trabajos</span></button>
+      <button data-tab="importar">＋<span>Importar</span></button>
+      <button data-tab="agenda">◷<span>Agenda</span></button>
+      <button data-tab="facturas">€<span>Facturas</span></button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <div id="modalRoot"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
