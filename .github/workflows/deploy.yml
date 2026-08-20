@@ -9,7 +9,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Mark deployment pending
         env:
@@ -25,22 +25,12 @@ jobs:
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             --data-binary @/tmp/status.json
-          printf '{"state":"pending","context":"panasonic/cloudflare","description":"Deploying Panasonic SAT","target_url":"%s/%s/actions/runs/%s"}' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > /tmp/panasonic-status.json
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            --data-binary @/tmp/panasonic-status.json
-
       - name: Check out repository with Git
         run: |
           git init .
           git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --depth=1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
-
       - name: Select Node.js 22 from runner toolcache
         run: |
           architecture="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
@@ -50,97 +40,17 @@ jobs:
           echo "$node_bin" >> "$GITHUB_PATH"
           "$node_bin/node" --version
           "$node_bin/npm" --version
-
       - name: Deploy static FLOW to Cloudflare Workers
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4.92.0 deploy
-
-      - name: Deploy Panasonic SAT Worker
-        id: panasonic
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin PANASONIC-SAT-CF
-          rm -rf /tmp/panasonic-sat-branch
-          git worktree add --detach /tmp/panasonic-sat-branch FETCH_HEAD
-          cd /tmp/panasonic-sat-branch/panasonic-sat
-          npx --yes wrangler@4.92.0 deploy 2>&1 | tee /tmp/panasonic-deploy.txt
-          URL="$(grep -Eo 'https://[^ ]+\.workers\.dev' /tmp/panasonic-deploy.txt | tail -1)"
-          test -n "$URL"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Panasonic Worker URL: $URL"
-
-      - name: Verify Panasonic health
-        id: panasonic_health
-        env:
-          APP_URL: ${{ steps.panasonic.outputs.url }}
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error "$APP_URL/api/health" | tee /tmp/panasonic-health.json
-          jq -e '.ok == true and .service == "panasonic-sat-servicepro"' /tmp/panasonic-health.json >/dev/null
-
-      - name: Protect Panasonic Worker with Cloudflare Access
-        id: panasonic_access
-        env:
-          APP_URL: ${{ steps.panasonic.outputs.url }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WORKER_NAME: panasonic-sat-servicepro
-          ACCESS_APP_NAME: Panasonic SAT ServicePro
-          ALLOWED_EMAIL: desorden.help@gmail.com
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/workers.json
-          WORKER_ID="$(jq -r --arg name "$WORKER_NAME" '.result[] | select(.id == $name) | .tag' /tmp/workers.json | head -1)"
-          test -n "$WORKER_ID" && test "$WORKER_ID" != "null"
-
-          curl --fail-with-body --silent --show-error \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps?per_page=100" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/access-apps.json
-
-          OLD_IDS="$(jq -r --arg name "$ACCESS_APP_NAME" '.result[]? | select(.name == $name) | .id' /tmp/access-apps.json)"
-          for id in $OLD_IDS; do
-            curl --fail-with-body --silent --show-error -X DELETE \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$id" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/dev/null
-          done
-
-          jq -n --arg name "$ACCESS_APP_NAME" --arg worker "$WORKER_ID" --arg email "$ALLOWED_EMAIL" \
-            '{type:"self_hosted",name:$name,destinations:[{type:"worker",worker_id:$worker}],session_duration:"24h",policies:[{name:"Panasonic SAT owner only",decision:"allow",include:[{email:{email:$email}}]}]}' \
-            >/tmp/access-payload.json
-
-          curl --fail-with-body --silent --show-error -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/access-payload.json >/tmp/access-result.json
-          jq -e '.success == true' /tmp/access-result.json >/dev/null
-
-          secured=0
-          for attempt in 1 2 3 4 5 6; do
-            code="$(curl -sS -o /dev/null -w '%{http_code}' "$APP_URL/")"
-            echo "Access propagation check $attempt: HTTP $code"
-            if [ "$code" != "200" ]; then secured=1; break; fi
-            sleep 5
-          done
-          test "$secured" = "1"
-
       - name: Publish deployment result
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
-          PANASONIC_OUTCOME: ${{ steps.panasonic.outcome }}
-          PANASONIC_HEALTH: ${{ steps.panasonic_health.outcome }}
-          PANASONIC_ACCESS: ${{ steps.panasonic_access.outcome }}
-          PANASONIC_URL: ${{ steps.panasonic.outputs.url }}
         run: |
           if [ "$DEPLOY_OUTCOME" = "success" ]; then
             state=success
@@ -157,21 +67,3 @@ jobs:
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             --data-binary @/tmp/status.json
-
-          if [ "$PANASONIC_OUTCOME" = "success" ] && [ "$PANASONIC_HEALTH" = "success" ] && [ "$PANASONIC_ACCESS" = "success" ]; then
-            pstate=success
-            pdescription="Panasonic SAT deployed and protected"
-            ptarget="$PANASONIC_URL"
-          else
-            pstate=failure
-            pdescription="Panasonic SAT deployment needs repair"
-            ptarget="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          fi
-          printf '{"state":"%s","context":"panasonic/cloudflare","description":"%s","target_url":"%s"}' "$pstate" "$pdescription" "$ptarget" > /tmp/panasonic-status.json
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            --data-binary @/tmp/panasonic-status.json
