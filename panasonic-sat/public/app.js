@@ -3,7 +3,7 @@ const statuses=['Nueva','Aceptada','Citada','En curso','Cerrada','Facturada'];
 const invoiceStatuses=['Pendiente','Preparada','Facturada','Cobrada'];
 const blank=()=>({workOrder:'',serviceAppointment:'',customerName:'',phone:'',email:'',address:'',city:'',indoorModel:'',outdoorModel:'',description:'',errorCode:'',status:'Nueva',appointmentAt:'',technicianNotes:'',diagnosis:'',actionTaken:'',materials:'',invoiceAmount:'',invoiceStatus:'Pendiente',invoiceRef:'',source:'ServicePro'});
 
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data}
+async function api(path,options={}){const response=await fetch(path,{...options,headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest',...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data}
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function money(v){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(v)||0)}
 function fmt(v){if(!v)return'Sin cita';const d=new Date(v);return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat('es-ES',{dateStyle:'medium',timeStyle:'short'}).format(d)}
