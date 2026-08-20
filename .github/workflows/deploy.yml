@@ -46,6 +46,100 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4.92.0 deploy
+      - name: Panasonic extraction end-to-end smoke test
+        id: panasonic_smoke
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          TOKEN_ID=''
+          POLICY_ID=''
+          cleanup() {
+            if [ -n "${POLICY_ID:-}" ]; then
+              curl --silent --show-error --request DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$APP_ID/policies/$POLICY_ID" \
+                --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/dev/null || true
+            fi
+            if [ -n "${TOKEN_ID:-}" ]; then
+              curl --silent --show-error --request DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/service_tokens/$TOKEN_ID" \
+                --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          curl --fail-with-body --silent --show-error \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps?per_page=100" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" > /tmp/access-apps.json
+          APP_ID="$(jq -r '.result[] | select(.name=="Panasonic SAT ServicePro") | .id' /tmp/access-apps.json | head -1)"
+          test -n "$APP_ID"
+
+          TOKEN_BODY="$(jq -nc --arg name "Panasonic SAT smoke $GITHUB_RUN_ID" '{name:$name,duration:"10m"}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/service_tokens" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$TOKEN_BODY" > /tmp/service-token.json
+          TOKEN_ID="$(jq -r '.result.id // empty' /tmp/service-token.json)"
+          CLIENT_ID="$(jq -r '.result.client_id // empty' /tmp/service-token.json)"
+          CLIENT_SECRET="$(jq -r '.result.client_secret // empty' /tmp/service-token.json)"
+          test -n "$TOKEN_ID" && test -n "$CLIENT_ID" && test -n "$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+          echo "::add-mask::$CLIENT_SECRET"
+
+          POLICY_BODY="$(jq -nc --arg name "Panasonic SAT smoke $GITHUB_RUN_ID" --arg token "$TOKEN_ID" '{name:$name,decision:"non_identity",include:[{service_token:{token_id:$token}}]}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$APP_ID/policies" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$POLICY_BODY" > /tmp/service-policy.json
+          POLICY_ID="$(jq -r '.result.id // empty' /tmp/service-policy.json)"
+          test -n "$POLICY_ID"
+
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw, ImageFont
+          im = Image.new('RGB', (1400, 700), 'white')
+          draw = ImageDraw.Draw(im)
+          try:
+              font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 56)
+          except Exception:
+              font = ImageFont.load_default()
+          lines = [
+              'Panasonic ServicePro',
+              'Work Order: QA-CF-12345',
+              'Customer: Maria Test',
+              'Phone: 600123123',
+              'Error code: H76',
+          ]
+          y = 70
+          for line in lines:
+              draw.text((70, y), line, fill='black', font=font)
+              y += 115
+          im.save('/tmp/servicepro-smoke.jpg', 'JPEG', quality=90)
+          PY
+          IMAGE_B64="$(base64 -w0 /tmp/servicepro-smoke.jpg)"
+          jq -nc --arg image "data:image/jpeg;base64,$IMAGE_B64" '{image:$image}' > /tmp/extract-request.json
+
+          HTTP_CODE="$(curl --silent --show-error \
+            --output /tmp/extract-response.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://panasonic-sat-servicepro.desorden-help-76b.workers.dev/api/extract' \
+            --header "CF-Access-Client-Id: $CLIENT_ID" \
+            --header "CF-Access-Client-Secret: $CLIENT_SECRET" \
+            --header 'Content-Type: application/json' \
+            --data-binary @/tmp/extract-request.json)"
+          echo "Panasonic smoke HTTP: $HTTP_CODE"
+          jq '{provider,error,workOrder:.extracted.servicePro.workOrder,errorCode:.extracted.job.errorCode}' /tmp/extract-response.json || cat /tmp/extract-response.json
+          test "$HTTP_CODE" = '200'
+          jq -e '.provider | contains("AppDeploy ai.extract")' /tmp/extract-response.json >/dev/null
+          jq -e '.extracted.servicePro.workOrder | contains("QA-CF-12345")' /tmp/extract-response.json >/dev/null
+          jq -e '.extracted.job.errorCode | contains("H76")' /tmp/extract-response.json >/dev/null
+          echo 'PANASONIC_EXTRACTION_E2E=SUCCESS'
       - name: Publish deployment result
         if: always()
         env:
