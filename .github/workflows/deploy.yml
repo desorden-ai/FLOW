@@ -9,61 +9,84 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
-      - name: Mark deployment pending
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cat > /tmp/status.json <<JSON
-          {"state":"pending","context":"cloudflare/deploy","description":"Deploying new FLOW base","target_url":"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"}
-          JSON
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            --data-binary @/tmp/status.json
       - name: Check out repository with Git
         run: |
           git init .
           git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --depth=1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
+
       - name: Select Node.js 22 from runner toolcache
         run: |
           architecture="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
           node_version_dir="$(find "$RUNNER_TOOL_CACHE/node" -mindepth 1 -maxdepth 1 -type d -name '22.*' | sort -V | tail -n 1)"
           node_bin="${node_version_dir}/${architecture}/bin"
-          test -x "$node_bin/node" || (echo "Node.js 22 is not available in RUNNER_TOOL_CACHE" && exit 1)
+          test -x "$node_bin/node"
           echo "$node_bin" >> "$GITHUB_PATH"
-          "$node_bin/node" --version
-          "$node_bin/npm" --version
+
       - name: Deploy static FLOW to Cloudflare Workers
-        id: deploy
+        id: flow
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4.92.0 deploy
+
+      - name: Deploy Panasonic SAT update
+        id: panasonic
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin PANASONIC-SAT-CF
+          rm -rf /tmp/panasonic-sat-branch
+          git worktree add --detach /tmp/panasonic-sat-branch FETCH_HEAD
+          cd /tmp/panasonic-sat-branch/panasonic-sat
+          if [ -n "${GEMINI_API_KEY:-}" ]; then
+            printf '%s' "$GEMINI_API_KEY" | npx --yes wrangler@4.92.0 secret put GEMINI_API_KEY >/tmp/gemini-secret.txt
+            echo 'Gemini backend secret configured'
+            echo 'gemini=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Gemini backend secret is not present in GitHub secrets; Workers AI fallback remains active'
+            echo 'gemini=false' >> "$GITHUB_OUTPUT"
+          fi
+          npx --yes wrangler@4.92.0 deploy 2>&1 | tee /tmp/panasonic-deploy.txt
+          URL="$(grep -Eo 'https://[^ ]+\.workers\.dev' /tmp/panasonic-deploy.txt | tail -1)"
+          test -n "$URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Panasonic remains protected
+        env:
+          APP_URL: ${{ steps.panasonic.outputs.url }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /dev/null -w '%{http_code}' "$APP_URL/")"
+          echo "Anonymous access HTTP $code"
+          test "$code" != "200"
+          curl --fail-with-body --silent --show-error \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps?per_page=100" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" >/tmp/access-apps.json
+          jq -e '.result[]? | select(.name == "Panasonic SAT ServicePro")' /tmp/access-apps.json >/dev/null
+
       - name: Publish deployment result
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          FLOW_OUTCOME: ${{ steps.flow.outcome }}
+          PANASONIC_OUTCOME: ${{ steps.panasonic.outcome }}
+          PANASONIC_URL: ${{ steps.panasonic.outputs.url }}
+          GEMINI_CONFIGURED: ${{ steps.panasonic.outputs.gemini }}
         run: |
-          if [ "$DEPLOY_OUTCOME" = "success" ]; then
-            state=success
-            description="FLOW deployed successfully"
-          else
-            state=failure
-            description="FLOW deployment failed"
-          fi
-          printf '{"state":"%s","context":"cloudflare/deploy","description":"%s","target_url":"%s/%s/actions/runs/%s"}' "$state" "$description" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > /tmp/status.json
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            --data-binary @/tmp/status.json
+          if [ "$FLOW_OUTCOME" = "success" ]; then state=success; else state=failure; fi
+          printf '{"state":"%s","context":"cloudflare/deploy","description":"FLOW deployment","target_url":"%s/%s/actions/runs/%s"}' "$state" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >/tmp/flow-status.json
+          curl --silent --show-error -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --data-binary @/tmp/flow-status.json >/dev/null
+          if [ "$PANASONIC_OUTCOME" = "success" ]; then pstate=success; else pstate=failure; fi
+          desc="Panasonic dual import deployed; Gemini secret=${GEMINI_CONFIGURED:-false}"
+          target="${PANASONIC_URL:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID}"
+          printf '{"state":"%s","context":"panasonic/cloudflare","description":"%s","target_url":"%s"}' "$pstate" "$desc" "$target" >/tmp/panasonic-status.json
+          curl --silent --show-error -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --data-binary @/tmp/panasonic-status.json >/dev/null
