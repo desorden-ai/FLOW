@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "panasonic-sat-servicepro",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-20",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "JOBS",
+        "class_name": "JobsStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["JobsStore"]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
