@@ -2,10 +2,9 @@ import app, { JobsStore } from './index.js';
 
 export { JobsStore };
 
-const MODEL = '@cf/google/gemma-4-26b-a4b-it';
-const PROMPT = `Eres un extractor OCR/visual técnico especializado en órdenes Panasonic ServicePro. Lee literalmente todo el texto visible de las capturas. No inventes datos ni completes por contexto. Devuelve SOLO un objeto JSON válido, sin markdown ni comentarios, con esta estructura exacta:
-{"customer":{"name":"","phone":"","email":"","address":"","city":""},"servicePro":{"workOrder":"","serviceAppointment":""},"equipment":{"indoorModel":"","outdoorModel":""},"job":{"description":"","errorCode":""},"meta":{"confidence":0,"warnings":[]}}
-Prioridades: 1) Work Order; 2) Service Appointment; 3) nombre y teléfono del cliente; 4) modelos interior/exterior; 5) avería; 6) código de error. Busca expresamente códigos Panasonic como Hxx, Fxx, Exx, Uxx y variantes alfanuméricas, y consérvalos exactamente. Si un campo no es visible usa cadena vacía. confidence debe ser 0-100.`;
+const APPDEPLOY_EXTRACT_URL = 'https://panasonic-sat-servicepro-ugde8c.v2.appdeploy.ai/api/cloudflare-extract-servicepro';
+const FALLBACK_MODEL = '@cf/google/gemma-4-26b-a4b-it';
+const PROMPT = `Eres un extractor técnico de órdenes Panasonic ServicePro. Extrae únicamente información visible. No inventes. Devuelve SOLO JSON válido con esta estructura exacta: {"customer":{"name":"","phone":"","email":"","address":"","city":""},"servicePro":{"workOrder":"","serviceAppointment":""},"equipment":{"indoorModel":"","outdoorModel":""},"job":{"description":"","errorCode":""},"meta":{"confidence":0,"warnings":[]}}. Mantén literalmente Work Order, Service Appointment, teléfonos, modelos y códigos de error. Busca expresamente códigos Panasonic Hxx, Fxx, Exx y Uxx. Si falta un dato usa cadena vacía. confidence 0-100.`;
 
 export default {
   async fetch(request, env, ctx) {
@@ -15,8 +14,8 @@ export default {
       return Response.json({
         ok: true,
         service: 'panasonic-sat-servicepro',
-        imageAI: 'workers-ai-vision-v2',
-        model: MODEL,
+        imageAI: 'appdeploy-ai-extract-fast',
+        fallback: 'workers-ai',
         textImport: true
       });
     }
@@ -24,102 +23,61 @@ export default {
     if (url.pathname === '/api/extract' && request.method === 'POST') {
       try {
         const body = await request.json();
-        const candidates = Array.isArray(body.images) ? body.images : [body.image];
-        const images = candidates
-          .filter((value) => typeof value === 'string' && /^data:image\/(png|jpeg|jpg|webp);base64,/i.test(value))
-          .slice(0, 4);
-
-        if (!images.length) {
-          return Response.json({ error: 'Se requiere una captura PNG, JPG o WebP' }, { status: 400 });
-        }
+        const image = pickImage(body);
+        if (!image) return Response.json({ error: 'Se requiere una captura PNG, JPG o WebP' }, { status: 400 });
 
         const failures = [];
+        const accessJwt = request.headers.get('cf-access-jwt-assertion') || '';
 
-        // Primary path: documented multimodal message format. The first image is the
-        // full screenshot and the following images, when present, are detailed crops.
-        try {
-          const content = [
-            {
-              type: 'text',
-              text: 'Analiza la captura completa y los recortes de detalle de la misma orden. Haz OCR del texto pequeño. Devuelve únicamente el JSON solicitado.'
-            },
-            ...images.map((image) => ({
-              type: 'image_url',
-              image_url: { url: image }
-            }))
-          ];
-
-          const result = await env.AI.run(MODEL, {
-            messages: [
-              { role: 'system', content: PROMPT },
-              { role: 'user', content }
-            ],
-            max_tokens: 1400,
-            temperature: 0
-          });
-
-          const extracted = parseResult(result);
-          if (hasUsefulData(extracted)) {
-            return Response.json({
-              extracted,
-              provider: 'Workers AI · Gemma 4 Vision v2',
-              imagesUsed: images.length
+        if (accessJwt) {
+          try {
+            const { data, mimeType } = splitDataUrl(image);
+            const response = await fetch(APPDEPLOY_EXTRACT_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cf-Access-Jwt-Assertion': accessJwt
+              },
+              body: JSON.stringify({ image: data, mimeType })
             });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload?.error || `AppDeploy HTTP ${response.status}`);
+            if (payload?.extracted) {
+              return Response.json({
+                extracted: normalize(payload.extracted),
+                provider: 'AppDeploy ai.extract · FAST',
+                attempts: Number(payload.attempts) || 1
+              });
+            }
+            throw new Error('AppDeploy no devolvió datos estructurados');
+          } catch (error) {
+            failures.push(`Extractor principal: ${messageOf(error)}`);
           }
-          failures.push('Gemma Vision devolvió campos vacíos');
-        } catch (error) {
-          failures.push(`Gemma Vision: ${messageOf(error)}`);
+        } else {
+          failures.push('No se recibió el JWT de Cloudflare Access');
         }
 
-        // Secondary path: Cloudflare's image-to-text/OCR conversion, then structured
-        // extraction from the resulting text. This is independent from the raw vision path.
         try {
-          const ocrChunks = [];
-          for (const [index, image] of images.entries()) {
-            const file = dataUrlToFile(image, `servicepro-${index + 1}.jpg`);
-            const converted = await env.AI.toMarkdown(file, {
-              conversionOptions: {
-                image: { descriptionLanguage: 'es' },
-                output: { format: 'text' }
-              }
-            });
-            const text = conversionText(converted);
-            if (text) ocrChunks.push(text);
-          }
-
-          const ocrText = [...new Set(ocrChunks)].join('\n\n--- RECORTE ---\n\n').slice(0, 28000);
-          if (!ocrText) throw new Error('OCR no devolvió texto');
-
-          const result = await env.AI.run(MODEL, {
-            messages: [
-              { role: 'system', content: PROMPT },
-              { role: 'user', content: `Texto OCR obtenido de una orden ServicePro. Extrae los campos literalmente:\n\n${ocrText}` }
-            ],
-            max_tokens: 1200,
-            temperature: 0
-          });
-
-          const extracted = parseResult(result);
+          const extracted = await extractWithWorkersAI(image, env.AI);
           if (hasUsefulData(extracted)) {
             return Response.json({
               extracted,
-              provider: 'Workers AI · OCR + Gemma 4',
-              imagesUsed: images.length
+              provider: 'Workers AI · fallback',
+              fallback: true,
+              warnings: failures
             });
           }
-          failures.push('OCR + Gemma devolvió campos vacíos');
+          failures.push('Workers AI devolvió campos vacíos');
         } catch (error) {
-          failures.push(`OCR: ${messageOf(error)}`);
+          failures.push(`Workers AI: ${messageOf(error)}`);
         }
 
         return Response.json({
-          error: 'No se ha podido leer texto útil de la captura.',
+          error: 'No se ha podido leer la captura.',
           details: failures
         }, { status: 502 });
       } catch (error) {
-        return Response.json({
-          error: `No se ha podido analizar la captura: ${messageOf(error)}`
-        }, { status: 502 });
+        return Response.json({ error: `No se ha podido analizar la captura: ${messageOf(error)}` }, { status: 502 });
       }
     }
 
@@ -127,40 +85,45 @@ export default {
   }
 };
 
-function dataUrlToFile(dataUrl, name) {
-  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i);
-  if (!match) throw new Error('Imagen no válida');
-  const mime = match[1].toLowerCase().replace('image/jpg', 'image/jpeg');
-  const binary = atob(match[2]);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return { name, blob: new Blob([bytes], { type: mime }) };
+function pickImage(body) {
+  const candidates = [body?.image, ...(Array.isArray(body?.images) ? body.images : [])];
+  return candidates.find((value) => typeof value === 'string' && /^data:image\/(png|jpeg|jpg|webp);base64,/i.test(value)) || '';
 }
 
-function conversionText(value) {
-  const item = Array.isArray(value) ? value[0] : value;
-  if (!item || typeof item !== 'object') return '';
-  if (typeof item.data === 'string') return item.data.trim();
-  if (typeof item.text === 'string') return item.text.trim();
-  return '';
+function splitDataUrl(dataUrl) {
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i);
+  if (!match) throw new Error('Imagen no válida');
+  return {
+    mimeType: match[1].toLowerCase().replace('image/jpg', 'image/jpeg'),
+    data: match[2]
+  };
+}
+
+async function extractWithWorkersAI(image, ai) {
+  const result = await ai.run(FALLBACK_MODEL, {
+    messages: [
+      { role: 'system', content: PROMPT },
+      { role: 'user', content: 'Lee esta captura de Panasonic ServicePro y extrae los datos solicitados.' }
+    ],
+    image,
+    max_tokens: 1000,
+    temperature: 0
+  });
+  return parseResult(result);
 }
 
 function parseResult(result) {
-  if (result && typeof result === 'object' && result.customer && result.servicePro) {
-    return normalize(result);
-  }
-
+  if (result && typeof result === 'object' && result.customer && result.servicePro) return normalize(result);
   let text = '';
   if (typeof result === 'string') text = result;
   else if (typeof result?.response === 'string') text = result.response;
   else if (typeof result?.choices?.[0]?.message?.content === 'string') text = result.choices[0].message.content;
   else if (typeof result?.result?.response === 'string') text = result.result.response;
-
   text = text.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start >= 0 && end > start) text = text.slice(start, end + 1);
-  if (!text) throw new Error('La IA no devolvió contenido');
+  if (!text) throw new Error('La IA no devolvió JSON');
   return normalize(JSON.parse(text));
 }
 
@@ -194,14 +157,10 @@ function normalize(value) {
 
 function hasUsefulData(value) {
   return Boolean(
-    value?.servicePro?.workOrder ||
-    value?.servicePro?.serviceAppointment ||
-    value?.customer?.name ||
-    value?.customer?.phone ||
-    value?.equipment?.indoorModel ||
-    value?.equipment?.outdoorModel ||
-    value?.job?.errorCode ||
-    value?.job?.description
+    value?.servicePro?.workOrder || value?.servicePro?.serviceAppointment ||
+    value?.customer?.name || value?.customer?.phone ||
+    value?.equipment?.indoorModel || value?.equipment?.outdoorModel ||
+    value?.job?.errorCode || value?.job?.description
   );
 }
 
