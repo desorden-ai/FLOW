@@ -4,6 +4,12 @@
   "main": "src/main.js",
   "compatibility_date": "2026-08-20",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "panasonic.desorden.cat",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
