@@ -6,6 +6,11 @@ on:
     paths:
       - 'panasonic-sat/**'
       - '.github/workflows/deploy-panasonic-sat.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'panasonic-sat/**'
+      - '.github/workflows/deploy-panasonic-sat.yml'
   workflow_dispatch:
 
 permissions:
