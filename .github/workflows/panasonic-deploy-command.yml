@@ -24,6 +24,12 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
     steps:
+      - name: Mark run started
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "$DEPLOY_ISSUE" --repo "$GITHUB_REPOSITORY" --body "PANASONIC_DEPLOY_STARTED\nRUN=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
       - name: Checkout Panasonic branch
         uses: actions/checkout@v4
         with:
