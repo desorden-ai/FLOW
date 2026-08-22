@@ -1,0 +1,17 @@
+{
+  "name": "panasonic-sat-cloud-ai",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "deploy": "wrangler deploy",
+    "check": "npm test && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@google/genai": "2.18.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.92.0"
+  }
+}
