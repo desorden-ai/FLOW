@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reserva de cita · DESORDEN</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="shell">
+<header><span class="eyebrow">DESORDEN</span><h1>Reserva tu cita</h1><p>Selecciona una de las horas disponibles.</p></header>
+<section id="status" class="status" aria-live="polite">Cargando disponibilidad…</section>
+<section id="booking" hidden><div id="client" class="client"></div><div id="slots" class="days"></div><button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button></section>
+<section id="success" class="success" hidden><div class="success-mark">✓</div><h2>Cita confirmada</h2><p id="successText"></p></section>
+</main>
+<script src="./app.js" defer></script>
+</body>
+</html>
