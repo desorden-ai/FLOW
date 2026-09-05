@@ -8,6 +8,8 @@ const slotsEl = $('#slots');
 const clientEl = $('#client');
 const successEl = $('#success');
 const successTextEl = $('#successText');
+const successAddressEl = $('#successAddress');
+const noneFitEl = $('#noneFit');
 
 let client = null;
 let contactWhatsApp = '';
@@ -18,6 +20,12 @@ function setStatus(text, error = false) {
   statusEl.dataset.error = error ? '1' : '0';
 }
 
+function clearStatus() {
+  statusEl.hidden = true;
+  statusEl.textContent = '';
+  statusEl.dataset.error = '0';
+}
+
 function groupByDate(slots) {
   return slots.reduce((groups, slot) => {
     (groups[slot.date] ??= []).push(slot);
@@ -26,11 +34,17 @@ function groupByDate(slots) {
 }
 
 function formatDate(value) {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-  }).format(new Date(`${value}T12:00:00`));
+  }).format(date);
+}
+
+function formatAddress(data) {
+  return [data?.address, data?.city].filter(Boolean).join(' · ');
 }
 
 async function getAvailability() {
@@ -52,31 +66,50 @@ async function confirmBooking(slotId) {
   return response.json();
 }
 
-function showBooking(booking) {
-  bookingEl.hidden = true;
-  statusEl.hidden = true;
-  successEl.hidden = false;
-  successTextEl.textContent = `${formatDate(booking.date)} · ${booking.time}`;
-}
-
 function renderClient(data) {
   clientEl.replaceChildren();
+
   const name = document.createElement('strong');
-  name.textContent = data.name;
+  name.textContent = data.name || 'Cliente';
+
   const address = document.createElement('span');
-  address.textContent = [data.address, data.city].filter(Boolean).join(' · ');
-  clientEl.append(name, document.createElement('br'), address);
+  address.textContent = formatAddress(data);
+
+  clientEl.append(name);
+  if (address.textContent) clientEl.append(document.createElement('br'), address);
+}
+
+function showBooking(booking) {
+  bookingEl.hidden = true;
+  clearStatus();
+  successEl.hidden = false;
+  successTextEl.textContent = `${formatDate(booking.date)} · ${booking.time}`;
+  successAddressEl.textContent = formatAddress(client);
+}
+
+function showLoadError(code) {
+  const messages = {
+    INVALID_TOKEN: 'El enlace de reserva no es válido.',
+    CLIENT_NOT_READY: 'Esta cita todavía no tiene horarios asignados.',
+  };
+  setStatus(messages[code] || 'No se ha podido cargar la disponibilidad.', true);
 }
 
 async function load() {
+  bookingEl.hidden = true;
+  successEl.hidden = true;
+
   if (!token) {
-    setStatus('El enlace de reserva no es válido.', true);
+    showLoadError('INVALID_TOKEN');
     return;
   }
 
   try {
     const data = await getAvailability();
-    if (!data.ok) throw new Error(data.error || 'UNKNOWN');
+    if (!data.ok) {
+      showLoadError(data.error);
+      return;
+    }
 
     client = data.client;
     contactWhatsApp = data.contactWhatsApp || '';
@@ -87,21 +120,28 @@ async function load() {
       return;
     }
 
-    render(data.slots || []);
-    statusEl.hidden = true;
+    renderSlots(data.slots || []);
+    clearStatus();
     bookingEl.hidden = false;
-  } catch (error) {
-    setStatus('No se ha podido cargar la disponibilidad.', true);
+  } catch {
+    showLoadError('NETWORK');
   }
 }
 
-function render(slots) {
+function renderSlots(slots) {
   slotsEl.replaceChildren();
 
   if (!slots.length) {
-    const empty = document.createElement('div');
-    empty.className = 'day';
-    empty.innerHTML = '<h2>No quedan horas libres</h2><p>Contacta por WhatsApp para buscar otra fecha.</p>';
+    const empty = document.createElement('section');
+    empty.className = 'day empty-state';
+
+    const title = document.createElement('h2');
+    title.textContent = 'No quedan horas libres';
+
+    const text = document.createElement('p');
+    text.textContent = 'Puedes escribirnos por WhatsApp para buscar otra fecha.';
+
+    empty.append(title, text);
     slotsEl.appendChild(empty);
     return;
   }
@@ -121,6 +161,7 @@ function render(slots) {
       button.className = 'slot';
       button.type = 'button';
       button.textContent = slot.time;
+      button.setAttribute('aria-label', `Reservar ${formatDate(slot.date)} a las ${slot.time}`);
       button.addEventListener('click', () => book(slot, button));
       grid.appendChild(button);
     });
@@ -134,13 +175,14 @@ async function book(slot, button) {
   const buttons = [...document.querySelectorAll('.slot')];
   buttons.forEach((item) => { item.disabled = true; });
   button.textContent = 'Confirmando…';
+  clearStatus();
 
   try {
     const data = await confirmBooking(slot.id);
 
     if (!data.ok) {
       if (data.error === 'SLOT_TAKEN') {
-        setStatus('Esta hora acaba de ser reservada. Actualizando opciones…', true);
+        setStatus('Esta hora acaba de ser reservada. Se han actualizado las opciones.', true);
         await load();
         return;
       }
@@ -148,18 +190,22 @@ async function book(slot, button) {
         showBooking(data.booking);
         return;
       }
+      if (data.error === 'INVALID_TOKEN') {
+        showLoadError('INVALID_TOKEN');
+        return;
+      }
       throw new Error(data.error || 'BOOKING_FAILED');
     }
 
     showBooking(data.booking);
-  } catch (error) {
+  } catch {
     setStatus('No se ha podido confirmar. Vuelve a intentarlo.', true);
     buttons.forEach((item) => { item.disabled = false; });
     button.textContent = slot.time;
   }
 }
 
-$('#noneFit').addEventListener('click', () => {
+noneFitEl.addEventListener('click', () => {
   if (!client) return;
   if (!contactWhatsApp) {
     setStatus('El contacto de WhatsApp todavía no está configurado.', true);
@@ -168,7 +214,7 @@ $('#noneFit').addEventListener('click', () => {
 
   const phone = contactWhatsApp.replace(/\D/g, '');
   const text = `Hola, soy ${client.name}. No puedo asistir en ninguna de las horas propuestas para el mantenimiento de ${client.address || 'mi domicilio'}. ¿Podemos buscar otra fecha?`;
-  location.href = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  window.location.assign(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
 });
 
 load();

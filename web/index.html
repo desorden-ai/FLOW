@@ -1,18 +1,38 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reserva de cita · DESORDEN</title>
-<link rel="stylesheet" href="./styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#07101f">
+  <title>Reserva de mantenimiento · DESORDEN</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<main class="shell">
-<header><span class="eyebrow">DESORDEN</span><h1>Reserva tu cita</h1><p>Selecciona una de las horas disponibles.</p></header>
-<section id="status" class="status" aria-live="polite">Cargando disponibilidad…</section>
-<section id="booking" hidden><div id="client" class="client"></div><div id="slots" class="days"></div><button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button></section>
-<section id="success" class="success" hidden><div class="success-mark">✓</div><h2>Cita confirmada</h2><p id="successText"></p></section>
-</main>
-<script src="./app.js" defer></script>
+  <main class="shell">
+    <header class="hero">
+      <span class="eyebrow">DESORDEN</span>
+      <h1>Reserva de mantenimiento</h1>
+      <p>Selecciona una de las horas disponibles.</p>
+    </header>
+
+    <section id="status" class="status" aria-live="polite">Cargando disponibilidad…</section>
+
+    <section id="booking" hidden>
+      <div id="client" class="client"></div>
+      <div id="slots" class="days"></div>
+      <button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button>
+    </section>
+
+    <section id="success" class="success" aria-live="polite" hidden>
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <p class="success-kicker">RESERVA COMPLETADA</p>
+      <h2>Tu cita está confirmada</h2>
+      <p id="successText" class="success-date"></p>
+      <p id="successAddress" class="success-address"></p>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
 </body>
 </html>

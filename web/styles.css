@@ -1,1 +1,139 @@
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf3ff;background:#07101f}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(180deg,#07101f,#0b1629);color:#edf3ff}.shell{width:min(720px,100%);margin:0 auto;padding:48px 20px 64px}.eyebrow{font-size:12px;letter-spacing:.18em;color:#79a7ff;font-weight:800}h1{font-size:clamp(34px,7vw,54px);line-height:1;margin:12px 0 10px}p{color:#aebbd0}.status,.client,.day,.success{background:#101c30;border:1px solid #1d2b43;border-radius:18px;padding:18px}.status{margin-top:28px}.client{margin:22px 0}.days{display:grid;gap:16px}.day h2{margin:0 0 14px;font-size:18px}.slot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.slot{border:1px solid #345586;background:#152847;color:#fff;border-radius:12px;padding:14px;font:inherit;font-weight:700;cursor:pointer}.slot:hover,.slot:focus{background:#1c3761}.slot:disabled{opacity:.45;cursor:wait}.link-button{width:100%;margin-top:20px;border:0;background:transparent;color:#9fc0ff;text-decoration:underline;padding:14px;cursor:pointer}.success{text-align:center;margin-top:28px}.success-mark{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px;background:#173b2b;color:#7ce0a6;font-size:28px;font-weight:900}[hidden]{display:none!important}@media(max-width:480px){.shell{padding-top:32px}.slot-grid{grid-template-columns:1fr}}
+:root{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#edf3ff;
+  background:#07101f;
+  font-synthesis:none;
+}
+*{box-sizing:border-box}
+html{background:#07101f}
+body{
+  margin:0;
+  min-height:100vh;
+  background:linear-gradient(180deg,#07101f 0%,#0a1425 100%);
+  color:#edf3ff;
+}
+button{font:inherit}
+.shell{
+  width:min(680px,100%);
+  margin:0 auto;
+  padding:48px 20px max(64px,env(safe-area-inset-bottom));
+}
+.hero{margin-bottom:26px}
+.eyebrow{
+  display:inline-block;
+  font-size:12px;
+  letter-spacing:.19em;
+  color:#7faaff;
+  font-weight:800;
+}
+h1{
+  margin:12px 0 10px;
+  max-width:12ch;
+  font-size:clamp(34px,8vw,54px);
+  line-height:.98;
+  letter-spacing:-.035em;
+}
+h2{margin:0}
+p{color:#aebbd0;line-height:1.5}
+.status,.client,.day,.success{
+  background:#101c30;
+  border:1px solid #1d2b43;
+  border-radius:18px;
+}
+.status{
+  margin-top:24px;
+  padding:16px 18px;
+}
+.status[data-error="1"]{
+  border-color:#59323c;
+  background:#21151d;
+  color:#ffd7df;
+}
+.client{
+  margin:0 0 18px;
+  padding:18px;
+  line-height:1.5;
+}
+.client strong{font-size:18px;color:#fff}
+.client span{color:#aebbd0}
+.days{display:grid;gap:14px}
+.day{padding:18px}
+.day h2{
+  margin:0 0 14px;
+  font-size:18px;
+  text-transform:capitalize;
+}
+.day p{margin-bottom:0}
+.slot-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+}
+.slot{
+  min-height:50px;
+  border:1px solid #345586;
+  background:#152847;
+  color:#fff;
+  border-radius:12px;
+  padding:12px 8px;
+  font-weight:750;
+  cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+.slot:hover,.slot:focus-visible{
+  background:#1c3761;
+  border-color:#5a82bd;
+  outline:none;
+}
+.slot:active{transform:scale(.98)}
+.slot:disabled{opacity:.48;cursor:wait;transform:none}
+.link-button{
+  width:100%;
+  min-height:52px;
+  margin-top:18px;
+  border:0;
+  background:transparent;
+  color:#a8c5ff;
+  text-decoration:underline;
+  text-underline-offset:4px;
+  cursor:pointer;
+}
+.link-button:focus-visible{outline:2px solid #7faaff;outline-offset:2px;border-radius:10px}
+.success{
+  margin-top:24px;
+  padding:28px 20px;
+  text-align:center;
+}
+.success-mark{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  margin:0 auto 14px;
+  background:#173b2b;
+  color:#7ce0a6;
+  font-size:28px;
+  font-weight:900;
+}
+.success-kicker{
+  margin:0 0 6px;
+  color:#7ce0a6;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.14em;
+}
+.success h2{font-size:26px}
+.success-date{margin:14px 0 4px;color:#fff;font-weight:700;text-transform:capitalize}
+.success-address{margin:0;color:#aebbd0}
+[hidden]{display:none!important}
+@media(max-width:560px){
+  .shell{padding-top:32px}
+  .slot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:350px){
+  .slot-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  .slot{transition:none}
+}
