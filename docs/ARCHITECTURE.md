@@ -2,50 +2,92 @@
 
 ## Objetivo
 
-Aplicación independiente para gestionar propuestas y confirmaciones de cita de mantenimiento sin depender de LAB, SAT, DATE ni otros sistemas.
+DESORDEN CITA es una aplicación independiente para ofrecer y confirmar citas de mantenimiento con un volumen pequeño de clientes, sin login, sin WhatsApp Business API y sin backend de pago.
 
 ## Componentes
 
 ```text
 Cliente
   ↓
-cita.desorden.cat
+https://cita.desorden.cat/?c=TOKEN
   ↓
 Cloudflare Pages
-  ├─ web/       frontend estático
-  └─ /api       Pages Function same-origin
-                  ↓
-            Google Apps Script
-                  ↓
-             Google Sheets
+  ├─ web/                 HTML + CSS + JS
+  └─ functions/api.js     proxy same-origin /api
+                              ↓
+                        Google Apps Script
+                              ↓
+                         Google Sheets CITA
+                         ├─ cita
+                         └─ FRANJAS
 ```
 
-## Flujo
+## Modelo de datos
 
-1. El administrador mantiene clientes y franjas en Google Sheets.
-2. Cada cliente recibe `https://cita.desorden.cat/?c=TOKEN_ALEATORIO`.
-3. La web consulta `/api?action=availability&token=...`.
-4. La Pages Function reenvía la consulta a Apps Script sin exponer su URL al frontend.
-5. Apps Script resuelve `token → cliente → bloque` y devuelve únicamente franjas `LIBRE` de ese bloque.
-6. Para reservar, la web envía `POST /api`.
-7. Apps Script adquiere `LockService`, comprueba si el cliente ya tiene cita, vuelve a validar la franja y solo entonces escribe `CONFIRMADO`.
-8. Los clientes de otros bloques mantienen disponibilidad independiente.
-9. Si ninguna opción encaja, la web abre WhatsApp contra el número configurado en `WHATSAPP_TARGET`.
+### `cita`
 
-## Reglas de integridad V1
+Es la fuente única de clientes/servicios. Las 17 columnas originales se preservan. El sistema añade:
 
-- Un token identifica a un único cliente.
-- Un cliente solo puede tener una cita `CONFIRMADO` dentro de su bloque.
-- Una franja confirmada no puede asignarse a otro cliente.
-- El backend nunca confía en un bloque enviado por el navegador.
-- La asignación se revalida dentro del bloqueo de servidor.
-- Las consultas de disponibilidad no se cachean.
+`CLIENTE_ID | BLOQUE | TOKEN | ESTADO_CITA | CITA_FECHA | CITA_HORA | CONFIRMADO_EN | URL_CITA`
 
-## Seguridad V1
+No existe una tabla `CLIENTES` duplicada.
 
-- Tokens largos, aleatorios y no secuenciales.
-- No exponer identificadores internos como mecanismo de autenticación.
-- No guardar secretos en GitHub.
-- `APPS_SCRIPT_URL` y `WHATSAPP_TARGET` se configuran en Cloudflare.
-- El frontend no recibe el teléfono del cliente.
-- La UI inserta los datos de cliente como texto, no como HTML ejecutable.
+### `FRANJAS`
+
+Una fila por hora propuesta:
+
+`ID | BLOQUE | FECHA | HORA | ESTADO | CLIENTE_ID | CONFIRMADO_EN`
+
+Cada bloque debe tener normalmente 8 filas activas: 2 fechas × 4 horas.
+
+## Lectura de disponibilidad
+
+1. El navegador envía únicamente el token a `/api`.
+2. Pages Functions valida el formato y reenvía a Apps Script.
+3. Apps Script resuelve `TOKEN → fila de cita → BLOQUE`.
+4. Si `ESTADO_CITA=CONFIRMADO`, devuelve únicamente la cita ya reservada.
+5. Si no existe cita, devuelve exclusivamente franjas `LIBRE` del bloque.
+6. El proxy aplica además una lista blanca a la respuesta para evitar exponer campos administrativos por accidente.
+
+## Reserva
+
+1. Navegador envía `token + slotId`.
+2. El proxy descarta cualquier bloque o identificador de cliente enviado por el navegador.
+3. Apps Script adquiere `LockService.getScriptLock()`.
+4. Dentro del bloqueo vuelve a leer cliente y franja.
+5. Comprueba:
+   - token válido;
+   - cliente con bloque;
+   - cliente sin reserva previa;
+   - slot existente;
+   - slot perteneciente al mismo bloque;
+   - slot todavía `LIBRE`.
+6. Escribe la reserva en `FRANJAS` y en la fila del cliente.
+7. Ejecuta `SpreadsheetApp.flush()` antes de liberar el bloqueo.
+
+Así, dos clientes que intenten reservar la misma hora simultáneamente no pueden obtener ambos `CONFIRMADO`.
+
+## Privacidad
+
+La respuesta pública contiene únicamente:
+
+- nombre;
+- dirección;
+- población;
+- fecha/hora de la cita, si existe;
+- IDs opacos de las franjas disponibles;
+- número operativo de WhatsApp configurado en Cloudflare.
+
+No se devuelven teléfonos de clientes, URLs de Drive, PDFs, SA de otros clientes ni filas completas del Sheet.
+
+## Configuración
+
+Apps Script admite:
+
+- `SPREADSHEET_ID`: opcional si el script no está vinculado directamente al Sheet.
+- `PUBLIC_BASE_URL`: opcional; por defecto `https://cita.desorden.cat`.
+
+Cloudflare Pages requiere:
+
+- `APPS_SCRIPT_URL`
+- `WHATSAPP_TARGET`

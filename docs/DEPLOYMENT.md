@@ -1,55 +1,67 @@
 # Despliegue
 
-## 1. Google Sheets
+## 1. Google Sheet
 
-Crear las pestañas y cabeceras indicadas en `GOOGLE_SHEETS.md`.
+El spreadsheet `CITA` ya debe contener:
 
-## 2. Apps Script
+- pestaña `cita` con las 17 columnas originales + 8 columnas técnicas de cita;
+- pestaña `FRANJAS` con sus 7 columnas.
 
-Desde el spreadsheet:
+El código también incluye `setupCitaV1()`, que es idempotente y puede ejecutarse como comprobación.
+
+## 2. Google Apps Script
+
+Desde el Sheet `CITA`:
 
 1. `Extensiones` → `Apps Script`.
-2. Copiar el contenido de `apps-script/Code.gs`.
-3. `Implementar` → `Nueva implementación`.
-4. Tipo: `Aplicación web`.
-5. Ejecutar como: propietario.
-6. Permitir acceso público mediante enlace según las opciones disponibles en la cuenta.
-7. Copiar la URL final terminada en `/exec`.
+2. Sustituir el contenido por `apps-script/Code.gs`.
+3. Ejecutar una vez `setupCitaV1()` y autorizar permisos.
+4. Ejecutar `syncClientMetadata()` cuando existan clientes.
+5. `Implementar` → `Nueva implementación`.
+6. Tipo: `Aplicación web`.
+7. Ejecutar como: propietario.
+8. Permitir acceso mediante enlace según las opciones de la cuenta.
+9. Copiar la URL final terminada en `/exec`.
+
+### Propiedades opcionales de Apps Script
+
+En `Configuración del proyecto` → `Propiedades de la secuencia de comandos`:
+
+- `SPREADSHEET_ID`: usar el ID del Sheet si el script no queda vinculado directamente al spreadsheet.
+- `PUBLIC_BASE_URL`: por defecto ya se usa `https://cita.desorden.cat`.
 
 ## 3. Cloudflare Pages
 
-Crear un proyecto conectado a `desorden-ai/FLOW`.
+Crear/conectar el proyecto con `desorden-ai/FLOW`.
 
-Configuración:
+Para validar la rama actual:
 
-- Rama de producción: `main`
-- Framework preset: `None`
-- Build command: vacío
-- Build output directory: `web`
+- rama: `Cita`;
+- framework preset: `None`;
+- build command: vacío;
+- build output directory: `web`.
 
-La carpeta `/functions` debe permanecer en la raíz del repositorio para que Cloudflare Pages genere la ruta server-side `/api`.
+La carpeta `/functions` debe quedar en la raíz del repositorio. Cloudflare la transforma en la ruta server-side `/api`.
+
+Cuando la V1 quede aprobada, la rama de producción puede pasar a `main` mediante el flujo Git que se decida; este repositorio no hace ese merge automáticamente.
 
 ## 4. Variables de Cloudflare
 
-En el proyecto Pages:
-
-`Settings` → `Variables and Secrets` → `Add`
-
-Crear:
+`Settings` → `Variables and Secrets`.
 
 ### `APPS_SCRIPT_URL`
 
-Valor: URL completa `/exec` del despliegue de Google Apps Script.
+URL completa `/exec` del despliegue de Apps Script.
 
 ### `WHATSAPP_TARGET`
 
-Valor: número de WhatsApp que recibirá las respuestas, en formato internacional y solo dígitos.
+Número que recibirá el mensaje cuando el cliente pulse «No puedo en ninguna de estas horas».
 
-Ejemplo de formato, no de número real:
+Formato internacional, preferentemente solo dígitos:
 
 `34XXXXXXXXX`
 
-No guardar estos valores directamente en `web/app.js`.
+No introducir estas variables en `web/app.js` ni en commits.
 
 ## 5. Dominio
 
@@ -57,13 +69,16 @@ Asignar:
 
 `cita.desorden.cat`
 
-## 6. QA mínimo obligatorio
+## 6. Smoke test
 
-1. Un cliente ve únicamente las franjas libres de su bloque.
-2. Reserva una franja y queda `CONFIRMADO`.
-3. Si vuelve a abrir su enlace, ve su cita ya confirmada y no puede reservar otra.
-4. Otro cliente del mismo bloque deja de ver esa franja.
-5. Un cliente de otro bloque mantiene sus propias opciones.
-6. Dos navegadores intentan reservar simultáneamente la misma franja y solo uno obtiene confirmación.
-7. «No puedo en ninguna de estas horas» abre WhatsApp con el número operativo y texto correctos.
-8. Un token inexistente no expone ningún dato.
+Antes de enviar enlaces reales:
+
+1. Crear dos clientes ficticios temporales en el mismo bloque.
+2. Ejecutar `syncClientMetadata()`.
+3. Crear las 8 franjas con `createBlockSlots(...)`.
+4. Abrir los dos enlaces en navegadores distintos.
+5. Confirmar una misma franja casi simultáneamente.
+6. Verificar que solo uno queda `CONFIRMADO`.
+7. Eliminar los datos ficticios después de la validación.
+
+La matriz completa está en `docs/QA.md`.
