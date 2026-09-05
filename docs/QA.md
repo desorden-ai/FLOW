@@ -1,99 +1,41 @@
 # QA
 
-## Automatizado
+## Pruebas automáticas
 
-Ejecutar desde la raíz:
+Ejecutar:
 
 ```bash
 npm test
 ```
 
-Incluye:
+Las pruebas no requieren dependencias externas y cubren:
 
-1. parseo sintáctico de `apps-script/Code.gs`;
-2. rechazo de tokens inválidos en `/api`;
-3. filtrado de campos administrativos en disponibilidad;
-4. limpieza del payload de reserva antes de reenviarlo;
-5. normalización de respuestas upstream inválidas.
+- sintaxis del Apps Script;
+- rechazo de token inválido antes del upstream;
+- saneado de datos privados en disponibilidad;
+- forwarding exclusivo de `action`, `token` y `slotId`;
+- saneado de la respuesta de reserva;
+- normalización de JSON upstream inválido;
+- routing de assets mediante `ASSETS`;
+- rechazo de métodos HTTP no soportados en `/api`.
 
-No requiere instalar dependencias.
+## Prueba local del Worker
 
-## QA funcional real
+```bash
+npm run dev
+```
 
-### TEST 1 — disponibilidad válida
+Para probar contra Apps Script real deben configurarse localmente los bindings equivalentes a `APPS_SCRIPT_URL` y `WHATSAPP_TARGET` sin commitear secretos.
 
-- Cliente con token válido y bloque asignado.
-- Debe ver únicamente franjas `LIBRE` de su bloque.
+## QA E2E obligatorio antes de producción definitiva
 
-### TEST 2 — token inválido
-
-- Abrir `?c=TOKEN_INEXISTENTE`.
-- No debe aparecer información de ningún cliente.
-
-### TEST 3 — reserva correcta
-
-- Reservar una franja libre.
-- `cita.ESTADO_CITA` → `CONFIRMADO`.
-- `FRANJAS.ESTADO` → `CONFIRMADO`.
-- Ambos registros deben guardar timestamp.
-
-### TEST 4 — mismo bloque
-
-- Cliente A reserva una franja.
-- Cliente B del mismo bloque recarga.
-- Esa franja ya no debe aparecer.
-
-### TEST 5 — bloque independiente
-
-- Cliente C pertenece a otro bloque.
-- La reserva del cliente A no debe alterar sus opciones.
-
-### TEST 6 — concurrencia
-
-- Dos clientes del mismo bloque abren la misma franja.
-- Pulsar confirmar casi simultáneamente en dos navegadores.
-- Solo uno puede obtener `CONFIRMADO`.
-- El segundo debe recibir `SLOT_TAKEN` y actualizar disponibilidad.
-
-### TEST 7 — doble reserva
-
-- Cliente ya confirmado intenta reservar otra franja reutilizando una petición.
-- Backend debe devolver `ALREADY_BOOKED`.
-
-### TEST 8 — reapertura
-
-- Cliente confirmado vuelve a abrir su URL.
-- Debe ver `Tu cita está confirmada`, fecha, hora y dirección.
-- No debe ver los botones de franjas.
-
-### TEST 9 — WhatsApp
-
-- Pulsar `No puedo en ninguna de estas horas`.
-- Debe abrir el número configurado en `WHATSAPP_TARGET`.
-- Texto esperado:
-
-`Hola, soy [CLIENTE]. No puedo asistir en ninguna de las horas propuestas para el mantenimiento de [DIRECCION]. ¿Podemos buscar otra fecha?`
-
-### TEST 10 — privacidad
-
-Inspeccionar respuesta `/api`.
-
-No debe incluir:
-
-- teléfono del cliente;
-- SA/WO;
-- URLs de Drive/PDF;
-- filas de otros clientes;
-- bloque interno;
-- `CLIENTE_ID`;
-- token de otro usuario.
-
-## Criterio de salida V1
-
-La V1 puede considerarse operativa cuando:
-
-- `npm test` pasa;
-- los 10 tests funcionales pasan;
-- Apps Script está desplegado;
-- Cloudflare tiene las dos variables requeridas;
-- `cita.desorden.cat` sirve la web y `/api` correctamente.
+1. Cliente A del bloque 1 ve 8 franjas.
+2. Cliente A confirma una.
+3. Al reabrir el enlace ve la cita confirmada.
+4. Cliente B del mismo bloque ya no ve esa franja.
+5. Cliente C de otro bloque no se ve afectado.
+6. Dos clientes intentan reservar simultáneamente la misma franja: solo uno confirma.
+7. Token inválido no devuelve datos personales.
+8. Alterar el payload con otro `block`/`clientId` no cambia la asignación backend.
+9. El botón de WhatsApp abre el número configurado.
+10. La confirmación queda registrada tanto en `cita` como en `FRANJAS`.

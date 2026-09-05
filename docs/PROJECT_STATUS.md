@@ -3,53 +3,41 @@
 ## Implementado
 
 - Repositorio: `desorden-ai/FLOW`.
-- Rama de trabajo: `Cita`.
-- Rama histórica preservada: `archive/pre-citas`.
-- Aplicación independiente de LAB, SAT, DATE y otros proyectos.
+- Rama de trabajo/despliegue: `Cita`.
 - Frontend HTML/CSS/JS sin framework.
-- Cloudflare Pages Function `/api` como proxy same-origin.
-- Backend Google Apps Script.
-- Fuente única de clientes: pestaña `cita` del Sheet `CITA`.
-- 17 columnas originales preservadas.
-- 8 columnas técnicas de reserva añadidas.
-- Pestaña `FRANJAS` creada.
-- Modelo 2 días × 4 horas por bloque.
-- Tokens opacos aleatorios.
-- Generación automática de `CLIENTE_ID`, `TOKEN` y `URL_CITA`.
-- Reserva concurrente protegida con `LockService`.
-- Prevención de doble reserva por cliente.
-- Vista de cita ya confirmada al reabrir el enlace.
-- Respuesta pública limitada a datos mínimos.
-- WhatsApp mediante enlace, sin API de pago.
-- QA automatizado del proxy y comprobación sintáctica de Apps Script.
+- Cloudflare Workers + Static Assets.
+- Worker API en `src/worker.js`.
+- Static assets en `web/`.
+- Google Apps Script como backend de reservas.
+- Google Sheet `CITA` con pestañas `cita` y `FRANJAS`.
+- Tokens opacos por cliente.
+- Bloques independientes.
+- 2 días × 4 franjas.
+- `LockService` para reserva concurrente.
+- Prevención de doble reserva.
+- Sanitización de respuestas en el Worker.
+- WhatsApp sin API de pago.
 
-## Estado del Google Sheet
+## Configuración externa
 
-El Sheet `CITA` está estructurado y actualmente no contiene clientes reales.
+- Apps Script desplegado mediante URL `/exec`.
+- Cloudflare Worker conectado al repositorio.
+- Variables requeridas: `APPS_SCRIPT_URL` y `WHATSAPP_TARGET`.
 
-Pestañas:
+## Pendiente
 
-- `cita`
-- `FRANJAS`
-
-No se han generado fixtures ni clientes ficticios en producción.
-
-## Pendiente externo
-
-- Copiar/desplegar `apps-script/Code.gs` en el proyecto Apps Script del Sheet.
-- Obtener la URL `/exec`.
-- Configurar `APPS_SCRIPT_URL` en Cloudflare.
-- Configurar `WHATSAPP_TARGET` en Cloudflare.
-- Conectar/desplegar Cloudflare Pages usando la rama `Cita` para validación.
-- Asociar `cita.desorden.cat`.
-- Ejecutar QA real con dos navegadores.
-- Cargar los clientes correctos cuando estén disponibles.
+- Confirmar que Cloudflare Workers Builds despliega la rama `Cita` con `wrangler.jsonc`.
+- Probar el subdominio `workers.dev` real.
+- Cargar clientes reales.
+- Crear bloques y franjas reales.
+- Ejecutar QA concurrente real.
+- Asociar posteriormente `cita.desorden.cat`.
 
 ## Fuera de V1
 
+- Pages Functions.
 - Supabase/Firebase.
 - Login de cliente.
 - WhatsApp Business API.
-- n8n, Make o Zapier.
-- Panel administrativo propio.
-- Aplicación móvil.
+- n8n/Make/Zapier.
+- Dashboard administrativo propio.

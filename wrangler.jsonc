@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "flow",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-09-06",
+  "assets": {
+    "directory": "./web",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api", "/api/*"]
+  }
+}

@@ -1,84 +1,69 @@
-# Despliegue
+# Despliegue — Cloudflare Workers
 
-## 1. Google Sheet
+## 1. Backend Google Apps Script
 
-El spreadsheet `CITA` ya debe contener:
+El Apps Script está vinculado al spreadsheet `CITA` y debe desplegarse como Aplicación web.
 
-- pestaña `cita` con las 17 columnas originales + 8 columnas técnicas de cita;
-- pestaña `FRANJAS` con sus 7 columnas.
+La URL de producción debe terminar en `/exec`.
 
-El código también incluye `setupCitaV1()`, que es idempotente y puede ejecutarse como comprobación.
+## 2. Worker conectado a GitHub
 
-## 2. Google Apps Script
+Repositorio:
 
-Desde el Sheet `CITA`:
+`desorden-ai/FLOW`
 
-1. `Extensiones` → `Apps Script`.
-2. Sustituir el contenido por `apps-script/Code.gs`.
-3. Ejecutar una vez `setupCitaV1()` y autorizar permisos.
-4. Ejecutar `syncClientMetadata()` cuando existan clientes.
-5. `Implementar` → `Nueva implementación`.
-6. Tipo: `Aplicación web`.
-7. Ejecutar como: propietario.
-8. Permitir acceso mediante enlace según las opciones de la cuenta.
-9. Copiar la URL final terminada en `/exec`.
+Rama de producción:
 
-### Propiedades opcionales de Apps Script
+`Cita`
 
-En `Configuración del proyecto` → `Propiedades de la secuencia de comandos`:
+El repositorio contiene `wrangler.jsonc`, por lo que Cloudflare Workers puede desplegar el Worker y los Static Assets como una sola unidad.
 
-- `SPREADSHEET_ID`: usar el ID del Sheet si el script no queda vinculado directamente al spreadsheet.
-- `PUBLIC_BASE_URL`: por defecto ya se usa `https://cita.desorden.cat`.
+Configuración principal:
 
-## 3. Cloudflare Pages
+- Worker entrypoint: `src/worker.js`
+- Static assets: `web/`
+- API: `/api`
 
-Crear/conectar el proyecto con `desorden-ai/FLOW`.
+## 3. Variables y secretos
 
-Para validar la rama actual:
-
-- rama: `Cita`;
-- framework preset: `None`;
-- build command: vacío;
-- build output directory: `web`.
-
-La carpeta `/functions` debe quedar en la raíz del repositorio. Cloudflare la transforma en la ruta server-side `/api`.
-
-Cuando la V1 quede aprobada, la rama de producción puede pasar a `main` mediante el flujo Git que se decida; este repositorio no hace ese merge automáticamente.
-
-## 4. Variables de Cloudflare
-
-`Settings` → `Variables and Secrets`.
+En el Worker, configurar para Production:
 
 ### `APPS_SCRIPT_URL`
 
-URL completa `/exec` del despliegue de Apps Script.
+URL completa del despliegue Apps Script terminada en `/exec`.
 
 ### `WHATSAPP_TARGET`
 
-Número que recibirá el mensaje cuando el cliente pulse «No puedo en ninguna de estas horas».
+Número de WhatsApp destino con prefijo internacional y solo dígitos.
 
-Formato internacional, preferentemente solo dígitos:
+No guardar ninguno de estos valores en GitHub.
 
-`34XXXXXXXXX`
+## 4. Build/Deploy
 
-No introducir estas variables en `web/app.js` ni en commits.
+Con integración Git de Workers, el deploy debe ejecutar Wrangler contra la configuración del repositorio.
 
-## 5. Dominio
+Comando equivalente:
 
-Asignar:
+```bash
+npx wrangler deploy
+```
 
-`cita.desorden.cat`
+No hay build de frontend: `web/` se publica directamente como Static Assets.
 
-## 6. Smoke test
+## 5. URL inicial
 
-Antes de enviar enlaces reales:
+Primero validar sobre el subdominio `*.workers.dev` del proyecto.
 
-1. Crear dos clientes ficticios temporales en el mismo bloque.
-2. Ejecutar `syncClientMetadata()`.
-3. Crear las 8 franjas con `createBlockSlots(...)`.
-4. Abrir los dos enlaces en navegadores distintos.
-5. Confirmar una misma franja casi simultáneamente.
-6. Verificar que solo uno queda `CONFIRMADO`.
-7. Eliminar los datos ficticios después de la validación.
+Después se podrá asociar `cita.desorden.cat` como Custom Domain sin cambiar la aplicación.
 
-La matriz completa está en `docs/QA.md`.
+## 6. QA de producción
+
+1. `/` devuelve la web CITA.
+2. `/api?action=availability&token=TOKEN_INVALIDO` devuelve JSON de error, no HTML.
+3. Cliente válido ve únicamente sus franjas.
+4. Una reserva cambia a `CONFIRMADO`.
+5. La franja desaparece para otro cliente del mismo bloque.
+6. Otro bloque permanece independiente.
+7. Dos reservas simultáneas: solo una gana.
+8. Reabrir el enlace muestra la cita ya confirmada.
+9. WhatsApp usa `WHATSAPP_TARGET`.

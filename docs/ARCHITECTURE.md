@@ -2,92 +2,53 @@
 
 ## Objetivo
 
-DESORDEN CITA es una aplicación independiente para ofrecer y confirmar citas de mantenimiento con un volumen pequeño de clientes, sin login, sin WhatsApp Business API y sin backend de pago.
+DESORDEN CITA es una aplicación independiente para confirmar citas de mantenimiento con un flujo mínimo y de bajo coste.
 
 ## Componentes
 
 ```text
-Cliente
+Navegador
   ↓
-https://cita.desorden.cat/?c=TOKEN
-  ↓
-Cloudflare Pages
-  ├─ web/                 HTML + CSS + JS
-  └─ functions/api.js     proxy same-origin /api
-                              ↓
-                        Google Apps Script
-                              ↓
-                         Google Sheets CITA
-                         ├─ cita
-                         └─ FRANJAS
+Cloudflare Worker
+  ├─ Static Assets → web/index.html, web/app.js, web/styles.css
+  └─ /api → src/worker.js
+              ↓
+         Google Apps Script
+              ↓
+         Google Sheet CITA
+         ├─ cita
+         └─ FRANJAS
 ```
 
-## Modelo de datos
+## Routing Cloudflare
 
-### `cita`
+`wrangler.jsonc` configura `web/` como Static Assets y el binding `ASSETS`.
 
-Es la fuente única de clientes/servicios. Las 17 columnas originales se preservan. El sistema añade:
+Solo `/api` y `/api/*` fuerzan la ejecución del Worker. El resto de recursos estáticos se sirve sin pasar por la lógica API.
 
-`CLIENTE_ID | BLOQUE | TOKEN | ESTADO_CITA | CITA_FECHA | CITA_HORA | CONFIRMADO_EN | URL_CITA`
+## Flujo de disponibilidad
 
-No existe una tabla `CLIENTES` duplicada.
+1. El cliente abre `/?c=TOKEN`.
+2. `web/app.js` llama a `GET /api?action=availability&token=TOKEN`.
+3. El Worker valida formato básico y reenvía la petición a Apps Script usando `APPS_SCRIPT_URL`.
+4. Apps Script resuelve `token → cliente → bloque`.
+5. Devuelve solo nombre, dirección, población, cita existente y franjas libres.
+6. El Worker vuelve a sanear la respuesta antes de enviarla al navegador.
 
-### `FRANJAS`
+## Flujo de reserva
 
-Una fila por hora propuesta:
+1. El navegador envía solo `action`, `token` y `slotId`.
+2. El Worker elimina cualquier campo adicional enviado por el cliente.
+3. Apps Script adquiere `LockService`.
+4. Relee cliente y franja dentro del bloqueo.
+5. Verifica bloque, estado y reserva previa.
+6. Actualiza `FRANJAS` y `cita` como `CONFIRMADO`.
 
-`ID | BLOQUE | FECHA | HORA | ESTADO | CLIENTE_ID | CONFIRMADO_EN`
+## Seguridad
 
-Cada bloque debe tener normalmente 8 filas activas: 2 fechas × 4 horas.
-
-## Lectura de disponibilidad
-
-1. El navegador envía únicamente el token a `/api`.
-2. Pages Functions valida el formato y reenvía a Apps Script.
-3. Apps Script resuelve `TOKEN → fila de cita → BLOQUE`.
-4. Si `ESTADO_CITA=CONFIRMADO`, devuelve únicamente la cita ya reservada.
-5. Si no existe cita, devuelve exclusivamente franjas `LIBRE` del bloque.
-6. El proxy aplica además una lista blanca a la respuesta para evitar exponer campos administrativos por accidente.
-
-## Reserva
-
-1. Navegador envía `token + slotId`.
-2. El proxy descarta cualquier bloque o identificador de cliente enviado por el navegador.
-3. Apps Script adquiere `LockService.getScriptLock()`.
-4. Dentro del bloqueo vuelve a leer cliente y franja.
-5. Comprueba:
-   - token válido;
-   - cliente con bloque;
-   - cliente sin reserva previa;
-   - slot existente;
-   - slot perteneciente al mismo bloque;
-   - slot todavía `LIBRE`.
-6. Escribe la reserva en `FRANJAS` y en la fila del cliente.
-7. Ejecuta `SpreadsheetApp.flush()` antes de liberar el bloqueo.
-
-Así, dos clientes que intenten reservar la misma hora simultáneamente no pueden obtener ambos `CONFIRMADO`.
-
-## Privacidad
-
-La respuesta pública contiene únicamente:
-
-- nombre;
-- dirección;
-- población;
-- fecha/hora de la cita, si existe;
-- IDs opacos de las franjas disponibles;
-- número operativo de WhatsApp configurado en Cloudflare.
-
-No se devuelven teléfonos de clientes, URLs de Drive, PDFs, SA de otros clientes ni filas completas del Sheet.
-
-## Configuración
-
-Apps Script admite:
-
-- `SPREADSHEET_ID`: opcional si el script no está vinculado directamente al Sheet.
-- `PUBLIC_BASE_URL`: opcional; por defecto `https://cita.desorden.cat`.
-
-Cloudflare Pages requiere:
-
-- `APPS_SCRIPT_URL`
-- `WHATSAPP_TARGET`
+- El navegador nunca decide `CLIENTE_ID` ni `BLOQUE`.
+- Tokens largos y no secuenciales.
+- `APPS_SCRIPT_URL` y `WHATSAPP_TARGET` son bindings de Cloudflare.
+- No se exponen teléfono, SA, WO, Drive URLs ni campos administrativos.
+- Respuestas API con `Cache-Control: no-store`.
+- No se requieren cookies ni login en V1.

@@ -39,11 +39,21 @@ async function readUpstream(response) {
   }
 }
 
+function sanitizeBooking(booking) {
+  if (!booking) return null;
+  return {
+    date: String(booking.date || ''),
+    time: String(booking.time || ''),
+    status: String(booking.status || ''),
+  };
+}
+
 function sanitizeAvailability(payload, contactWhatsApp) {
-  if (!payload || payload.ok !== true) return payload;
+  if (!payload || payload.ok !== true) {
+    return { ok: false, error: String((payload && payload.error) || 'UPSTREAM_ERROR') };
+  }
 
   const client = payload.client || {};
-  const booking = payload.booking || null;
   const slots = Array.isArray(payload.slots) ? payload.slots : [];
 
   return {
@@ -53,11 +63,7 @@ function sanitizeAvailability(payload, contactWhatsApp) {
       address: String(client.address || ''),
       city: String(client.city || ''),
     },
-    booking: booking ? {
-      date: String(booking.date || ''),
-      time: String(booking.time || ''),
-      status: String(booking.status || ''),
-    } : null,
+    booking: sanitizeBooking(payload.booking),
     slots: slots.map((slot) => ({
       id: String(slot.id || ''),
       date: String(slot.date || ''),
@@ -67,9 +73,19 @@ function sanitizeAvailability(payload, contactWhatsApp) {
   };
 }
 
-export async function onRequestGet(context) {
+function sanitizeBookingResult(payload) {
+  if (!payload || payload.ok !== true) {
+    const result = { ok: false, error: String((payload && payload.error) || 'UPSTREAM_ERROR') };
+    if (payload && payload.booking) result.booking = sanitizeBooking(payload.booking);
+    return result;
+  }
+
+  return { ok: true, booking: sanitizeBooking(payload.booking) };
+}
+
+export async function handleApiGet(request, env) {
   try {
-    const requestUrl = new URL(context.request.url);
+    const requestUrl = new URL(request.url);
     const action = requestUrl.searchParams.get('action');
     const token = safeToken(requestUrl.searchParams.get('token'));
 
@@ -77,7 +93,7 @@ export async function onRequestGet(context) {
       return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
     }
 
-    const url = new URL(upstreamUrl(context.env));
+    const url = new URL(upstreamUrl(env));
     url.searchParams.set('action', 'availability');
     url.searchParams.set('token', token);
 
@@ -90,19 +106,18 @@ export async function onRequestGet(context) {
     const result = await readUpstream(upstream);
     if (!result.ok) return jsonResponse(result.payload, result.status);
 
-    const sanitized = sanitizeAvailability(result.payload, context.env.WHATSAPP_TARGET);
-    return jsonResponse(sanitized);
+    return jsonResponse(sanitizeAvailability(result.payload, env.WHATSAPP_TARGET));
   } catch (error) {
     const code = error instanceof Error ? error.message : 'PROXY_ERROR';
     return jsonResponse({ ok: false, error: code }, 500);
   }
 }
 
-export async function onRequestPost(context) {
+export async function handleApiPost(request, env) {
   try {
     let payload;
     try {
-      payload = await context.request.json();
+      payload = await request.json();
     } catch {
       return jsonResponse({ ok: false, error: 'INVALID_JSON' }, 400);
     }
@@ -113,7 +128,7 @@ export async function onRequestPost(context) {
       return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
     }
 
-    const upstream = await fetch(upstreamUrl(context.env), {
+    const upstream = await fetch(upstreamUrl(env), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
@@ -124,9 +139,35 @@ export async function onRequestPost(context) {
     });
 
     const result = await readUpstream(upstream);
-    return jsonResponse(result.payload, result.status);
+    if (!result.ok) return jsonResponse(result.payload, result.status);
+    return jsonResponse(sanitizeBookingResult(result.payload));
   } catch (error) {
     const code = error instanceof Error ? error.message : 'PROXY_ERROR';
     return jsonResponse({ ok: false, error: code }, 500);
   }
 }
+
+async function handleApi(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname !== '/api') {
+    return jsonResponse({ ok: false, error: 'NOT_FOUND' }, 404);
+  }
+
+  if (request.method === 'GET') return handleApiGet(request, env);
+  if (request.method === 'POST') return handleApiPost(request, env);
+  return jsonResponse({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+      return handleApi(request, env);
+    }
+
+    if (!env.ASSETS || typeof env.ASSETS.fetch !== 'function') {
+      return new Response('Static asset binding not configured', { status: 500 });
+    }
+    return env.ASSETS.fetch(request);
+  },
+};

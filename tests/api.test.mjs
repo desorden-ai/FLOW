@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { onRequestGet, onRequestPost } from '../functions/api.js';
+import worker, { handleApiGet, handleApiPost } from '../src/worker.js';
 
 test('Apps Script source parses as JavaScript', () => {
   const source = fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8');
@@ -18,10 +18,10 @@ test('GET rejects missing/invalid token before upstream call', async () => {
   };
 
   try {
-    const response = await onRequestGet({
-      request: new Request('https://cita.example/api?action=availability&token=x'),
-      env: { APPS_SCRIPT_URL: 'https://script.example/exec' },
-    });
+    const response = await handleApiGet(
+      new Request('https://cita.example/api?action=availability&token=x'),
+      { APPS_SCRIPT_URL: 'https://script.example/exec' },
+    );
     assert.equal(response.status, 400);
     assert.equal(called, false);
     assert.deepEqual(await response.json(), { ok: false, error: 'BAD_REQUEST' });
@@ -52,20 +52,19 @@ test('GET forwards availability and strips unknown customer fields', async () =>
 
   try {
     const token = '1234567890abcdef1234567890abcdef';
-    const response = await onRequestGet({
-      request: new Request(`https://cita.example/api?action=availability&token=${token}`),
-      env: {
+    const response = await handleApiGet(
+      new Request(`https://cita.example/api?action=availability&token=${token}`),
+      {
         APPS_SCRIPT_URL: 'https://script.example/exec',
         WHATSAPP_TARGET: '+34 600 111 222',
       },
-    });
+    );
 
     assert.equal(response.status, 200);
     assert.match(forwardedUrl, /action=availability/);
     assert.match(forwardedUrl, /token=1234567890abcdef/);
 
-    const payload = await response.json();
-    assert.deepEqual(payload, {
+    assert.deepEqual(await response.json(), {
       ok: true,
       client: {
         name: 'Cliente Prueba',
@@ -81,20 +80,26 @@ test('GET forwards availability and strips unknown customer fields', async () =>
   }
 });
 
-test('POST forwards only action, token and slotId', async () => {
+test('POST forwards only action, token and slotId and sanitizes response', async () => {
   const originalFetch = globalThis.fetch;
   let forwardedBody = null;
   globalThis.fetch = async (_url, init) => {
     forwardedBody = JSON.parse(init.body);
     return new Response(JSON.stringify({
       ok: true,
-      booking: { date: '2026-09-10', time: '10:30', status: 'CONFIRMADO' },
+      booking: {
+        date: '2026-09-10',
+        time: '10:30',
+        status: 'CONFIRMADO',
+        clientId: 'PRIVATE',
+      },
+      internal: 'PRIVATE',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
 
   try {
-    const response = await onRequestPost({
-      request: new Request('https://cita.example/api', {
+    const response = await handleApiPost(
+      new Request('https://cita.example/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -105,14 +110,18 @@ test('POST forwards only action, token and slotId', async () => {
           clientId: 'ATTACKER-CONTROLLED',
         }),
       }),
-      env: { APPS_SCRIPT_URL: 'https://script.example/exec' },
-    });
+      { APPS_SCRIPT_URL: 'https://script.example/exec' },
+    );
 
     assert.equal(response.status, 200);
     assert.deepEqual(forwardedBody, {
       action: 'book',
       token: '1234567890abcdef1234567890abcdef',
       slotId: 'SLT-123456789abc',
+    });
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      booking: { date: '2026-09-10', time: '10:30', status: 'CONFIRMADO' },
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -124,13 +133,33 @@ test('invalid upstream JSON is normalized to 502', async () => {
   globalThis.fetch = async () => new Response('<html>not json</html>', { status: 200 });
 
   try {
-    const response = await onRequestGet({
-      request: new Request('https://cita.example/api?action=availability&token=1234567890abcdef1234567890abcdef'),
-      env: { APPS_SCRIPT_URL: 'https://script.example/exec' },
-    });
+    const response = await handleApiGet(
+      new Request('https://cita.example/api?action=availability&token=1234567890abcdef1234567890abcdef'),
+      { APPS_SCRIPT_URL: 'https://script.example/exec' },
+    );
     assert.equal(response.status, 502);
     assert.deepEqual(await response.json(), { ok: false, error: 'UPSTREAM_INVALID_JSON' });
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('worker sends non-api requests to static assets binding', async () => {
+  let received = '';
+  const response = await worker.fetch(new Request('https://cita.example/styles.css'), {
+    ASSETS: {
+      async fetch(request) {
+        received = new URL(request.url).pathname;
+        return new Response('asset-ok');
+      },
+    },
+  });
+  assert.equal(received, '/styles.css');
+  assert.equal(await response.text(), 'asset-ok');
+});
+
+test('worker rejects unsupported /api methods', async () => {
+  const response = await worker.fetch(new Request('https://cita.example/api', { method: 'PUT' }), {});
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { ok: false, error: 'METHOD_NOT_ALLOWED' });
 });
