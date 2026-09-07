@@ -37,6 +37,14 @@ Canonical client/service storage remains Google Sheet tab `cita`.
 
 Public booking `/` and the existing public `/api` booking contract are **frozen**. Do not change customer booking behavior, token semantics, reservation locking, confirmed reservation preservation, Panasonic customer text, or personalized WhatsApp customer flow.
 
+### 1.1 Narrow public-booking bugfix explicitly allowed
+
+There is one confirmed presentation bug in the current public page: free times are sorted lexicographically in `web/app.js` by `${date}|${time}`. Because stored/displayed hours may be `9:00` instead of zero-padded `09:00`, the UI currently renders examples such as `10:00`, `11:00`, `12:00`, `9:00`.
+
+Fix only this issue so dates remain ascending and times within each date are chronological by actual hour/minute, e.g. `9:00`, `10:00`, `11:00`, `12:00`. Do not alter slot availability, booking semantics, labels, Panasonic layout, customer text, tokens, WhatsApp flow, or backend reservation behavior.
+
+Add a regression test if the existing test structure permits it cheaply. This is the only public-customer change authorized by this handoff.
+
 ## 2. Existing files that matter
 
 Read these first; do not perform a repository-wide redesign audit.
@@ -47,6 +55,7 @@ Read these first; do not perform a repository-wide redesign audit.
 - `web/admin/schedule.css`
 - `web/admin/admin.js`
 - `web/admin/whatsapp.js`
+- `web/app.js` — only for the chronological-time bugfix in §1.1
 - `src/worker.js`
 - `apps-script/Admin.gs`
 - `apps-script/Code.gs`
@@ -70,6 +79,8 @@ Upgrade only the admin experience in two directions:
 
 1. make `/admin/` a compact responsive mini-application with clearly different mobile and desktop layouts while remaining one codebase and one URL;
 2. allow the administrator to import a new list of clients in bulk without manually editing Google Sheets.
+
+Also apply the narrow chronological-time ordering fix defined in §1.1.
 
 No product rewrite.
 
@@ -347,6 +358,7 @@ Expected:
 - `web/admin/clients.css`
 - `web/admin/admin.js`
 - optionally one small `web/admin/import.css` or `web/admin/import.js` only if it reduces complexity
+- `web/app.js` — only chronological slot ordering fix from §1.1
 - `src/worker.js`
 - `apps-script/Admin.gs`
 - `tests/admin.test.mjs`
@@ -354,7 +366,7 @@ Expected:
 - `docs/WEB_ADMIN.md`
 - `docs/GOOGLE_SHEETS.md` only if import behavior needs documentation
 
-Do not touch public customer files unless strictly necessary. If no public change is required, leave `web/index.html`, `web/app.js`, `web/styles.css` unchanged.
+Do not touch `web/index.html` or `web/styles.css` unless strictly necessary. No other public-customer change is authorized.
 
 ## 8. Tests / QA required
 
@@ -373,7 +385,8 @@ Add/adjust automated tests for at least:
 5. valid batch is proxied with sanitized clients only;
 6. duplicate / invalid result codes are handled without exposing upstream internals;
 7. existing `createClient`, `updateClient`, `archiveClient`, `updateAvailability`, `changePassword` remain green;
-8. public booking API tests remain green.
+8. public booking API tests remain green;
+9. public slot ordering is chronological even when the source contains non-zero-padded times such as `9:00` alongside `10:00`, `11:00`, `12:00`.
 
 Manual browser QA checklist:
 
@@ -391,7 +404,8 @@ Manual browser QA checklist:
 - existing duplicate not imported;
 - successful import -> one dashboard refresh and new clients visible;
 - availability editor unchanged;
-- customer public booking unaffected.
+- customer public booking unchanged except chronological ordering of the displayed free hours;
+- verify visual order `9:00`, `10:00`, `11:00`, `12:00` for a date containing those slots.
 
 ## 9. Definition of done
 
@@ -400,10 +414,11 @@ Task is done only when:
 - implementation is complete on `codex/cita-admin-responsive-import`;
 - `npm test` passes;
 - no secret/config changes are required in Git;
-- public booking code/contract is unchanged unless explicitly justified;
+- public booking code/contract is unchanged except the explicit chronological-time bugfix in §1.1;
 - mobile admin is materially more compact;
 - desktop admin uses available width efficiently;
 - bulk paste/CSV import has preview + duplicate protection + single batch backend write;
+- public free-hour display is chronological for padded and non-padded hour strings;
 - docs mention the new admin import flow;
 - Codex provides a short final report containing:
   - changed files;
