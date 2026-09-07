@@ -1,6 +1,9 @@
 const ADMIN_DEFAULT_PASSWORD_SHA256 = 'f06be6f822432aaf9837dee1c733f9abf76874e89367d05d5a105ce93e451c5d';
 const ADMIN_PASSWORD_PROPERTY = 'ADMIN_PASSWORD_SHA256';
+const ADMIN_SCHEDULE_PROPERTY_PREFIX = 'ADMIN_SCHEDULE_V2_';
 const ADMIN_DEFAULT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
+const ADMIN_MAX_DATES = 8;
+const ADMIN_MAX_TIMES_PER_DATE = 8;
 
 function adminSnapshot_(adminKey) {
   requireAdmin_(adminKey);
@@ -58,7 +61,7 @@ function adminSnapshot_(adminKey) {
       if (!blocks[block]) {
         blocks[block] = {
           visits: {}, cities: {}, pending: 0, free: 0, reserved: 0,
-          dates: {}, times: {}, slots: [], clients: [], conflicts: [],
+          slots: [], clients: [], conflicts: [],
         };
       }
       blocks[block].visits[id] = true;
@@ -103,8 +106,6 @@ function adminSnapshot_(adminKey) {
     const clientId = value_(row, slotHeaders, 'CLIENTE_ID');
     if (!block || !blocks[block] || !date || !time || !status) return;
 
-    blocks[block].dates[date] = true;
-    blocks[block].times[time] = true;
     blocks[block].slots.push({
       date: date,
       time: time,
@@ -152,8 +153,6 @@ function adminSnapshot_(adminKey) {
 
   const blockList = Object.keys(blocks).sort().map(function(block) {
     const item = blocks[block];
-    const dates = Object.keys(item.dates).sort();
-    const times = Object.keys(item.times).sort();
 
     item.slots.sort(function(a, b) {
       return (a.date + '|' + a.time).localeCompare(b.date + '|' + b.time);
@@ -172,9 +171,7 @@ function adminSnapshot_(adminKey) {
       pending: item.pending,
       free: item.free,
       reserved: item.reserved,
-      date1: dates[0] || '',
-      date2: dates[1] || '',
-      times: times.length ? times.slice(0, 4) : ADMIN_DEFAULT_TIMES.slice(),
+      schedule: adminScheduleForBlock_(block, item.slots),
       slots: item.slots,
       clients: item.clients,
       conflicts: item.conflicts,
@@ -209,6 +206,10 @@ function adminSnapshot_(adminKey) {
     },
     blocks: blockList,
     appointments: appointments,
+    limits: {
+      maxDates: ADMIN_MAX_DATES,
+      maxTimesPerDate: ADMIN_MAX_TIMES_PER_DATE,
+    },
   };
 }
 
@@ -219,18 +220,9 @@ function adminUpdateAvailability_(payload) {
 
   requireAdmin_(payload && payload.adminKey);
   const block = String((payload && payload.block) || '').trim();
-  const date1 = adminNormalizeDate_((payload && payload.date1) || '');
-  const date2 = adminNormalizeDate_((payload && payload.date2) || '');
-  const times = Array.isArray(payload && payload.times) ? payload.times.map(adminNormalizeTime_) : [];
+  const schedule = adminNormalizeSchedule_(payload && payload.days);
 
   if (!block) throw new Error('INVALID_BLOCK');
-  if (!date1 || !date2 || date1 === date2) throw new Error('INVALID_DATES');
-  if (times.length !== 4 || Object.keys(times.reduce(function(map, time) {
-    map[time] = true;
-    return map;
-  }, {})).length !== 4) {
-    throw new Error('INVALID_TIMES');
-  }
 
   const spreadsheet = getSpreadsheet_();
   const clientSheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
@@ -254,11 +246,13 @@ function adminUpdateAvailability_(payload) {
 
     const output = [];
     const confirmedKeys = {};
+
     for (let index = 1; index < values.length; index += 1) {
       const rawRow = values[index];
       const shownRow = display[index];
       const id = value_(shownRow, slotHeaders, 'ID');
       if (!id) continue;
+
       const rowBlock = value_(shownRow, slotHeaders, 'BLOQUE');
       const status = value_(shownRow, slotHeaders, 'ESTADO');
       const date = value_(shownRow, slotHeaders, 'FECHA');
@@ -272,10 +266,10 @@ function adminUpdateAvailability_(payload) {
       }
     }
 
-    [date1, date2].forEach(function(date) {
-      times.forEach(function(time) {
-        if (confirmedKeys[date + '|' + time]) return;
-        output.push(['SLT-' + randomHex_(12), block, date, time, 'LIBRE', '', '']);
+    schedule.forEach(function(day) {
+      day.times.forEach(function(time) {
+        if (confirmedKeys[day.date + '|' + time]) return;
+        output.push(['SLT-' + randomHex_(12), block, day.date, time, 'LIBRE', '', '']);
       });
     });
 
@@ -288,12 +282,76 @@ function adminUpdateAvailability_(payload) {
     const clearRows = Math.max(oldRows, output.length);
     if (clearRows) slotSheet.getRange(2, 1, clearRows, SLOT_HEADERS.length).clearContent();
     if (output.length) slotSheet.getRange(2, 1, output.length, SLOT_HEADERS.length).setValues(output);
+
+    PropertiesService.getScriptProperties().setProperty(
+      ADMIN_SCHEDULE_PROPERTY_PREFIX + block,
+      JSON.stringify(schedule)
+    );
+
     SpreadsheetApp.flush();
   } finally {
     if (lock.hasLock()) lock.releaseLock();
   }
 
   return adminSnapshot_(payload.adminKey);
+}
+
+function adminScheduleForBlock_(block, slots) {
+  const stored = PropertiesService.getScriptProperties().getProperty(ADMIN_SCHEDULE_PROPERTY_PREFIX + block);
+  if (stored) {
+    try {
+      return adminNormalizeSchedule_(JSON.parse(stored));
+    } catch (error) {
+      console.error('Invalid stored admin schedule for ' + block, error);
+    }
+  }
+
+  const grouped = {};
+  (slots || []).forEach(function(slot) {
+    if (!slot.date || !slot.time) return;
+    if (!grouped[slot.date]) grouped[slot.date] = {};
+    grouped[slot.date][slot.time] = true;
+  });
+
+  const derived = Object.keys(grouped).sort().slice(0, ADMIN_MAX_DATES).map(function(date) {
+    return {
+      date: date,
+      times: Object.keys(grouped[date]).sort().slice(0, ADMIN_MAX_TIMES_PER_DATE),
+    };
+  }).filter(function(day) { return day.times.length; });
+
+  if (derived.length) return derived;
+  return [];
+}
+
+function adminNormalizeSchedule_(days) {
+  if (!Array.isArray(days) || days.length < 1 || days.length > ADMIN_MAX_DATES) {
+    throw new Error('INVALID_DATES');
+  }
+
+  const seenDates = {};
+  const normalized = days.map(function(day) {
+    const date = adminNormalizeDate_(day && day.date);
+    if (!date || seenDates[date]) throw new Error('INVALID_DATES');
+    seenDates[date] = true;
+
+    if (!day || !Array.isArray(day.times) || day.times.length < 1 || day.times.length > ADMIN_MAX_TIMES_PER_DATE) {
+      throw new Error('INVALID_TIMES');
+    }
+
+    const seenTimes = {};
+    const times = day.times.map(function(value) {
+      const time = adminNormalizeTime_(value);
+      if (seenTimes[time]) throw new Error('INVALID_TIMES');
+      seenTimes[time] = true;
+      return time;
+    }).sort();
+
+    return { date: date, times: times };
+  });
+
+  normalized.sort(function(a, b) { return a.date.localeCompare(b.date); });
+  return normalized;
 }
 
 function adminChangePassword_(payload) {
