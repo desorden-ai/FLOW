@@ -126,3 +126,39 @@ test('spreadsheet formula input is stored as literal text and technical failures
   assert.throws(()=>h.context.adminImportClients_({adminKey:KEY,clients:[input]}),/technical failure/);
   assert.equal(h.locked,false);
 });
+test('public/admin/schedule/conflict/appointment times sort chronologically with non-padded hours',()=>{
+  const h=scriptHarness(),c=h.context;
+  // Add BLK-TEST slots that lexicographic sorting would misorder.
+  h.sheets.FRANJAS.rows.push(['SLT-0010','BLK-TEST','2026-09-10','10:00','LIBRE','','']);
+  h.sheets.FRANJAS.rows.push(['SLT-0003','BLK-TEST','2026-09-10','12:00','LIBRE','','']);
+  h.sheets.FRANJAS.rows.push(['SLT-0004','BLK-TEST','2026-09-10','11:00','LIBRE','','']);
+  const data=c.availability_(TOKEN);
+  assert.deepEqual(plain(data.slots.map(s=>s.time)),['9:00','10:00','11:00','12:00'],'public slots must be chronological');
+
+  // Exercise conflict ordering by making the other block overlap at 9:00 and 10:00.
+  h.sheets.FRANJAS.rows.push(['SLT-O009','BLK-OTHER','2026-09-10','9:00','LIBRE','','']);
+
+  // Confirm the first client at 9:00 and add another confirmed visit at 10:00.
+  c.book_(TOKEN,'SLT-0001');
+  h.sheets.cita.rows.push(h.row({...h.base,CLIENTE:'Segon Client',CLIENTE_ID:'CLI-second',TOKEN:'b'.repeat(64),URL_CITA:'https://cita.desorden.cat/#c='+'b'.repeat(64),ESTADO_CITA:'CONFIRMADO',CITA_FECHA:'2026-09-10',CITA_HORA:'10:00',SA:'SA-SECOND'}));
+
+  const snapshot=plain(c.adminSnapshot_(KEY,true));
+  const block=snapshot.blocks.find(b=>b.block==='BLK-TEST');
+  assert.deepEqual(block.slots.filter(s=>s.date==='2026-09-10').map(s=>s.time),['9:00','10:00','11:00','12:00'],'admin slots must be chronological');
+  assert.deepEqual(block.conflicts.filter(s=>s.date==='2026-09-10').map(s=>s.time),['9:00','10:00'],'admin conflicts must be chronological');
+  assert.deepEqual(snapshot.appointments.map(a=>a.time),['9:00','10:00'],'appointments must be chronological');
+
+  const normalized=plain(c.adminNormalizeSchedule_([{date:'2026-09-10',times:['12:00','09:00','11:00','10:00']}]))
+  assert.deepEqual(normalized[0].times,['09:00','10:00','11:00','12:00'],'normalized schedule must be chronological');
+  const derived=plain(c.adminScheduleForBlock_('BLK-DERIVED',[
+    {date:'2026-09-10',time:'12:00'},{date:'2026-09-10',time:'9:00'},{date:'2026-09-10',time:'11:00'},{date:'2026-09-10',time:'10:00'},
+  ]));
+  assert.deepEqual(derived[0].times,['9:00','10:00','11:00','12:00'],'derived schedule must be chronological');
+
+  // Availability mutation must also keep preserved legacy confirmed 9:00 before newly generated 10:00+.
+  const update=scriptHarness();
+  update.context.book_(TOKEN,'SLT-0001');
+  update.context.adminUpdateAvailability_({adminKey:KEY,block:'BLK-TEST',days:[{date:'2026-09-10',times:['10:00','11:00','12:00']}]});
+  const persisted=update.sheets.FRANJAS.rows.slice(1).filter(row=>row[1]==='BLK-TEST'&&row[2]==='2026-09-10').map(row=>row[3]);
+  assert.deepEqual(persisted,['9:00','10:00','11:00','12:00'],'persisted availability rows must be chronological');
+});

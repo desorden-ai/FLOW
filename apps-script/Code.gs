@@ -769,8 +769,12 @@ function publicClient_(client) {
   };
 }
 
+function timeMinutes_(value) {
+  var parts = String(value || '').split(':'); return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
 function compareSlots_(a, b) {
-  return (a.date + ' ' + a.time).localeCompare(b.date + ' ' + b.time);
+  return a.date.localeCompare(b.date) || timeMinutes_(a.time) - timeMinutes_(b.time);
 }
 
 function bookingUnitKey_(row, headers) {

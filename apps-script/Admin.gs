@@ -163,13 +163,13 @@ function adminSnapshot_(adminKey, metadataReady) {
     const item = blocks[block];
 
     item.slots.sort(function(a, b) {
-      return (a.date + '|' + a.time).localeCompare(b.date + '|' + b.time);
+      return a.date.localeCompare(b.date) || timeMinutes_(a.time) - timeMinutes_(b.time);
     });
     item.clients.sort(function(a, b) {
       return String(a.name || '').localeCompare(String(b.name || ''), 'es');
     });
     item.conflicts.sort(function(a, b) {
-      return (a.date + '|' + a.time).localeCompare(b.date + '|' + b.time);
+      return a.date.localeCompare(b.date) || timeMinutes_(a.time) - timeMinutes_(b.time);
     });
 
     return {
@@ -199,7 +199,7 @@ function adminSnapshot_(adminKey, metadataReady) {
       block: unit.block,
     };
   }).sort(function(a, b) {
-    return (String(a.date) + '|' + String(a.time)).localeCompare(String(b.date) + '|' + String(b.time));
+    return String(a.date).localeCompare(String(b.date)) || timeMinutes_(a.time) - timeMinutes_(b.time);
   });
 
   return {
@@ -296,8 +296,10 @@ function adminUpdateAvailability_(payload) {
     });
 
     output.sort(function(a, b) {
-      return (String(a[1] || '') + '|' + adminCellDate_(a[2]) + '|' + adminCellTime_(a[3]))
-        .localeCompare(String(b[1] || '') + '|' + adminCellDate_(b[2]) + '|' + adminCellTime_(b[3]));
+      const blockOrder = String(a[1] || '').localeCompare(String(b[1] || ''));
+      if (blockOrder) return blockOrder;
+      const dateOrder = adminCellDate_(a[2]).localeCompare(adminCellDate_(b[2]));
+      return dateOrder || timeMinutes_(adminCellTime_(a[3])) - timeMinutes_(adminCellTime_(b[3]));
     });
 
     const oldRows = Math.max(slotSheet.getLastRow() - 1, 0);
@@ -605,7 +607,7 @@ function adminScheduleForBlock_(block, slots) {
   const derived = Object.keys(grouped).sort().slice(0, ADMIN_MAX_DATES).map(function(date) {
     return {
       date: date,
-      times: Object.keys(grouped[date]).sort().slice(0, ADMIN_MAX_TIMES_PER_DATE),
+      times: Object.keys(grouped[date]).sort(function(a, b) { return timeMinutes_(a) - timeMinutes_(b); }).slice(0, ADMIN_MAX_TIMES_PER_DATE),
     };
   }).filter(function(day) { return day.times.length; });
 
@@ -634,7 +636,7 @@ function adminNormalizeSchedule_(days) {
       if (seenTimes[time]) throw new Error('INVALID_TIMES');
       seenTimes[time] = true;
       return time;
-    }).sort();
+    }).sort(function(a, b) { return timeMinutes_(a) - timeMinutes_(b); });
 
     return { date: date, times: times };
   });

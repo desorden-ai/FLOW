@@ -2,18 +2,27 @@ const API_URL = '/api';
 const $ = (selector) => document.querySelector(selector);
 const TOKEN_KEY = 'desorden_cita_booking_token';
 function bootstrapToken() {
+  const valid = value => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
   let stored = '';
   try { stored = sessionStorage.getItem(TOKEN_KEY) || ''; } catch {}
-  const candidates = [stored, new URLSearchParams(location.hash.slice(1)).get('c'), new URLSearchParams(location.search).get('c')];
-  const value = candidates.find(value => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)) || '';
-  let retained = false;
+  // 1. Explicit credential in URL always wins.
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get('c');
+  const fromQuery = new URLSearchParams(location.search).get('c');
+  const explicit = fromHash ?? fromQuery;  // null when URL has no c= at all
+  let value = '';
+  if (explicit != null) {
+    // URL contains c= — use it if valid; discard storage otherwise.
+    value = valid(explicit) ? explicit : '';
+  } else {
+    // No c= in URL — fall back to sessionStorage.
+    value = valid(stored) ? stored : '';
+  }
   try {
-    if (value) { sessionStorage.setItem(TOKEN_KEY, value); retained = true; }
+    if (value) sessionStorage.setItem(TOKEN_KEY, value);
     else sessionStorage.removeItem(TOKEN_KEY);
   } catch {}
-  // Scrub malformed URLs too, including when storage is unavailable.
   history.replaceState(null, '', location.pathname);
-  return retained ? value : '';
+  return value;
 }
 const token = bootstrapToken();
 const COPY = {
