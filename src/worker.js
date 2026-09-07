@@ -36,12 +36,25 @@ function safeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
 }
 
-function safeTimes(value) {
-  if (!Array.isArray(value) || value.length !== 4) return [];
-  const times = value.map((item) => String(item || '').trim());
-  if (!times.every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time))) return [];
-  if (new Set(times).size !== 4) return [];
-  return times;
+function safeSchedule(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 8) return [];
+  const dates = new Set();
+  const schedule = [];
+
+  for (const item of value) {
+    const date = safeDate(item && item.date);
+    if (!date || dates.has(date)) return [];
+    dates.add(date);
+
+    const rawTimes = item && item.times;
+    if (!Array.isArray(rawTimes) || rawTimes.length < 1 || rawTimes.length > 8) return [];
+    const times = rawTimes.map((entry) => String(entry || '').trim());
+    if (!times.every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time))) return [];
+    if (new Set(times).size !== times.length) return [];
+    schedule.push({ date, times });
+  }
+
+  return schedule;
 }
 
 function safeAdminPassword(value) {
@@ -120,6 +133,7 @@ function sanitizeAdminSnapshot(payload) {
   const summary = payload.summary || {};
   const blocks = Array.isArray(payload.blocks) ? payload.blocks : [];
   const appointments = Array.isArray(payload.appointments) ? payload.appointments : [];
+  const limits = payload.limits || {};
 
   return {
     ok: true,
@@ -131,6 +145,10 @@ function sanitizeAdminSnapshot(payload) {
       reservedSlots: Number(summary.reservedSlots || 0),
       blocks: Number(summary.blocks || 0),
     },
+    limits: {
+      maxDates: Math.min(Math.max(Number(limits.maxDates || 8), 1), 8),
+      maxTimesPerDate: Math.min(Math.max(Number(limits.maxTimesPerDate || 8), 1), 8),
+    },
     blocks: blocks.map((block) => ({
       block: String(block.block || ''),
       label: String(block.label || ''),
@@ -138,9 +156,10 @@ function sanitizeAdminSnapshot(payload) {
       pending: Number(block.pending || 0),
       free: Number(block.free || 0),
       reserved: Number(block.reserved || 0),
-      date1: String(block.date1 || ''),
-      date2: String(block.date2 || ''),
-      times: Array.isArray(block.times) ? block.times.slice(0, 4).map((time) => String(time || '')) : [],
+      schedule: Array.isArray(block.schedule) ? block.schedule.slice(0, 8).map((day) => ({
+        date: String(day.date || ''),
+        times: Array.isArray(day.times) ? day.times.slice(0, 8).map((time) => String(time || '')) : [],
+      })) : [],
       slots: Array.isArray(block.slots) ? block.slots.map((slot) => ({
         date: String(slot.date || ''),
         time: String(slot.time || ''),
@@ -262,13 +281,11 @@ export async function handleAdminApi(request, env) {
       upstreamPayload = { action: 'adminSnapshot', adminKey };
     } else if (payload.action === 'updateAvailability') {
       const block = safeBlock(payload.block);
-      const date1 = safeDate(payload.date1);
-      const date2 = safeDate(payload.date2);
-      const times = safeTimes(payload.times);
-      if (!block || !date1 || !date2 || date1 === date2 || !times.length) {
+      const days = safeSchedule(payload.days);
+      if (!block || !days.length) {
         return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
       }
-      upstreamPayload = { action: 'adminUpdateAvailability', adminKey, block, date1, date2, times };
+      upstreamPayload = { action: 'adminUpdateAvailability', adminKey, block, days };
     } else if (payload.action === 'changePassword') {
       const newKey = safeAdminPassword(payload.newKey);
       if (!newKey) return jsonResponse({ ok: false, error: 'INVALID_NEW_PASSWORD' }, 400);
