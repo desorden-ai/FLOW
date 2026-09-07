@@ -6,34 +6,48 @@ Do not merge or deploy `Cita`.
 
 Read exactly these documents first, in this order:
 
-1. `docs/CODEX_PRIVACY_SECURITY_V1.md`
-2. `docs/CODEX_ADMIN_V2_HANDOFF.md`
+1. `docs/CODEX_PUBLIC_UX_FINAL.md`
+2. `docs/CODEX_PRIVACY_SECURITY_V1.md`
+3. `docs/CODEX_ADMIN_V2_HANDOFF.md`
 
 Implement them as one coherent change set.
 
 ## Conflict rule
 
-`CODEX_PRIVACY_SECURITY_V1.md` is newer and overrides any conflicting statement in `CODEX_ADMIN_V2_HANDOFF.md` about public booking files being frozen or the chronological-time fix being the only allowed public change.
+Precedence is:
 
-All responsive-admin, bulk-import, data-integrity, test and no-deploy requirements from `CODEX_ADMIN_V2_HANDOFF.md` remain active.
+1. `CODEX_PUBLIC_UX_FINAL.md` for visible public UX, branding hierarchy, languages, copy and dark/minimal styling;
+2. `CODEX_PRIVACY_SECURITY_V1.md` for privacy, token handling, public API minimization, admin WhatsApp hardening, token regeneration, headers and logging;
+3. `CODEX_ADMIN_V2_HANDOFF.md` for responsive admin, bulk import, existing admin behavior and related tests.
+
+Therefore:
+
+- any older instruction to show an Ángel Molero / blue-M identity block in the public header is superseded;
+- the public header now shows Panasonic only, plus the small `CA · ES` selector and booking subtitle;
+- company/service/legal identity belongs only in the footer;
+- Catalan is the default public language, Spanish is selectable;
+- the dark minimal public visual direction in `CODEX_PUBLIC_UX_FINAL.md` is final;
+- all privacy/security requirements remain mandatory unless the final UX document explicitly changes only presentation/copy;
+- all responsive-admin, bulk-import, data-integrity, test and no-deploy requirements remain active.
 
 ## Execution economy
 
 Do not perform a repository-wide audit.
 
-Start from the files named in those two documents. Reuse current plain HTML/CSS/JS, Worker and Apps Script contracts. Add no framework and no dependency unless a genuine blocker proves one necessary; none is expected.
+Start from the files named in the three documents. Reuse current plain HTML/CSS/JS, Worker and Apps Script contracts. Add no framework and no dependency unless a genuine blocker proves one necessary; none is expected.
 
 Prioritize implementation in this order:
 
 1. public API minimization + POST token transport;
 2. token bootstrap/scrubbing + fragment links + backward compatibility;
-3. public minimal UX / confirmation / fallback WhatsApp;
-4. admin WhatsApp exact identity resolution + first-name message;
-5. token regeneration;
-6. security headers/static wrapping;
-7. responsive admin;
-8. bulk import;
-9. tests + docs.
+3. final public dark/minimal UX + CA/ES localization + chronological time order;
+4. public confirmation + PII-free localized fallback WhatsApp;
+5. admin WhatsApp exact identity resolution + first-name message;
+6. token regeneration;
+7. security headers/static wrapping;
+8. responsive admin;
+9. bulk import;
+10. tests + docs.
 
 Run `npm test` after coherent milestones, not after every small edit.
 
