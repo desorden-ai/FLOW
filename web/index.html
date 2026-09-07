@@ -3,31 +3,46 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#07101f">
-  <title>Reserva de mantenimiento · DESORDEN</title>
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Mantenimiento Panasonic · Reserva</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="shell">
     <header class="hero">
-      <span class="eyebrow">DESORDEN</span>
-      <h1>Reserva de mantenimiento</h1>
-      <p>Selecciona una de las horas disponibles.</p>
+      <div class="panasonic-wordmark" aria-label="Panasonic">Panasonic</div>
+
+      <div class="hero-copy">
+        <h1>Mantenimiento Panasonic</h1>
+        <p>Confirma la fecha de tu mantenimiento</p>
+      </div>
+
+      <div class="service-line" aria-label="Servicio autorizado Panasonic">
+        <span class="service-mark" aria-hidden="true">SAT</span>
+        <span class="service-divider" aria-hidden="true"></span>
+        <span>Servicio autorizado Panasonic</span>
+      </div>
     </header>
+
+    <div class="rule" aria-hidden="true"></div>
 
     <section id="status" class="status" aria-live="polite">Cargando disponibilidad…</section>
 
     <section id="booking" hidden>
       <div id="client" class="client"></div>
       <div id="slots" class="days"></div>
-      <button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button>
+
+      <div class="fallback-wrap">
+        <button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button>
+      </div>
     </section>
 
     <section id="success" class="success" aria-live="polite" hidden>
       <div class="success-mark" aria-hidden="true">✓</div>
-      <p class="success-kicker">RESERVA COMPLETADA</p>
-      <h2>Tu cita está confirmada</h2>
+      <p class="success-kicker">CITA CONFIRMADA</p>
+      <h2>Tu mantenimiento está reservado</h2>
       <p id="successText" class="success-date"></p>
       <p id="successAddress" class="success-address"></p>
     </section>
