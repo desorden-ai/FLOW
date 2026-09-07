@@ -4,6 +4,8 @@ const ADMIN_SCHEDULE_PROPERTY_PREFIX = 'ADMIN_SCHEDULE_V2_';
 const ADMIN_DEFAULT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
 const ADMIN_MAX_DATES = 8;
 const ADMIN_MAX_TIMES_PER_DATE = 8;
+const ADMIN_MAX_SAS = 8;
+const ADMIN_ARCHIVED_STATUS = 'ARCHIVADO';
 
 function adminSnapshot_(adminKey) {
   requireAdmin_(adminKey);
@@ -29,6 +31,7 @@ function adminSnapshot_(adminKey) {
     if (!id) return;
 
     const block = value_(row, headers, 'BLOQUE');
+    const rowStatus = value_(row, headers, 'ESTADO_CITA') || 'PENDIENTE';
     if (!units[id]) {
       units[id] = {
         id: id,
@@ -38,7 +41,7 @@ function adminSnapshot_(adminKey) {
         address: value_(row, headers, 'DIRECCION'),
         city: value_(row, headers, 'POBLACION'),
         bookingUrl: value_(row, headers, 'URL_CITA'),
-        status: value_(row, headers, 'ESTADO_CITA') || 'PENDIENTE',
+        status: rowStatus,
         date: value_(row, headers, 'CITA_FECHA'),
         time: value_(row, headers, 'CITA_HORA'),
         sas: {},
@@ -51,30 +54,30 @@ function adminSnapshot_(adminKey) {
     if (!unit.phone) unit.phone = value_(row, headers, 'TELEFONO');
     if (!unit.bookingUrl) unit.bookingUrl = value_(row, headers, 'URL_CITA');
 
-    if (value_(row, headers, 'ESTADO_CITA') === 'CONFIRMADO') {
+    if (rowStatus === 'CONFIRMADO') {
       unit.status = 'CONFIRMADO';
       unit.date = value_(row, headers, 'CITA_FECHA') || unit.date;
       unit.time = value_(row, headers, 'CITA_HORA') || unit.time;
+    } else if (unit.status !== 'CONFIRMADO' && rowStatus === ADMIN_ARCHIVED_STATUS) {
+      unit.status = ADMIN_ARCHIVED_STATUS;
     }
 
-    if (block) {
-      if (!blocks[block]) {
-        blocks[block] = {
-          visits: {}, cities: {}, pending: 0, free: 0, reserved: 0,
-          slots: [], clients: [], conflicts: [],
-        };
-      }
+    if (block && rowStatus !== ADMIN_ARCHIVED_STATUS) {
+      adminEnsureBlock_(blocks, block);
       blocks[block].visits[id] = true;
       const city = value_(row, headers, 'POBLACION');
       if (city) blocks[block].cities[city] = true;
     }
   });
 
-  const unitList = Object.keys(units).map(function(id) { return units[id]; });
+  const allUnits = Object.keys(units).map(function(id) { return units[id]; });
+  const unitList = allUnits.filter(function(unit) {
+    return unit.status !== ADMIN_ARCHIVED_STATUS && Boolean(unit.block);
+  });
   const confirmed = unitList.filter(function(unit) { return unit.status === 'CONFIRMADO'; });
 
   unitList.forEach(function(unit) {
-    if (!unit.block || !blocks[unit.block]) return;
+    adminEnsureBlock_(blocks, unit.block);
     if (unit.status !== 'CONFIRMADO') blocks[unit.block].pending += 1;
     blocks[unit.block].clients.push({
       id: unit.id,
@@ -104,8 +107,9 @@ function adminSnapshot_(adminKey) {
     const date = value_(row, slotHeaders, 'FECHA');
     const time = value_(row, slotHeaders, 'HORA');
     const clientId = value_(row, slotHeaders, 'CLIENTE_ID');
-    if (!block || !blocks[block] || !date || !time || !status) return;
+    if (!block || !date || !time || !status) return;
 
+    adminEnsureBlock_(blocks, block);
     blocks[block].slots.push({
       date: date,
       time: time,
@@ -209,14 +213,26 @@ function adminSnapshot_(adminKey) {
     limits: {
       maxDates: ADMIN_MAX_DATES,
       maxTimesPerDate: ADMIN_MAX_TIMES_PER_DATE,
+      maxSasPerClient: ADMIN_MAX_SAS,
     },
   };
 }
 
-function adminUpdateAvailability_(payload) {
-  if (payload && payload.mode === 'changePassword') {
-    return adminChangePassword_(payload);
+function adminEnsureBlock_(blocks, block) {
+  if (!blocks[block]) {
+    blocks[block] = {
+      visits: {}, cities: {}, pending: 0, free: 0, reserved: 0,
+      slots: [], clients: [], conflicts: [],
+    };
   }
+  return blocks[block];
+}
+
+function adminUpdateAvailability_(payload) {
+  if (payload && payload.mode === 'changePassword') return adminChangePassword_(payload);
+  if (payload && payload.mode === 'createClient') return adminCreateClient_(payload);
+  if (payload && payload.mode === 'updateClient') return adminUpdateClient_(payload);
+  if (payload && payload.mode === 'archiveClient') return adminArchiveClient_(payload);
 
   requireAdmin_(payload && payload.adminKey);
   const block = String((payload && payload.block) || '').trim();
@@ -233,7 +249,7 @@ function adminUpdateAvailability_(payload) {
   const clientHeaders = header_(clientValues[0]);
   const knownBlock = clientValues.slice(1).some(function(row) {
     return value_(row, clientHeaders, 'BLOQUE') === block;
-  });
+  }) || getSlots_().some(function(slot) { return slot.block === block; });
   if (!knownBlock) throw new Error('UNKNOWN_BLOCK');
 
   const lock = LockService.getScriptLock();
@@ -294,6 +310,221 @@ function adminUpdateAvailability_(payload) {
   }
 
   return adminSnapshot_(payload.adminKey);
+}
+
+function adminCreateClient_(payload) {
+  requireAdmin_(payload && payload.adminKey);
+  const data = adminNormalizeClientInput_(payload && payload.client, true);
+  if (!data.ok) return data;
+
+  const spreadsheet = getSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
+  if (!sheet) return { ok: false, error: 'ADMIN_DATA_NOT_READY' };
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = header_(values[0]);
+  requireHeaders_(headers, [
+    'SA', 'CLIENTE', 'TELEFONO', 'DIRECCION', 'POBLACION', 'CLIENTE_ID', 'BLOQUE',
+    'ESTADO_CITA', 'CITA_FECHA', 'CITA_HORA', 'CONFIRMADO_EN', 'TOKEN', 'URL_CITA',
+  ]);
+
+  if (!adminBlockKnown_(data.client.block, values, headers)) {
+    return { ok: false, error: 'UNKNOWN_BLOCK' };
+  }
+
+  if (adminClientIdentityExists_('', data.client, values, headers)) {
+    return { ok: false, error: 'CLIENT_ALREADY_EXISTS' };
+  }
+
+  const sas = data.client.sas.length ? data.client.sas : [''];
+  const width = sheet.getLastColumn();
+  const rows = sas.map(function(sa) {
+    const row = new Array(width).fill('');
+    row[headers.SA] = sa;
+    row[headers.CLIENTE] = data.client.name;
+    row[headers.TELEFONO] = data.client.phone;
+    row[headers.DIRECCION] = data.client.address;
+    row[headers.POBLACION] = data.client.city;
+    row[headers.BLOQUE] = data.client.block;
+    row[headers.ESTADO_CITA] = 'PENDIENTE';
+    return row;
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, width).setValues(rows);
+    SpreadsheetApp.flush();
+    syncClientMetadata();
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
+  }
+
+  return adminSnapshot_(payload.adminKey);
+}
+
+function adminUpdateClient_(payload) {
+  requireAdmin_(payload && payload.adminKey);
+  const clientId = String((payload && payload.clientId) || '').trim();
+  if (!clientId) return { ok: false, error: 'INVALID_CLIENT' };
+
+  const data = adminNormalizeClientInput_(payload && payload.client, false);
+  if (!data.ok) return data;
+
+  const spreadsheet = getSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
+  if (!sheet) return { ok: false, error: 'ADMIN_DATA_NOT_READY' };
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = header_(values[0]);
+  requireHeaders_(headers, [
+    'CLIENTE', 'TELEFONO', 'DIRECCION', 'POBLACION', 'CLIENTE_ID', 'BLOQUE', 'ESTADO_CITA',
+  ]);
+
+  const indexes = [];
+  let currentBlock = '';
+  let confirmed = false;
+  values.slice(1).forEach(function(row, index) {
+    if (value_(row, headers, 'CLIENTE_ID') !== clientId) return;
+    indexes.push(index + 2);
+    if (!currentBlock) currentBlock = value_(row, headers, 'BLOQUE');
+    if (value_(row, headers, 'ESTADO_CITA') === 'CONFIRMADO') confirmed = true;
+  });
+
+  if (!indexes.length) return { ok: false, error: 'CLIENT_NOT_FOUND' };
+  if (confirmed && data.client.block !== currentBlock) {
+    return { ok: false, error: 'CLIENT_CONFIRMED_BLOCK_LOCKED' };
+  }
+  if (!adminBlockKnown_(data.client.block, values, headers)) {
+    return { ok: false, error: 'UNKNOWN_BLOCK' };
+  }
+  if (adminClientIdentityExists_(clientId, data.client, values, headers)) {
+    return { ok: false, error: 'CLIENT_ALREADY_EXISTS' };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    indexes.forEach(function(rowNumber) {
+      sheet.getRange(rowNumber, headers.CLIENTE + 1).setValue(data.client.name);
+      sheet.getRange(rowNumber, headers.TELEFONO + 1).setValue(data.client.phone);
+      sheet.getRange(rowNumber, headers.DIRECCION + 1).setValue(data.client.address);
+      sheet.getRange(rowNumber, headers.POBLACION + 1).setValue(data.client.city);
+      sheet.getRange(rowNumber, headers.BLOQUE + 1).setValue(data.client.block);
+    });
+    SpreadsheetApp.flush();
+    syncClientMetadata();
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
+  }
+
+  return adminSnapshot_(payload.adminKey);
+}
+
+function adminArchiveClient_(payload) {
+  requireAdmin_(payload && payload.adminKey);
+  const clientId = String((payload && payload.clientId) || '').trim();
+  if (!clientId) return { ok: false, error: 'INVALID_CLIENT' };
+
+  const spreadsheet = getSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
+  if (!sheet) return { ok: false, error: 'ADMIN_DATA_NOT_READY' };
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = header_(values[0]);
+  requireHeaders_(headers, [
+    'CLIENTE_ID', 'BLOQUE', 'ESTADO_CITA', 'CITA_FECHA', 'CITA_HORA', 'CONFIRMADO_EN',
+  ]);
+
+  const indexes = [];
+  let confirmed = false;
+  values.slice(1).forEach(function(row, index) {
+    if (value_(row, headers, 'CLIENTE_ID') !== clientId) return;
+    indexes.push(index + 2);
+    if (value_(row, headers, 'ESTADO_CITA') === 'CONFIRMADO') confirmed = true;
+  });
+
+  if (!indexes.length) return { ok: false, error: 'CLIENT_NOT_FOUND' };
+  if (confirmed) return { ok: false, error: 'CLIENT_CONFIRMED_CANNOT_ARCHIVE' };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    indexes.forEach(function(rowNumber) {
+      sheet.getRange(rowNumber, headers.BLOQUE + 1).setValue('');
+      sheet.getRange(rowNumber, headers.ESTADO_CITA + 1).setValue(ADMIN_ARCHIVED_STATUS);
+      sheet.getRange(rowNumber, headers.CITA_FECHA + 1).setValue('');
+      sheet.getRange(rowNumber, headers.CITA_HORA + 1).setValue('');
+      sheet.getRange(rowNumber, headers.CONFIRMADO_EN + 1).setValue('');
+    });
+    SpreadsheetApp.flush();
+    syncClientMetadata();
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
+  }
+
+  return adminSnapshot_(payload.adminKey);
+}
+
+function adminNormalizeClientInput_(input, includeSas) {
+  const client = input || {};
+  const name = adminCleanText_(client.name, 160);
+  const phone = adminCleanText_(client.phone, 40);
+  const address = adminCleanText_(client.address, 220);
+  const city = adminCleanText_(client.city, 120);
+  const block = String(client.block || '').trim();
+
+  if (!name || !address || !city || !block) return { ok: false, error: 'INVALID_CLIENT' };
+
+  let sas = [];
+  if (includeSas) {
+    if (!Array.isArray(client.sas) || client.sas.length > ADMIN_MAX_SAS) {
+      return { ok: false, error: 'INVALID_SAS' };
+    }
+    const seen = {};
+    sas = client.sas.map(function(value) {
+      return adminCleanText_(value, 40);
+    }).filter(function(value) {
+      if (!value || seen[value]) return false;
+      seen[value] = true;
+      return true;
+    });
+  }
+
+  return {
+    ok: true,
+    client: { name: name, phone: phone, address: address, city: city, block: block, sas: sas },
+  };
+}
+
+function adminCleanText_(value, maxLength) {
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
+}
+
+function adminBlockKnown_(block, values, headers) {
+  if (!block) return false;
+  const inClients = values.slice(1).some(function(row) {
+    return value_(row, headers, 'BLOQUE') === block;
+  });
+  if (inClients) return true;
+  return getSlots_().some(function(slot) { return slot.block === block; });
+}
+
+function adminClientIdentityExists_(clientId, client, values, headers) {
+  const sample = new Array(values[0].length).fill('');
+  sample[headers.CLIENTE] = client.name;
+  sample[headers.TELEFONO] = client.phone;
+  sample[headers.DIRECCION] = client.address;
+  sample[headers.POBLACION] = client.city;
+  const candidateKey = bookingUnitKey_(sample, headers);
+
+  return values.slice(1).some(function(row) {
+    const rowId = value_(row, headers, 'CLIENTE_ID');
+    const status = value_(row, headers, 'ESTADO_CITA');
+    if (status === ADMIN_ARCHIVED_STATUS) return false;
+    if (clientId && rowId === clientId) return false;
+    return bookingUnitKey_(row, headers) === candidateKey;
+  });
 }
 
 function adminScheduleForBlock_(block, slots) {
