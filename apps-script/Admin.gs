@@ -1,7 +1,5 @@
 const ADMIN_PASSWORD_SHA256 = 'f06be6f822432aaf9837dee1c733f9abf76874e89367d05d5a105ce93e451c5d';
-const ADMIN_DASHBOARD_SHEET = 'DASHBOARD';
-const ADMIN_FIRST_BLOCK_ROW = 11;
-const ADMIN_LAST_BLOCK_ROW = 19;
+const ADMIN_DEFAULT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
 
 function adminSnapshot_(adminKey) {
   requireAdmin_(adminKey);
@@ -10,21 +8,22 @@ function adminSnapshot_(adminKey) {
   const spreadsheet = getSpreadsheet_();
   const clientSheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
   const slotSheet = spreadsheet.getSheetByName(CFG.SLOT_SHEET);
-  const dashboard = spreadsheet.getSheetByName(ADMIN_DASHBOARD_SHEET);
-  if (!clientSheet || !slotSheet || !dashboard) throw new Error('ADMIN_DATA_NOT_READY');
+  if (!clientSheet || !slotSheet) throw new Error('ADMIN_DATA_NOT_READY');
 
   const clientValues = clientSheet.getDataRange().getDisplayValues();
   const headers = header_(clientValues[0]);
   requireHeaders_(headers, ['SA','CLIENTE','DIRECCION','POBLACION','CLIENTE_ID','BLOQUE','ESTADO_CITA','CITA_FECHA','CITA_HORA']);
 
   const units = {};
+  const blocks = {};
   clientValues.slice(1).forEach(function(row) {
     const id = value_(row, headers, 'CLIENTE_ID');
     if (!id) return;
+    const block = value_(row, headers, 'BLOQUE');
     if (!units[id]) {
       units[id] = {
         id: id,
-        block: value_(row, headers, 'BLOQUE'),
+        block: block,
         name: value_(row, headers, 'CLIENTE'),
         address: value_(row, headers, 'DIRECCION'),
         city: value_(row, headers, 'POBLACION'),
@@ -42,17 +41,18 @@ function adminSnapshot_(adminKey) {
       unit.date = value_(row, headers, 'CITA_FECHA') || unit.date;
       unit.time = value_(row, headers, 'CITA_HORA') || unit.time;
     }
+    if (block) {
+      if (!blocks[block]) blocks[block] = { visits: {}, cities: {}, pending: 0, free: 0, reserved: 0, dates: {}, times: {} };
+      blocks[block].visits[id] = true;
+      const city = value_(row, headers, 'POBLACION');
+      if (city) blocks[block].cities[city] = true;
+    }
   });
 
   const unitList = Object.keys(units).map(function(id) { return units[id]; });
   const confirmed = unitList.filter(function(unit) { return unit.status === 'CONFIRMADO'; });
-
-  const blockMetrics = {};
   unitList.forEach(function(unit) {
-    if (!unit.block) return;
-    if (!blockMetrics[unit.block]) blockMetrics[unit.block] = { visits: 0, pending: 0, free: 0, reserved: 0 };
-    blockMetrics[unit.block].visits += 1;
-    if (unit.status !== 'CONFIRMADO') blockMetrics[unit.block].pending += 1;
+    if (unit.block && unit.status !== 'CONFIRMADO' && blocks[unit.block]) blocks[unit.block].pending += 1;
   });
 
   const slotValues = slotSheet.getDataRange().getDisplayValues();
@@ -63,28 +63,31 @@ function adminSnapshot_(adminKey) {
   slotValues.slice(1).forEach(function(row) {
     const block = value_(row, slotHeaders, 'BLOQUE');
     const status = value_(row, slotHeaders, 'ESTADO');
-    if (!block || !status) return;
-    if (!blockMetrics[block]) blockMetrics[block] = { visits: 0, pending: 0, free: 0, reserved: 0 };
-    if (status === 'LIBRE') { blockMetrics[block].free += 1; freeSlots += 1; }
-    if (status === 'CONFIRMADO') { blockMetrics[block].reserved += 1; reservedSlots += 1; }
+    const date = value_(row, slotHeaders, 'FECHA');
+    const time = value_(row, slotHeaders, 'HORA');
+    if (!block || !blocks[block]) return;
+    if (date) blocks[block].dates[date] = true;
+    if (time) blocks[block].times[time] = true;
+    if (status === 'LIBRE') { blocks[block].free += 1; freeSlots += 1; }
+    if (status === 'CONFIRMADO') { blocks[block].reserved += 1; reservedSlots += 1; }
   });
 
-  const config = dashboard.getRange(ADMIN_FIRST_BLOCK_ROW, 1, ADMIN_LAST_BLOCK_ROW - ADMIN_FIRST_BLOCK_ROW + 1, 14).getDisplayValues();
-  const blocks = config.map(function(row) {
-    const block = String(row[13] || '').trim();
-    const metrics = blockMetrics[block] || { visits: 0, pending: 0, free: 0, reserved: 0 };
+  const blockList = Object.keys(blocks).sort().map(function(block) {
+    const item = blocks[block];
+    const dates = Object.keys(item.dates).sort();
+    const times = Object.keys(item.times).sort();
     return {
       block: block,
-      label: String(row[1] || block),
-      visits: metrics.visits,
-      pending: metrics.pending,
-      free: metrics.free,
-      reserved: metrics.reserved,
-      date1: adminNormalizeDate_(row[4]),
-      date2: adminNormalizeDate_(row[5]),
-      times: [row[6], row[7], row[8], row[9]].map(function(v) { return String(v || ''); }),
+      label: adminBlockLabel_(block, Object.keys(item.cities).sort()),
+      visits: Object.keys(item.visits).length,
+      pending: item.pending,
+      free: item.free,
+      reserved: item.reserved,
+      date1: dates[0] || '',
+      date2: dates[1] || '',
+      times: times.length ? times.slice(0, 4) : ADMIN_DEFAULT_TIMES.slice(),
     };
-  }).filter(function(item) { return item.block; });
+  });
 
   const appointments = confirmed.map(function(unit) {
     return {
@@ -107,9 +110,9 @@ function adminSnapshot_(adminKey) {
       pending: unitList.length - confirmed.length,
       freeSlots: freeSlots,
       reservedSlots: reservedSlots,
-      blocks: blocks.length,
+      blocks: blockList.length,
     },
-    blocks: blocks,
+    blocks: blockList,
     appointments: appointments,
   };
 }
@@ -128,21 +131,66 @@ function adminUpdateAvailability_(payload) {
   }
 
   const spreadsheet = getSpreadsheet_();
-  const dashboard = spreadsheet.getSheetByName(ADMIN_DASHBOARD_SHEET);
-  if (!dashboard) throw new Error('ADMIN_DATA_NOT_READY');
+  const clientSheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
+  const slotSheet = spreadsheet.getSheetByName(CFG.SLOT_SHEET);
+  if (!clientSheet || !slotSheet) throw new Error('ADMIN_DATA_NOT_READY');
 
-  const rows = dashboard.getRange(ADMIN_FIRST_BLOCK_ROW, 14, ADMIN_LAST_BLOCK_ROW - ADMIN_FIRST_BLOCK_ROW + 1, 1).getDisplayValues();
-  let targetRow = 0;
-  rows.forEach(function(row, index) {
-    if (String(row[0] || '').trim() === block) targetRow = ADMIN_FIRST_BLOCK_ROW + index;
+  const clientValues = clientSheet.getDataRange().getDisplayValues();
+  const clientHeaders = header_(clientValues[0]);
+  const knownBlock = clientValues.slice(1).some(function(row) {
+    return value_(row, clientHeaders, 'BLOQUE') === block;
   });
-  if (!targetRow) throw new Error('UNKNOWN_BLOCK');
+  if (!knownBlock) throw new Error('UNKNOWN_BLOCK');
 
-  const d1 = new Date(date1 + 'T12:00:00');
-  const d2 = new Date(date2 + 'T12:00:00');
-  dashboard.getRange(targetRow, 5, 1, 2).setValues([[d1, d2]]).setNumberFormat('yyyy-mm-dd');
-  dashboard.getRange(targetRow, 7, 1, 4).setValues([times]);
-  SpreadsheetApp.flush();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const values = slotSheet.getDataRange().getValues();
+    const display = slotSheet.getDataRange().getDisplayValues();
+    const slotHeaders = header_(display[0]);
+    requireHeaders_(slotHeaders, SLOT_HEADERS);
+
+    const output = [];
+    const confirmedKeys = {};
+    for (let index = 1; index < values.length; index += 1) {
+      const rawRow = values[index];
+      const shownRow = display[index];
+      const id = value_(shownRow, slotHeaders, 'ID');
+      if (!id) continue;
+      const rowBlock = value_(shownRow, slotHeaders, 'BLOQUE');
+      const status = value_(shownRow, slotHeaders, 'ESTADO');
+      const date = value_(shownRow, slotHeaders, 'FECHA');
+      const time = value_(shownRow, slotHeaders, 'HORA');
+
+      if (rowBlock === block && status === 'CONFIRMADO') {
+        confirmedKeys[date + '|' + time] = true;
+        output.push(rawRow.slice(0, SLOT_HEADERS.length));
+      } else if (rowBlock !== block) {
+        output.push(rawRow.slice(0, SLOT_HEADERS.length));
+      }
+    }
+
+    [date1, date2].forEach(function(date) {
+      times.forEach(function(time) {
+        if (confirmedKeys[date + '|' + time]) return;
+        output.push(['SLT-' + randomHex_(12), block, date, time, 'LIBRE', '', '']);
+      });
+    });
+
+    output.sort(function(a, b) {
+      return (String(a[1] || '') + '|' + adminCellDate_(a[2]) + '|' + adminCellTime_(a[3]))
+        .localeCompare(String(b[1] || '') + '|' + adminCellDate_(b[2]) + '|' + adminCellTime_(b[3]));
+    });
+
+    const oldRows = Math.max(slotSheet.getLastRow() - 1, 0);
+    const clearRows = Math.max(oldRows, output.length);
+    if (clearRows) slotSheet.getRange(2, 1, clearRows, SLOT_HEADERS.length).clearContent();
+    if (output.length) slotSheet.getRange(2, 1, output.length, SLOT_HEADERS.length).setValues(output);
+    SpreadsheetApp.flush();
+  } finally {
+    if (lock.hasLock()) lock.releaseLock();
+  }
+
   return adminSnapshot_(payload.adminKey);
 }
 
@@ -172,4 +220,24 @@ function adminNormalizeTime_(value) {
   const text = String(value || '').trim();
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) throw new Error('INVALID_TIME');
   return text;
+}
+
+function adminCellDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, CFG.TZ, 'yyyy-MM-dd');
+  }
+  return String(value || '');
+}
+
+function adminCellTime_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, CFG.TZ, 'HH:mm');
+  }
+  return String(value || '');
+}
+
+function adminBlockLabel_(block, cities) {
+  if (block === 'BLK-PALLEJA-01') return 'Pallejà · Grupo 1';
+  if (block === 'BLK-PALLEJA-02') return 'Pallejà · Grupo 2';
+  return cities.length ? cities.join(' / ') : block;
 }
