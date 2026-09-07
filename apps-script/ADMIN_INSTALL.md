@@ -24,7 +24,10 @@ No es necesario volver a modificar `Code.gs` para las mejoras visuales del panel
 
 - snapshot privado del dashboard;
 - edición segura de disponibilidad;
-- preservación de franjas `CONFIRMADO` al modificar horarios;
+- hasta 8 fechas distintas por bloque;
+- hasta 8 horas distintas e independientes por cada fecha;
+- preservación de franjas `CONFIRMADO` al modificar o eliminar días/horarios;
+- almacenamiento de la planificación administrativa en `Script Properties` para separar configuración deseada de citas históricas confirmadas;
 - cambio de contraseña mediante `Script Properties`;
 - detalle por bloque con franjas individuales y clientes agrupados por visita;
 - detección de solapamientos de fecha/hora entre bloques.
