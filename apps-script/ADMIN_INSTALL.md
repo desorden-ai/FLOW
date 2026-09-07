@@ -2,37 +2,31 @@
 
 `Admin.gs` contiene el backend privado del dashboard web `/admin`.
 
-## Único cambio requerido en `Code.gs`
+## Estado actual
 
-Sustituir solamente la función `doPost(e)` actual por esta versión:
+`Code.gs` ya debe contener las rutas administrativas en `doPost(e)`:
 
-```javascript
-function doPost(e) {
-  try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+- `adminSnapshot`
+- `adminUpdateAvailability`
 
-    if (payload.action === 'book') {
-      return json_(book_(payload.token, payload.slotId));
-    }
+No es necesario volver a modificar `Code.gs` para las mejoras visuales del panel.
 
-    if (payload.action === 'adminSnapshot') {
-      return json_(adminSnapshot_(payload.adminKey));
-    }
+## Actualizar el backend del dashboard
 
-    if (payload.action === 'adminUpdateAvailability') {
-      return json_(adminUpdateAvailability_(payload));
-    }
+1. Abrir el proyecto Apps Script vinculado a la hoja `CITA`.
+2. Abrir `Admin.gs`.
+3. Sustituir todo su contenido por la versión actual de `apps-script/Admin.gs` de la rama `Cita`.
+4. Guardar.
+5. Ir a **Implementar → Gestionar implementaciones → Editar**.
+6. Seleccionar **Nueva versión** y publicar manteniendo la misma URL y permisos del Web App.
 
-    return json_({ ok: false, error: 'UNKNOWN_ACTION' });
-  } catch (error) {
-    console.error(error);
-    const message = error instanceof Error ? error.message : String(error);
-    if (message === 'UNAUTHORIZED') return json_({ ok: false, error: 'UNAUTHORIZED' });
-    return json_({ ok: false, error: 'SERVER_ERROR' });
-  }
-}
-```
+## Funciones incluidas
 
-Después añadir `Admin.gs` al mismo proyecto Apps Script y crear una nueva versión del Web App manteniendo la misma URL y permisos.
+- snapshot privado del dashboard;
+- edición segura de disponibilidad;
+- preservación de franjas `CONFIRMADO` al modificar horarios;
+- cambio de contraseña mediante `Script Properties`;
+- detalle por bloque con franjas individuales y clientes agrupados por visita;
+- detección de solapamientos de fecha/hora entre bloques.
 
-No se requieren variables nuevas en Cloudflare. La clave de administración se valida por SHA-256 en Worker y Apps Script; el secreto en claro no está en GitHub.
+No se requieren variables nuevas en Cloudflare.
