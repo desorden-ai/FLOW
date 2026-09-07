@@ -5,18 +5,12 @@ function bootstrapToken() {
   const valid = value => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
   let stored = '';
   try { stored = sessionStorage.getItem(TOKEN_KEY) || ''; } catch {}
-  // 1. Explicit credential in URL always wins.
   const fromHash = new URLSearchParams(location.hash.slice(1)).get('c');
   const fromQuery = new URLSearchParams(location.search).get('c');
-  const explicit = fromHash ?? fromQuery;  // null when URL has no c= at all
+  const explicit = fromHash ?? fromQuery;
   let value = '';
-  if (explicit != null) {
-    // URL contains c= — use it if valid; discard storage otherwise.
-    value = valid(explicit) ? explicit : '';
-  } else {
-    // No c= in URL — fall back to sessionStorage.
-    value = valid(stored) ? stored : '';
-  }
+  if (explicit != null) value = valid(explicit) ? explicit : '';
+  else value = valid(stored) ? stored : '';
   try {
     if (value) sessionStorage.setItem(TOKEN_KEY, value);
     else sessionStorage.removeItem(TOKEN_KEY);
@@ -27,28 +21,34 @@ function bootstrapToken() {
 const token = bootstrapToken();
 const COPY = {
   ca: {
-    title: 'Manteniment Panasonic · Reserva', subtitle: 'Confirma la data del teu manteniment',
-    intro: 'Selecciona una data i hora disponibles.', fallback: "No puc en cap d'aquestes hores",
+    title: 'Panasonic · Confirmar visita',
+    intro: "Té una revisió de manteniment pendent. Esculli el dia i l'hora que li vagi millor",
+    fallback: "No puc en cap d'aquestes hores", confirm: 'Confirmar visita',
     confirmed: 'Cita confirmada', reserved: 'El manteniment ha quedat reservat.',
     empty: 'No queden hores disponibles', emptyHelp: 'Pots contactar-nos per buscar una altra data.',
-    service: 'Servei Tècnic Autoritzat Panasonic', legal: 'Avís legal', privacy: 'Privacitat',
+    service: 'Servei tècnic autoritzat Panasonic', legal: 'Avís legal', privacy: 'Privacitat',
     company: 'Fontaneria Ángel Molero e Hijos S.L.', loading: 'Carregant disponibilitat…',
-    confirming: 'Confirmant…', reserve: 'Reservar', at: 'a les',
+    confirming: 'Confirmant…', reserve: 'Seleccionar', at: 'a les',
     invalid: 'L’enllaç de reserva no és vàlid.', unavailable: 'Aquesta cita encara no té horaris assignats.',
     error: 'No s’ha pogut carregar la disponibilitat. Torna-ho a provar més tard.',
-    failed: 'No s’ha pogut confirmar. Torna-ho a provar.', taken: 'Aquesta hora acaba de ser reservada. Hem actualitzat les opcions.',
+    failed: 'No s’ha pogut confirmar. Torna-ho a provar.',
+    taken: 'Aquesta hora acaba de ser reservada. Hem actualitzat les opcions.',
+    morning: 'Bon dia', afternoon: 'Bona tarda',
   },
   es: {
-    title: 'Mantenimiento Panasonic · Reserva', subtitle: 'Confirma la fecha de tu mantenimiento',
-    intro: 'Selecciona una fecha y hora disponibles.', fallback: 'No puedo en ninguna de estas horas',
+    title: 'Panasonic · Confirmar visita',
+    intro: 'Tiene una revisión de mantenimiento pendiente. Elija el día y la hora que le vaya mejor.',
+    fallback: 'No puedo en ninguna de estas horas', confirm: 'Confirmar visita',
     confirmed: 'Cita confirmada', reserved: 'Su mantenimiento ha quedado reservado.',
     empty: 'No quedan horas disponibles', emptyHelp: 'Puede contactarnos para buscar otra fecha.',
-    service: 'Servicio Técnico Autorizado Panasonic', legal: 'Aviso legal', privacy: 'Privacidad',
+    service: 'Servicio técnico autorizado Panasonic', legal: 'Aviso legal', privacy: 'Privacidad',
     company: 'Fontanería Ángel Molero e Hijos S.L.', loading: 'Cargando disponibilidad…',
-    confirming: 'Confirmando…', reserve: 'Reservar', at: 'a las',
+    confirming: 'Confirmando…', reserve: 'Seleccionar', at: 'a las',
     invalid: 'El enlace de reserva no es válido.', unavailable: 'Esta cita todavía no tiene horarios asignados.',
     error: 'No se ha podido cargar la disponibilidad. Vuelve a intentarlo más tarde.',
-    failed: 'No se ha podido confirmar. Vuelve a intentarlo.', taken: 'Esta hora acaba de ser reservada. Se han actualizado las opciones.',
+    failed: 'No se ha podido confirmar. Vuelve a intentarlo.',
+    taken: 'Esta hora acaba de ser reservada. Se han actualizado las opciones.',
+    morning: 'Buenos días', afternoon: 'Buenas tardes',
   },
 };
 let language = 'ca';
@@ -56,6 +56,7 @@ let snapshot = null;
 let statusKey = 'loading';
 let statusError = false;
 let busySlot = '';
+let selectedSlotId = '';
 function t(key) { return COPY[language][key]; }
 function setStatus(key, error = false) {
   statusKey = key; statusError = error;
@@ -74,6 +75,13 @@ function formatDate(value) {
   const text = new Intl.DateTimeFormat(language === 'ca' ? 'ca-ES' : 'es-ES', { weekday:'long', day:'numeric', month:'long' }).format(date);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+function greeting() {
+  let hour = new Date().getHours();
+  try {
+    hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone:'Europe/Madrid', hour:'2-digit', hourCycle:'h23' }).format(new Date()));
+  } catch {}
+  return hour < 14 ? t('morning') : t('afternoon');
+}
 async function callPublic(action, extra = {}) {
   const response = await fetch(API_URL, { method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action, token, ...extra }) });
   const data = await response.json();
@@ -82,6 +90,9 @@ async function callPublic(action, extra = {}) {
 }
 function textElement(tag, text, className = '') {
   const el = document.createElement(tag); el.textContent = text; el.className = className; return el;
+}
+function selectedSlot() {
+  return snapshot?.slots?.find(slot => slot.slotId === selectedSlotId) || null;
 }
 function render() {
   document.documentElement.lang = language;
@@ -96,23 +107,41 @@ function render() {
     $('#successText').textContent = `${formatDate(snapshot.booking.date)} · ${snapshot.booking.time}`;
     return;
   }
-  $('#client').replaceChildren(textElement('h2', snapshot.client?.firstName ? `Hola, ${snapshot.client.firstName}` : 'Hola'), textElement('p', t('intro')));
+
+  const name = snapshot.client?.firstName ? `, ${snapshot.client.firstName}` : '';
+  $('#client').replaceChildren(textElement('h2', `${greeting()}${name}`), textElement('p', t('intro')));
+
   const slotsEl = $('#slots'); slotsEl.replaceChildren();
   if (!snapshot.slots.length) {
     const empty = textElement('section', '', 'day');
     empty.append(textElement('h2', t('empty')), textElement('p', t('emptyHelp'))); slotsEl.append(empty);
   }
+
   Object.entries(groupByDate(snapshot.slots)).forEach(([date,items]) => {
     const day = textElement('section', '', 'day');
     const grid = textElement('div', '', 'slot-grid');
     items.forEach(slot => {
-      const button = textElement('button', busySlot === slot.slotId ? t('confirming') : slot.time, 'slot');
-      button.type = 'button'; button.disabled = Boolean(busySlot);
+      const selected = selectedSlotId === slot.slotId;
+      const button = textElement('button', slot.time, `slot${selected ? ' selected' : ''}`);
+      button.type = 'button';
+      button.disabled = Boolean(busySlot);
+      button.setAttribute('aria-pressed', String(selected));
       button.setAttribute('aria-label', `${t('reserve')} ${formatDate(date)} ${t('at')} ${slot.time}`);
-      button.addEventListener('click', () => book(slot)); grid.append(button);
+      button.addEventListener('click', () => {
+        if (busySlot) return;
+        selectedSlotId = slot.slotId;
+        setStatus('');
+        render();
+      });
+      grid.append(button);
     });
     day.append(textElement('h2', formatDate(date)), grid); slotsEl.append(day);
   });
+
+  const confirm = $('#confirmBooking');
+  confirm.hidden = !snapshot.slots.length;
+  confirm.disabled = !selectedSlotId || Boolean(busySlot);
+  confirm.textContent = busySlot ? t('confirming') : t('confirm');
 }
 async function load() {
   if (!token) { setStatus('invalid', true); return; }
@@ -120,27 +149,43 @@ async function load() {
     const data = await callPublic('availability');
     if (!data.ok) {
       snapshot = null;
+      selectedSlotId = '';
       setStatus(data.error === 'INVALID_TOKEN' ? 'invalid' : data.error === 'CLIENT_NOT_READY' ? 'unavailable' : 'error', true);
-    } else { snapshot = data; setStatus(''); }
-  } catch { snapshot = null; setStatus('error', true); }
+    } else {
+      snapshot = data;
+      if (!selectedSlot()) selectedSlotId = '';
+      setStatus('');
+    }
+  } catch {
+    snapshot = null;
+    selectedSlotId = '';
+    setStatus('error', true);
+  }
   render();
 }
 async function book(slot) {
-  if (busySlot) return;
+  if (busySlot || !slot) return;
   busySlot = slot.slotId; setStatus(''); render();
   try {
     const data = await callPublic('book', { slotId:slot.slotId });
     if ((data.ok || data.error === 'ALREADY_BOOKED') && data.booking) {
-      snapshot.booking = data.booking; setStatus('');
+      snapshot.booking = data.booking;
+      selectedSlotId = '';
+      setStatus('');
     } else if (data.error === 'SLOT_TAKEN') {
-      await load(); if (snapshot && !snapshot.booking) setStatus('taken', true);
+      selectedSlotId = '';
+      await load();
+      if (snapshot && !snapshot.booking) setStatus('taken', true);
     } else if (data.error === 'INVALID_TOKEN') {
-      snapshot = null; setStatus('invalid', true);
+      snapshot = null;
+      selectedSlotId = '';
+      setStatus('invalid', true);
     } else setStatus('failed', true);
   } catch { setStatus('failed', true); }
   finally { busySlot = ''; render(); }
 }
 document.querySelectorAll('[data-language]').forEach(el => el.addEventListener('click', () => { language = el.dataset.language; render(); }));
+$('#confirmBooking').addEventListener('click', () => book(selectedSlot()));
 $('#noneFit').addEventListener('click', () => location.assign(`/contact?lang=${language}`));
 render();
 load();
