@@ -27,6 +27,21 @@ Significado:
 
 No escribir manualmente `CLIENTE_ID`, `TOKEN` o `URL_CITA` salvo recuperación técnica. Apps Script los genera.
 
+### Unidad de reserva y múltiples SAs
+
+La reserva representa una **visita física**, no una fila ni una SA aislada.
+
+Dos o más filas se consideran la misma unidad de reserva cuando coinciden, tras normalización:
+
+- `CLIENTE`
+- `TELEFONO`
+- `DIRECCION`
+- `POBLACION`
+
+Esas filas comparten el mismo `CLIENTE_ID`, `TOKEN`, `URL_CITA` y estado de reserva. Si el cliente confirma una franja, Apps Script actualiza todas las SAs asociadas a esa visita.
+
+Esto evita que un mismo domicilio con varias órdenes reciba enlaces independientes o pueda reservar dos veces.
+
 ## 2. Pestaña `FRANJAS`
 
 Cabeceras exactas:
@@ -51,7 +66,7 @@ Una franja pertenece a un único bloque. Los clientes de otro bloque no la ven.
 syncClientMetadata()
 ```
 
-El script genera automáticamente los campos internos que falten sin sobrescribir los existentes.
+El script genera automáticamente los campos internos que falten y consolida las filas que correspondan a una misma visita.
 
 ## 4. Crear un bloque con 8 opciones
 
@@ -99,6 +114,8 @@ Al reservar, Apps Script actualiza atómicamente:
 - `CONFIRMADO_EN`
 
 ### `cita`
+
+En todas las filas que pertenecen a la misma visita:
 
 - `ESTADO_CITA = CONFIRMADO`
 - `CITA_FECHA`
