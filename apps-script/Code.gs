@@ -67,25 +67,24 @@ function handleControlEdit(e) {
   generateSelectedSlots();
 }
 
-function doGet(e) {
-  try {
-    const action = String((e && e.parameter && e.parameter.action) || '');
-    if (action !== 'availability') return json_({ ok: false, error: 'UNKNOWN_ACTION' });
-    return json_(availability_(e.parameter.token));
-  } catch (error) {
-    console.error(error);
-    return json_({ ok: false, error: 'SERVER_ERROR' });
-  }
+function doGet() {
+  return json_({ ok: false, error: 'METHOD_NOT_ALLOWED' });
 }
 
 function doPost(e) {
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    if (payload.action !== 'book') return json_({ ok: false, error: 'UNKNOWN_ACTION' });
-    return json_(book_(payload.token, payload.slotId));
+    const raw = (e && e.postData && e.postData.contents) || '{}';
+    if (raw.length > 262144) return json_({ ok:false, error:'BAD_REQUEST' });
+    const payload = JSON.parse(raw);
+    if (!payload || typeof payload !== 'object') return json_({ ok:false, error:'BAD_REQUEST' });
+    if (payload.action === 'availability') return json_(availability_(payload.token));
+    if (payload.action === 'book') return json_(book_(payload.token, payload.slotId));
+    if (payload.action === 'adminSnapshot') return json_(adminSnapshot_(payload.adminKey));
+    if (payload.action === 'adminUpdateAvailability') return json_(adminUpdateAvailability_(payload));
+    return json_({ ok: false, error: 'UNKNOWN_ACTION' });
   } catch (error) {
-    console.error(error);
-    return json_({ ok: false, error: 'SERVER_ERROR' });
+    const allowed = ['UNAUTHORIZED', 'INVALID_NEW_PASSWORD', 'INVALID_DATES', 'INVALID_TIMES', 'INVALID_TIME', 'UNKNOWN_BLOCK', 'ADMIN_DATA_NOT_READY'];
+    return json_({ ok: false, error: allowed.indexOf(error.message) >= 0 ? error.message : 'SERVER_ERROR' });
   }
 }
 
@@ -146,7 +145,7 @@ function syncClientMetadata() {
   for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
     const row = values[rowIndex];
     const name = value_(row, headers, 'CLIENTE');
-    if (!name) continue;
+    if (!name || value_(row, headers, 'ESTADO_CITA') === 'ARCHIVADO') continue;
     totalRows += 1;
 
     const key = bookingUnitKey_(row, headers);
@@ -561,7 +560,7 @@ function availability_(token) {
     })
     .sort(compareSlots_)
     .map(function (slot) {
-      return { id: slot.id, date: slot.date, time: slot.time };
+      return { slotId: slot.id, date: slot.date, time: slot.time };
     });
 
   return {
@@ -575,7 +574,7 @@ function availability_(token) {
 function book_(token, slotId) {
   const normalizedToken = String(token || '').trim();
   const normalizedSlotId = String(slotId || '').trim();
-  if (!normalizedToken) return { ok: false, error: 'INVALID_TOKEN' };
+  if (!/^[a-f0-9]{64}$/i.test(normalizedToken)) return { ok: false, error: 'INVALID_TOKEN' };
   if (!normalizedSlotId) return { ok: false, error: 'INVALID_SLOT' };
 
   const lock = LockService.getScriptLock();
@@ -656,7 +655,7 @@ function book_(token, slotId) {
 
 function getClientByToken_(token) {
   const normalizedToken = String(token || '').trim();
-  if (!normalizedToken) return null;
+  if (!/^[a-f0-9]{64}$/i.test(normalizedToken)) return null;
 
   const sheet = getSpreadsheet_().getSheetByName(CFG.CLIENT_SHEET);
   if (!sheet) throw new Error('Missing ' + CFG.CLIENT_SHEET);
@@ -681,6 +680,7 @@ function getClientByToken_(token) {
 
   const firstRow = values[firstRowIndex];
   const clientId = value_(firstRow, headers, 'CLIENTE_ID');
+  if (!clientId) return null;
   const rowNumbers = [];
   const sas = [];
   const blocks = {};
@@ -692,7 +692,9 @@ function getClientByToken_(token) {
     const row = values[rowIndex];
     const sameClientId = clientId && value_(row, headers, 'CLIENTE_ID') === clientId;
     const sameToken = value_(row, headers, 'TOKEN') === normalizedToken;
-    if (!sameClientId && !sameToken) continue;
+    if (sameToken && !sameClientId) return null;
+    if (!sameClientId) continue;
+    if (!sameToken || value_(row, headers, 'ESTADO_CITA') === 'ARCHIVADO') return null;
 
     rowNumbers.push(rowIndex + 1);
     const sa = value_(row, headers, 'SA');
@@ -763,9 +765,7 @@ function bookingFromClient_(client) {
 
 function publicClient_(client) {
   return {
-    name: client.name,
-    address: client.address,
-    city: client.city,
+    firstName: String(client.name || '').trim().split(/\s+/)[0],
   };
 }
 
@@ -879,7 +879,7 @@ function randomHex_(length) {
 function buildBookingUrl_(token) {
   const configured = PropertiesService.getScriptProperties().getProperty('PUBLIC_BASE_URL');
   const base = String(configured || CFG.PUBLIC_BASE_URL).replace(/\/$/, '');
-  return base + '/?c=' + encodeURIComponent(token);
+  return base + '/#c=' + encodeURIComponent(token);
 }
 
 function json_(payload) {

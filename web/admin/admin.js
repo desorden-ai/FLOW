@@ -276,10 +276,12 @@ function renderClients(block, parent) {
   list.className = 'client-list';
   (block.clients || []).forEach((client) => {
     client.block = block.block;
-    const card = document.createElement('article');
+    const card = document.createElement('details');
     card.className = 'admin-client';
+    card.dataset.clientId = client.id;
+    card.open = window.matchMedia('(min-width: 900px)').matches;
 
-    const top = document.createElement('div');
+    const top = document.createElement('summary');
     top.className = 'client-top';
     const identity = document.createElement('div');
     addText(identity, 'strong', '', client.name || 'Cliente');
@@ -309,9 +311,10 @@ function renderClients(block, parent) {
 
       const whats = document.createElement('a');
       whats.className = 'mini-action';
+      whats.dataset.clientId = client.id;
       whats.href = `https://wa.me/${digits(client.phone)}`;
       whats.target = '_blank';
-      whats.rel = 'noopener';
+      whats.rel = 'noopener noreferrer';
       whats.textContent = 'WhatsApp';
       actions.append(whats);
     }
@@ -320,6 +323,15 @@ function renderClients(block, parent) {
     const edit = button('Editar', 'mini-action');
     edit.addEventListener('click', () => openClientDialog(block.block, client));
     actions.append(edit);
+    const regenerate = button('Regenerar enlace', 'mini-action');
+    regenerate.addEventListener('click', async () => {
+      if (!window.confirm('¿Regenerar el enlace? El anterior dejará de funcionar. La cita y el histórico se conservarán.')) return;
+      regenerate.disabled = true;
+      try { applySnapshot(await callApi('regenerateBookingToken', { clientId:client.id })); setStatus('Enlace regenerado. El anterior ha quedado revocado.'); }
+      catch (error) { setStatus(clientErrorMessage(error.message), true); }
+      finally { regenerate.disabled = false; }
+    });
+    actions.append(regenerate);
 
     const archive = button('Archivar', 'mini-action archive-action');
     archive.disabled = client.status === 'CONFIRMADO';
@@ -569,7 +581,10 @@ function renderAppointments(items) {
 
 async function loadDashboard() {
   setStatus('');
-  const data = await callApi('snapshot');
+  applySnapshot(await callApi('snapshot'));
+}
+
+function applySnapshot(data) {
   limits = {
     maxDates: Number(data.limits?.maxDates || 8),
     maxTimesPerDate: Number(data.limits?.maxTimesPerDate || 8),
@@ -712,3 +727,67 @@ if (adminKey) {
 } else {
   showLogin();
 }
+
+const clientMedia = window.matchMedia('(min-width: 900px)');
+clientMedia.addEventListener('change', event => document.querySelectorAll('details.admin-client').forEach(card => { card.open = event.matches; }));
+const importDialog = $('#importDialog');
+let importRows = [];
+let importing = false;
+function invalidatePreview() {
+  importRows = []; $('#importPreview').replaceChildren(); $('#importCounts').textContent = '';
+  $('#saveImport').disabled = true; $('#saveImport').textContent = 'Importar 0 clientes';
+}
+$('#importClients').addEventListener('click', () => {
+  invalidatePreview(); $('#importText').value = ''; $('#importFile').value = ''; $('#importError').textContent = '';
+  $('#importBlock').replaceChildren();
+  blocksState.forEach(block => { const option = document.createElement('option'); option.value = block.block; option.textContent = block.label || block.block; $('#importBlock').append(option); });
+  importDialog.showModal();
+});
+$('#cancelImport').addEventListener('click', () => { if (!importing) importDialog.close(); });
+importDialog.addEventListener('cancel', event => { if (importing) event.preventDefault(); });
+$('#importText').addEventListener('input', invalidatePreview);
+$('#importBlock').addEventListener('change', invalidatePreview);
+$('#importFile').addEventListener('change', async () => {
+  invalidatePreview(); $('#importText').value = ''; $('#importError').textContent = '';
+  const file = $('#importFile').files[0];
+  if (!file) return;
+  if (!/\.csv$/i.test(file.name) || file.size > 262144) { $('#importError').textContent = 'Selecciona un CSV de hasta 256 KB.'; return; }
+  $('#previewImport').disabled = true;
+  try { $('#importText').value = await file.text(); }
+  catch { $('#importError').textContent = 'No se ha podido leer el archivo.'; }
+  finally { $('#previewImport').disabled = false; }
+});
+$('#previewImport').addEventListener('click', () => {
+  invalidatePreview(); $('#importError').textContent = '';
+  try {
+    importRows = CitaImport.preview($('#importText').value, blocksState, $('#importBlock').value);
+    const valid = importRows.filter(row => row.status === 'VALID').length;
+    const duplicate = importRows.filter(row => row.status === 'DUPLICATE').length;
+    $('#importCounts').textContent = importRows.length + ' filas detectadas · ' + valid + ' válidas · ' + duplicate + ' duplicadas · ' + (importRows.length-valid-duplicate) + ' necesitan revisión';
+    importRows.forEach(row => {
+      const item = document.createElement('article'); item.className = 'import-row';
+      addText(item, 'strong', '', row.status + ' · Fila ' + row.row + ' · ' + row.client.name);
+      addText(item, 'p', '', [row.client.phone, row.client.address, row.client.city, row.client.block, row.client.sas.join(', ')].filter(Boolean).join(' · '));
+      if (row.reason) addText(item, 'p', '', row.reason);
+      $('#importPreview').append(item);
+    });
+    $('#saveImport').disabled = !valid; $('#saveImport').textContent = 'Importar ' + valid + ' clientes';
+  } catch (error) { $('#importError').textContent = error.message; }
+});
+$('#saveImport').addEventListener('click', async () => {
+  if (importing) return;
+  const clients = importRows.filter(row => row.status === 'VALID').map(row => row.client);
+  if (!clients.length) return;
+  importing = true;
+  const controls = [...importDialog.querySelectorAll('button,input,select,textarea')];
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    const data = await callApi('importClients', { clients });
+    applySnapshot(data); importDialog.close();
+    setStatus(data.import.created + ' clientes importados · ' + data.import.duplicates + ' duplicados · ' + data.import.invalid + ' inválidos.');
+  } catch {
+    $('#importError').textContent = 'No se ha podido confirmar el resultado. Actualiza el panel y revisa la vista previa antes de repetir la importación.';
+  } finally {
+    importing = false; controls.forEach(control => { control.disabled = false; }); invalidatePreview();
+  }
+});

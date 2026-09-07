@@ -1,53 +1,43 @@
 <!doctype html>
-<html lang="es">
+<html lang="ca">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#08090b">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <title>Mantenimiento Panasonic · Reserva</title>
+  <meta name="referrer" content="no-referrer">
+  <title>Manteniment Panasonic · Reserva</title>
+  <script src="./app.js" defer></script>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="shell">
     <header class="hero">
-      <div class="panasonic-wordmark" aria-label="Panasonic">Panasonic</div>
-
-      <div class="hero-copy">
-        <h1>Mantenimiento Panasonic</h1>
-        <p>Confirma la fecha de tu mantenimiento</p>
-      </div>
-
-      <div class="service-line" aria-label="Servicio autorizado Panasonic">
-        <span class="service-mark" aria-hidden="true">SAT</span>
-        <span class="service-divider" aria-hidden="true"></span>
-        <span>Servicio autorizado Panasonic</span>
-      </div>
+      <nav class="languages" aria-label="Idioma">
+        <button type="button" data-language="ca" lang="ca" aria-pressed="true" aria-label="Català">CA</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" data-language="es" lang="es" aria-pressed="false" aria-label="Español">ES</button>
+      </nav>
+      <h1 class="panasonic-wordmark">Panasonic</h1>
+      <p data-i18n="subtitle">Confirma la data del teu manteniment</p>
     </header>
-
-    <div class="rule" aria-hidden="true"></div>
-
-    <section id="status" class="status" aria-live="polite">Cargando disponibilidad…</section>
-
+    <section id="status" class="status" aria-live="polite">Carregant disponibilitat…</section>
     <section id="booking" hidden>
       <div id="client" class="client"></div>
       <div id="slots" class="days"></div>
-
-      <div class="fallback-wrap">
-        <button id="noneFit" class="link-button" type="button">No puedo en ninguna de estas horas</button>
-      </div>
+      <button id="noneFit" class="fallback" type="button" data-i18n="fallback">No puc en cap d'aquestes hores</button>
     </section>
-
     <section id="success" class="success" aria-live="polite" hidden>
-      <div class="success-mark" aria-hidden="true">✓</div>
-      <p class="success-kicker">CITA CONFIRMADA</p>
-      <h2>Tu mantenimiento está reservado</h2>
+      <h2 data-i18n="confirmed">Cita confirmada</h2>
       <p id="successText" class="success-date"></p>
-      <p id="successAddress" class="success-address"></p>
+      <p data-i18n="reserved">El manteniment ha quedat reservat.</p>
     </section>
+    <footer>
+      <p data-i18n="service">Servei Tècnic Autoritzat Panasonic</p>
+      <p><a href="https://www.fontaneriabages.com/aviso-legal-es-rgpd" rel="noopener noreferrer" data-i18n="legal">Avís legal</a> · <a href="https://www.fontaneriabages.com/politica-de-privacidad-es-rgpd" rel="noopener noreferrer" data-i18n="privacy">Privacitat</a></p>
+      <p data-i18n="company">Fontaneria Ángel Molero e Hijos S.L.</p>
+    </footer>
   </main>
-
-  <script src="./app.js" defer></script>
 </body>
 </html>

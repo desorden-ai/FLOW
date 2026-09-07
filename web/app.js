@@ -1,267 +1,137 @@
 const API_URL = '/api';
 const $ = (selector) => document.querySelector(selector);
-const token = new URLSearchParams(location.search).get('c');
-
-const statusEl = $('#status');
-const bookingEl = $('#booking');
-const slotsEl = $('#slots');
-const clientEl = $('#client');
-const successEl = $('#success');
-const successTextEl = $('#successText');
-const successAddressEl = $('#successAddress');
-const noneFitEl = $('#noneFit');
-
-let client = null;
-let contactWhatsApp = '';
-
-function setStatus(text, error = false) {
-  statusEl.hidden = false;
-  statusEl.textContent = text;
-  statusEl.dataset.error = error ? '1' : '0';
+const TOKEN_KEY = 'desorden_cita_booking_token';
+function bootstrapToken() {
+  let stored = '';
+  try { stored = sessionStorage.getItem(TOKEN_KEY) || ''; } catch {}
+  const candidates = [stored, new URLSearchParams(location.hash.slice(1)).get('c'), new URLSearchParams(location.search).get('c')];
+  const value = candidates.find(value => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)) || '';
+  let retained = false;
+  try {
+    if (value) { sessionStorage.setItem(TOKEN_KEY, value); retained = true; }
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {}
+  // Scrub malformed URLs too, including when storage is unavailable.
+  history.replaceState(null, '', location.pathname);
+  return retained ? value : '';
 }
-
-function clearStatus() {
-  statusEl.hidden = true;
-  statusEl.textContent = '';
-  statusEl.dataset.error = '0';
+const token = bootstrapToken();
+const COPY = {
+  ca: {
+    title: 'Manteniment Panasonic · Reserva', subtitle: 'Confirma la data del teu manteniment',
+    intro: 'Selecciona una data i hora disponibles.', fallback: "No puc en cap d'aquestes hores",
+    confirmed: 'Cita confirmada', reserved: 'El manteniment ha quedat reservat.',
+    empty: 'No queden hores disponibles', emptyHelp: 'Pots contactar-nos per buscar una altra data.',
+    service: 'Servei Tècnic Autoritzat Panasonic', legal: 'Avís legal', privacy: 'Privacitat',
+    company: 'Fontaneria Ángel Molero e Hijos S.L.', loading: 'Carregant disponibilitat…',
+    confirming: 'Confirmant…', reserve: 'Reservar', at: 'a les',
+    invalid: 'L’enllaç de reserva no és vàlid.', unavailable: 'Aquesta cita encara no té horaris assignats.',
+    error: 'No s’ha pogut carregar la disponibilitat. Torna-ho a provar més tard.',
+    failed: 'No s’ha pogut confirmar. Torna-ho a provar.', taken: 'Aquesta hora acaba de ser reservada. Hem actualitzat les opcions.',
+  },
+  es: {
+    title: 'Mantenimiento Panasonic · Reserva', subtitle: 'Confirma la fecha de tu mantenimiento',
+    intro: 'Selecciona una fecha y hora disponibles.', fallback: 'No puedo en ninguna de estas horas',
+    confirmed: 'Cita confirmada', reserved: 'Su mantenimiento ha quedado reservado.',
+    empty: 'No quedan horas disponibles', emptyHelp: 'Puede contactarnos para buscar otra fecha.',
+    service: 'Servicio Técnico Autorizado Panasonic', legal: 'Aviso legal', privacy: 'Privacidad',
+    company: 'Fontanería Ángel Molero e Hijos S.L.', loading: 'Cargando disponibilidad…',
+    confirming: 'Confirmando…', reserve: 'Reservar', at: 'a las',
+    invalid: 'El enlace de reserva no es válido.', unavailable: 'Esta cita todavía no tiene horarios asignados.',
+    error: 'No se ha podido cargar la disponibilidad. Vuelve a intentarlo más tarde.',
+    failed: 'No se ha podido confirmar. Vuelve a intentarlo.', taken: 'Esta hora acaba de ser reservada. Se han actualizado las opciones.',
+  },
+};
+let language = 'ca';
+let snapshot = null;
+let statusKey = 'loading';
+let statusError = false;
+let busySlot = '';
+function t(key) { return COPY[language][key]; }
+function setStatus(key, error = false) {
+  statusKey = key; statusError = error;
+  $('#status').hidden = !key;
+  $('#status').textContent = key ? t(key) : '';
+  $('#status').dataset.error = error ? '1' : '0';
 }
-
-function greetingForNow() {
-  return new Date().getHours() < 14 ? 'Buenos días' : 'Buenas tardes';
-}
-
 function groupByDate(slots) {
-  return [...slots]
-    .sort((a, b) => `${a.date}|${a.time}`.localeCompare(`${b.date}|${b.time}`))
-    .reduce((groups, slot) => {
-      (groups[slot.date] ??= []).push(slot);
-      return groups;
-    }, {});
+  const minutes = value => { const [h,m] = value.split(':').map(Number); return h * 60 + m; };
+  return [...slots].sort((a,b) => a.date.localeCompare(b.date) || minutes(a.time) - minutes(b.time))
+    .reduce((groups,slot) => { (groups[slot.date] ??= []).push(slot); return groups; }, {});
 }
-
 function formatDate(value) {
   const date = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return '';
+  const text = new Intl.DateTimeFormat(language === 'ca' ? 'ca-ES' : 'es-ES', { weekday:'long', day:'numeric', month:'long' }).format(date);
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
-
-function formatAddress(data) {
-  return [data?.address, data?.city].filter(Boolean).join(' · ');
-}
-
-function firstName(value) {
-  const name = String(value || '').trim();
-  return name ? name.split(/\s+/)[0] : '';
-}
-
-async function readApiResponse(response) {
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    return { ok: false, error: `HTTP_${response.status || 'INVALID_JSON'}` };
-  }
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      error: String(data?.error || `HTTP_${response.status}`),
-      booking: data?.booking || null,
-    };
-  }
-
+async function callPublic(action, extra = {}) {
+  const response = await fetch(API_URL, { method:'POST', cache:'no-store', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action, token, ...extra }) });
+  const data = await response.json();
+  if (!response.ok) return { ok:false, error:data?.error };
   return data;
 }
-
-async function getAvailability() {
-  const url = new URL(API_URL, location.origin);
-  url.searchParams.set('action', 'availability');
-  url.searchParams.set('token', token);
-  const response = await fetch(url, { cache: 'no-store' });
-  return readApiResponse(response);
+function textElement(tag, text, className = '') {
+  const el = document.createElement(tag); el.textContent = text; el.className = className; return el;
 }
-
-async function confirmBooking(slotId) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'book', token, slotId }),
-  });
-  return readApiResponse(response);
-}
-
-function renderClient(data) {
-  clientEl.replaceChildren();
-
-  const title = document.createElement('h2');
-  const shortName = firstName(data?.name);
-  title.textContent = shortName ? `Hola, ${shortName}` : 'Hola';
-
-  const intro = document.createElement('p');
-  intro.textContent = 'Selecciona una de las fechas disponibles para realizar el mantenimiento de tu equipo.';
-
-  clientEl.append(title, intro);
-
-  const formattedAddress = formatAddress(data);
-  if (formattedAddress) {
-    const address = document.createElement('div');
-    address.className = 'client-address';
-    address.textContent = formattedAddress;
-    clientEl.append(address);
-  }
-}
-
-function showBooking(booking) {
-  bookingEl.hidden = true;
-  clearStatus();
-  successEl.hidden = false;
-  successTextEl.textContent = `${formatDate(booking.date)} · ${booking.time}`;
-  successAddressEl.textContent = formatAddress(client);
-}
-
-function showLoadError(code) {
-  const messages = {
-    INVALID_TOKEN: 'El enlace de reserva no es válido.',
-    CLIENT_NOT_READY: 'Esta cita todavía no tiene horarios asignados.',
-    BAD_REQUEST: 'El enlace de reserva no contiene datos válidos.',
-    SERVER_ERROR: 'No se ha podido cargar la agenda. Vuelve a intentarlo más tarde.',
-    APPS_SCRIPT_URL_NOT_CONFIGURED: 'La agenda no está disponible en este momento.',
-    UPSTREAM_HTTP_ERROR: 'La agenda no ha respondido correctamente.',
-    UPSTREAM_INVALID_JSON: 'La agenda ha devuelto una respuesta no válida.',
-    HTTP_500: 'No se ha podido cargar la agenda.',
-    HTTP_502: 'No se ha podido conectar con la agenda.',
-    NETWORK: 'No se ha podido conectar con el servicio de reservas.',
-  };
-  const normalized = String(code || 'UNKNOWN');
-  setStatus(messages[normalized] || 'No se ha podido cargar la disponibilidad.', true);
-}
-
-async function load() {
-  bookingEl.hidden = true;
-  successEl.hidden = true;
-
-  if (!token) {
-    showLoadError('INVALID_TOKEN');
+function render() {
+  document.documentElement.lang = language;
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-language]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.language === language)));
+  setStatus(statusKey, statusError);
+  $('#booking').hidden = !snapshot || Boolean(snapshot.booking);
+  $('#success').hidden = !snapshot?.booking;
+  if (!snapshot) return;
+  if (snapshot.booking) {
+    $('#successText').textContent = `${formatDate(snapshot.booking.date)} · ${snapshot.booking.time}`;
     return;
   }
-
-  try {
-    const data = await getAvailability();
-    if (!data.ok) {
-      showLoadError(data.error);
-      return;
-    }
-
-    client = data.client;
-    contactWhatsApp = data.contactWhatsApp || '';
-    renderClient(client);
-
-    if (data.booking) {
-      showBooking(data.booking);
-      return;
-    }
-
-    renderSlots(data.slots || []);
-    clearStatus();
-    bookingEl.hidden = false;
-  } catch (error) {
-    console.error(error);
-    showLoadError('NETWORK');
+  $('#client').replaceChildren(textElement('h2', snapshot.client?.firstName ? `Hola, ${snapshot.client.firstName}` : 'Hola'), textElement('p', t('intro')));
+  const slotsEl = $('#slots'); slotsEl.replaceChildren();
+  if (!snapshot.slots.length) {
+    const empty = textElement('section', '', 'day');
+    empty.append(textElement('h2', t('empty')), textElement('p', t('emptyHelp'))); slotsEl.append(empty);
   }
-}
-
-function renderSlots(slots) {
-  slotsEl.replaceChildren();
-
-  if (!slots.length) {
-    const empty = document.createElement('section');
-    empty.className = 'day empty-state';
-
-    const title = document.createElement('h2');
-    title.textContent = 'No quedan horas libres';
-
-    const text = document.createElement('p');
-    text.textContent = 'Puedes escribirnos por WhatsApp para buscar otra fecha.';
-
-    empty.append(title, text);
-    slotsEl.appendChild(empty);
-    return;
-  }
-
-  Object.entries(groupByDate(slots)).forEach(([date, items]) => {
-    const box = document.createElement('section');
-    box.className = 'day';
-
-    const title = document.createElement('h2');
-    title.textContent = formatDate(date);
-
-    const grid = document.createElement('div');
-    grid.className = 'slot-grid';
-
-    items.forEach((slot) => {
-      const button = document.createElement('button');
-      button.className = 'slot';
-      button.type = 'button';
-      button.textContent = slot.time;
-      button.setAttribute('aria-label', `Reservar ${formatDate(slot.date)} a las ${slot.time}`);
-      button.addEventListener('click', () => book(slot, button));
-      grid.appendChild(button);
+  Object.entries(groupByDate(snapshot.slots)).forEach(([date,items]) => {
+    const day = textElement('section', '', 'day');
+    const grid = textElement('div', '', 'slot-grid');
+    items.forEach(slot => {
+      const button = textElement('button', busySlot === slot.slotId ? t('confirming') : slot.time, 'slot');
+      button.type = 'button'; button.disabled = Boolean(busySlot);
+      button.setAttribute('aria-label', `${t('reserve')} ${formatDate(date)} ${t('at')} ${slot.time}`);
+      button.addEventListener('click', () => book(slot)); grid.append(button);
     });
-
-    box.append(title, grid);
-    slotsEl.appendChild(box);
+    day.append(textElement('h2', formatDate(date)), grid); slotsEl.append(day);
   });
 }
-
-async function book(slot, button) {
-  const buttons = [...document.querySelectorAll('.slot')];
-  buttons.forEach((item) => { item.disabled = true; });
-  button.textContent = 'Confirmando…';
-  clearStatus();
-
+async function load() {
+  if (!token) { setStatus('invalid', true); return; }
   try {
-    const data = await confirmBooking(slot.id);
-
+    const data = await callPublic('availability');
     if (!data.ok) {
-      if (data.error === 'SLOT_TAKEN') {
-        setStatus('Esta hora acaba de ser reservada. Se han actualizado las opciones.', true);
-        await load();
-        return;
-      }
-      if (data.error === 'ALREADY_BOOKED' && data.booking) {
-        showBooking(data.booking);
-        return;
-      }
-      if (data.error === 'INVALID_TOKEN') {
-        showLoadError('INVALID_TOKEN');
-        return;
-      }
-      throw new Error(data.error || 'BOOKING_FAILED');
-    }
-
-    showBooking(data.booking);
-  } catch (error) {
-    console.error(error);
-    setStatus('No se ha podido confirmar. Vuelve a intentarlo.', true);
-    buttons.forEach((item) => { item.disabled = false; });
-    button.textContent = slot.time;
-  }
+      snapshot = null;
+      setStatus(data.error === 'INVALID_TOKEN' ? 'invalid' : data.error === 'CLIENT_NOT_READY' ? 'unavailable' : 'error', true);
+    } else { snapshot = data; setStatus(''); }
+  } catch { snapshot = null; setStatus('error', true); }
+  render();
 }
-
-noneFitEl.addEventListener('click', () => {
-  if (!client) return;
-  if (!contactWhatsApp) {
-    setStatus('El contacto de WhatsApp todavía no está configurado.', true);
-    return;
-  }
-
-  const phone = contactWhatsApp.replace(/\D/g, '');
-  const text = `${greetingForNow()}, soy ${client.name}. No puedo asistir en ninguna de las horas propuestas para el mantenimiento de ${client.address || 'mi domicilio'}. ¿Podemos buscar otra fecha?`;
-  window.location.assign(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
-});
-
+async function book(slot) {
+  if (busySlot) return;
+  busySlot = slot.slotId; setStatus(''); render();
+  try {
+    const data = await callPublic('book', { slotId:slot.slotId });
+    if ((data.ok || data.error === 'ALREADY_BOOKED') && data.booking) {
+      snapshot.booking = data.booking; setStatus('');
+    } else if (data.error === 'SLOT_TAKEN') {
+      await load(); if (snapshot && !snapshot.booking) setStatus('taken', true);
+    } else if (data.error === 'INVALID_TOKEN') {
+      snapshot = null; setStatus('invalid', true);
+    } else setStatus('failed', true);
+  } catch { setStatus('failed', true); }
+  finally { busySlot = ''; render(); }
+}
+document.querySelectorAll('[data-language]').forEach(el => el.addEventListener('click', () => { language = el.dataset.language; render(); }));
+$('#noneFit').addEventListener('click', () => location.assign(`/contact?lang=${language}`));
+render();
 load();

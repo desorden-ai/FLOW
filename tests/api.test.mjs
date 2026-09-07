@@ -29,7 +29,7 @@ test('Apps Script provides a visual and idempotent slot dashboard', () => {
   assert.match(source, /\^\(\\d\|\[01\]\\d\|2\[0-3\]\):\(\[0-5\]\\d\)\$/);
 });
 
-test('GET rejects missing/invalid token before upstream call', async () => {
+test('GET is disabled before upstream call', async () => {
   const originalFetch = globalThis.fetch;
   let called = false;
   globalThis.fetch = async () => {
@@ -42,18 +42,19 @@ test('GET rejects missing/invalid token before upstream call', async () => {
       new Request('https://cita.example/api?action=availability&token=x'),
       { APPS_SCRIPT_URL: 'https://script.example/exec' },
     );
-    assert.equal(response.status, 400);
+    assert.equal(response.status, 405);
     assert.equal(called, false);
-    assert.deepEqual(await response.json(), { ok: false, error: 'BAD_REQUEST' });
+    assert.deepEqual(await response.json(), { ok: false, error: 'METHOD_NOT_ALLOWED' });
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('GET forwards availability and strips unknown customer fields', async () => {
+test('POST forwards availability without query tokens and strips all private fields', async () => {
   const originalFetch = globalThis.fetch;
-  let forwardedUrl = '';
-  globalThis.fetch = async (url) => {
+  let forwardedUrl = ''; let forwardedInit;
+  globalThis.fetch = async (url, init) => {
+    forwardedInit = init;
     forwardedUrl = String(url);
     return new Response(JSON.stringify({
       ok: true,
@@ -71,9 +72,9 @@ test('GET forwards availability and strips unknown customer fields', async () =>
   };
 
   try {
-    const token = '1234567890abcdef1234567890abcdef';
-    const response = await handleApiGet(
-      new Request(`https://cita.example/api?action=availability&token=${token}`),
+    const token = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+    const response = await handleApiPost(
+      new Request('https://cita.example/api', { method:'POST', body:JSON.stringify({action:'availability', token}) }),
       {
         APPS_SCRIPT_URL: 'https://script.example/exec',
         WHATSAPP_TARGET: '+34 600 111 222',
@@ -81,19 +82,17 @@ test('GET forwards availability and strips unknown customer fields', async () =>
     );
 
     assert.equal(response.status, 200);
-    assert.match(forwardedUrl, /action=availability/);
-    assert.match(forwardedUrl, /token=1234567890abcdef/);
+    assert.equal(forwardedUrl, 'https://script.example/exec');
+    assert.equal(forwardedInit.method, 'POST');
+    assert.deepEqual(JSON.parse(forwardedInit.body), {action:'availability', token});
 
     assert.deepEqual(await response.json(), {
       ok: true,
       client: {
-        name: 'Cliente Prueba',
-        address: 'C/ Exemple 1',
-        city: 'Martorell',
+        firstName: 'Cliente',
       },
       booking: null,
-      slots: [{ id: 'SLT-1234', date: '2026-09-10', time: '09:00' }],
-      contactWhatsApp: '34600111222',
+      slots: [{ slotId: 'SLT-1234', date: '2026-09-10', time: '09:00' }],
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -124,7 +123,7 @@ test('POST forwards only action, token and slotId and sanitizes response', async
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'book',
-          token: '1234567890abcdef1234567890abcdef',
+          token: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
           slotId: 'SLT-123456789abc',
           block: 'ATTACKER-CONTROLLED',
           clientId: 'ATTACKER-CONTROLLED',
@@ -136,7 +135,7 @@ test('POST forwards only action, token and slotId and sanitizes response', async
     assert.equal(response.status, 200);
     assert.deepEqual(forwardedBody, {
       action: 'book',
-      token: '1234567890abcdef1234567890abcdef',
+      token: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
       slotId: 'SLT-123456789abc',
     });
     assert.deepEqual(await response.json(), {
@@ -153,8 +152,8 @@ test('invalid upstream JSON is normalized to 502', async () => {
   globalThis.fetch = async () => new Response('<html>not json</html>', { status: 200 });
 
   try {
-    const response = await handleApiGet(
-      new Request('https://cita.example/api?action=availability&token=1234567890abcdef1234567890abcdef'),
+    const response = await handleApiPost(
+      new Request('https://cita.example/api', {method:'POST', body:JSON.stringify({action:'availability', token:'a'.repeat(64)})}),
       { APPS_SCRIPT_URL: 'https://script.example/exec' },
     );
     assert.equal(response.status, 502);

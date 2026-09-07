@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#090b0e">
+  <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>DESORDEN CITA · Panel</title>
   <link rel="stylesheet" href="./admin.css">
@@ -54,6 +55,7 @@
         </div>
         <p>Hasta 8 fechas por zona y hasta 8 horas distintas en cada fecha.</p>
       </div>
+      <button id="importClients" type="button" class="mini-action">Importar clientes</button>
       <div id="blocks" class="blocks"></div>
     </section>
 
@@ -128,6 +130,21 @@
     </form>
   </dialog>
 
+  <dialog id="importDialog" class="client-dialog">
+    <section class="client-card import-card">
+      <h2>Importar clientes</h2>
+      <p>Pega una tabla de Excel/Sheets con cabeceras o selecciona un CSV. Máximo 100 clientes. No se admiten archivos XLSX.</p>
+      <label class="client-field" for="importBlock"><span>Bloque de destino si la fila no indica uno</span><select id="importBlock"></select></label>
+      <label class="client-field" for="importText"><span>Tabla TSV o CSV</span><textarea id="importText" rows="7" maxlength="262144"></textarea></label>
+      <label class="client-field" for="importFile"><span>Archivo CSV</span><input id="importFile" type="file" accept=".csv,text/csv"></label>
+      <button id="previewImport" class="mini-action" type="button">Preparar vista previa</button>
+      <p id="importCounts" aria-live="polite"></p>
+      <p id="importError" class="error" role="alert"></p>
+      <div id="importPreview"></div>
+      <div class="dialog-actions"><button id="cancelImport" class="ghost" type="button">Cerrar</button><button id="saveImport" class="save-password" type="button" disabled>Importar 0 clientes</button></div>
+    </section>
+  </dialog>
+  <script src="./import.js" defer></script>
   <script src="./admin.js" defer></script>
   <script src="./whatsapp.js" defer></script>
 </body>
