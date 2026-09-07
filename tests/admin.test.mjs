@@ -76,7 +76,7 @@ test('admin API accepts and forwards eight dates with eight distinct times each'
       summary: {},
       blocks: [],
       appointments: [],
-      limits: { maxDates: 8, maxTimesPerDate: 8 },
+      limits: { maxDates: 8, maxTimesPerDate: 8, maxSasPerClient: 8 },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
 
@@ -137,6 +137,85 @@ test('admin API rejects a ninth time on one date before upstream access', async 
     }), { APPS_SCRIPT_URL: 'https://script.example/exec' });
     assert.equal(response.status, 400);
     assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('admin API validates and forwards createClient without exposing arbitrary fields', async () => {
+  const originalFetch = globalThis.fetch;
+  let forwarded;
+  globalThis.fetch = async (_url, init) => {
+    forwarded = JSON.parse(init.body);
+    return new Response(JSON.stringify({
+      ok: true,
+      summary: {},
+      blocks: [],
+      appointments: [],
+      limits: {},
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  try {
+    const response = await handleAdminApi(adminRequest({
+      action: 'createClient',
+      client: {
+        name: 'Cliente Test',
+        phone: '+34 600 000 000',
+        address: 'Calle Test 1',
+        city: 'Martorell',
+        block: 'BLK-MARTORELL-01',
+        sas: ['SA-10001', 'SA-10002'],
+        injected: 'should-not-pass',
+      },
+    }), { APPS_SCRIPT_URL: 'https://script.example/exec' });
+
+    assert.equal(response.status, 200);
+    assert.equal(forwarded.action, 'adminUpdateAvailability');
+    assert.equal(forwarded.mode, 'createClient');
+    assert.deepEqual(forwarded.client.sas, ['SA-10001', 'SA-10002']);
+    assert.equal('injected' in forwarded.client, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('admin API rejects malformed client data before upstream access', async () => {
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => { called = true; throw new Error('should not call upstream'); };
+
+  try {
+    const response = await handleAdminApi(adminRequest({
+      action: 'createClient',
+      client: { name: '', address: '', city: '', block: 'bad block', sas: [] },
+    }), { APPS_SCRIPT_URL: 'https://script.example/exec' });
+
+    assert.equal(response.status, 400);
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('admin API maps confirmed-client archive protection to conflict', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ok: false,
+    error: 'CLIENT_CONFIRMED_CANNOT_ARCHIVE',
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+  try {
+    const response = await handleAdminApi(adminRequest({
+      action: 'archiveClient',
+      clientId: 'CLI-abcdef123456',
+    }), { APPS_SCRIPT_URL: 'https://script.example/exec' });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), {
+      ok: false,
+      error: 'CLIENT_CONFIRMED_CANNOT_ARCHIVE',
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
