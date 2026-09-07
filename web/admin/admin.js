@@ -18,9 +18,24 @@ const newPasswordConfirmEl = $('#newPasswordConfirm');
 const passwordErrorEl = $('#passwordError');
 const savePasswordEl = $('#savePassword');
 
+const clientDialog = $('#clientDialog');
+const clientForm = $('#clientForm');
+const clientDialogTitle = $('#clientDialogTitle');
+const clientNameEl = $('#clientName');
+const clientPhoneEl = $('#clientPhone');
+const clientAddressEl = $('#clientAddress');
+const clientCityEl = $('#clientCity');
+const clientBlockEl = $('#clientBlock');
+const clientSasEl = $('#clientSas');
+const clientSasHelpEl = $('#clientSasHelp');
+const clientErrorEl = $('#clientError');
+const saveClientEl = $('#saveClient');
+
 let adminKey = sessionStorage.getItem(STORAGE_KEY) || '';
 let blockLabels = {};
-let limits = { maxDates: 8, maxTimesPerDate: 8 };
+let blocksState = [];
+let editingClient = null;
+let limits = { maxDates: 8, maxTimesPerDate: 8, maxSasPerClient: 8 };
 
 function setStatus(text, error = false) {
   statusEl.hidden = !text;
@@ -176,18 +191,91 @@ function copyButton(url) {
   return copy;
 }
 
+function populateBlockSelect(selectedBlock, locked = false) {
+  clientBlockEl.replaceChildren();
+  blocksState.forEach((block) => {
+    const option = document.createElement('option');
+    option.value = block.block;
+    option.textContent = block.label || block.block;
+    if (block.block === selectedBlock) option.selected = true;
+    clientBlockEl.append(option);
+  });
+  clientBlockEl.disabled = locked;
+}
+
+function openClientDialog(blockName, client = null) {
+  editingClient = client;
+  clientErrorEl.hidden = true;
+  clientErrorEl.textContent = '';
+
+  clientDialogTitle.textContent = client ? 'Editar cliente' : 'Añadir cliente';
+  clientNameEl.value = client?.name || '';
+  clientPhoneEl.value = client?.phone || '';
+  clientAddressEl.value = client?.address || '';
+  clientCityEl.value = client?.city || (blockLabels[blockName] || '').replace(/\s·\sGrupo\s\d+$/, '');
+  populateBlockSelect(client?.block || blockName, client?.status === 'CONFIRMADO');
+
+  clientSasEl.value = (client?.sas || []).join(', ');
+  clientSasEl.readOnly = Boolean(client);
+  clientSasEl.disabled = Boolean(client);
+  clientSasHelpEl.textContent = client
+    ? 'Los SAs existentes se mantienen sin cambios para proteger las órdenes de servicio.'
+    : `Opcional. Puedes indicar hasta ${limits.maxSasPerClient} SAs separados por comas.`;
+
+  saveClientEl.textContent = client ? 'Guardar cambios' : 'Añadir cliente';
+  clientDialog.showModal();
+  clientNameEl.focus();
+}
+
+function clientErrorMessage(code) {
+  const messages = {
+    CLIENT_ALREADY_EXISTS: 'Ya existe una visita con los mismos datos de cliente, teléfono, dirección y población.',
+    CLIENT_CONFIRMED_BLOCK_LOCKED: 'Este cliente tiene una cita confirmada y no puede moverse a otro bloque.',
+    CLIENT_CONFIRMED_CANNOT_ARCHIVE: 'No se puede archivar un cliente con una cita confirmada.',
+    CLIENT_NOT_FOUND: 'El cliente ya no existe o ha cambiado.',
+    UNKNOWN_BLOCK: 'El bloque seleccionado ya no está disponible.',
+    INVALID_CLIENT: 'Revisa nombre, dirección, población y bloque.',
+    INVALID_SAS: 'Revisa los SAs indicados.',
+  };
+  return messages[code] || code;
+}
+
+async function archiveClient(client) {
+  if (client.status === 'CONFIRMADO') {
+    setStatus('No se puede archivar un cliente con una cita confirmada.', true);
+    return;
+  }
+  const accepted = window.confirm(`¿Archivar a ${client.name}?\n\nDejará de aparecer como cliente activo, pero el registro histórico se conservará en la hoja.`);
+  if (!accepted) return;
+
+  setStatus('');
+  try {
+    await callApi('archiveClient', { clientId: client.id });
+    setStatus(`${client.name} archivado. El histórico se conserva.`);
+    await loadDashboard();
+  } catch (error) {
+    setStatus(`No se pudo archivar: ${clientErrorMessage(error.message)}`, true);
+  }
+}
+
 function renderClients(block, parent) {
   const section = document.createElement('section');
   section.className = 'block-detail-section';
   const heading = document.createElement('div');
-  heading.className = 'detail-heading';
-  addText(heading, 'h4', '', 'Clientes del bloque');
-  addText(heading, 'span', 'detail-count', String(block.clients?.length || 0));
+  heading.className = 'detail-heading client-heading';
+  const headingLeft = document.createElement('div');
+  headingLeft.className = 'client-heading-left';
+  addText(headingLeft, 'h4', '', 'Clientes del bloque');
+  addText(headingLeft, 'span', 'detail-count', String(block.clients?.length || 0));
+  const addClient = button('+ Añadir cliente', 'mini-action client-add');
+  addClient.addEventListener('click', () => openClientDialog(block.block));
+  heading.append(headingLeft, addClient);
   section.append(heading);
 
   const list = document.createElement('div');
   list.className = 'client-list';
   (block.clients || []).forEach((client) => {
+    client.block = block.block;
     const card = document.createElement('article');
     card.className = 'admin-client';
 
@@ -228,6 +316,17 @@ function renderClients(block, parent) {
       actions.append(whats);
     }
     actions.append(copyButton(client.bookingUrl));
+
+    const edit = button('Editar', 'mini-action');
+    edit.addEventListener('click', () => openClientDialog(block.block, client));
+    actions.append(edit);
+
+    const archive = button('Archivar', 'mini-action archive-action');
+    archive.disabled = client.status === 'CONFIRMADO';
+    archive.title = archive.disabled ? 'Una cita confirmada no se puede archivar.' : 'Quitar del panel conservando el histórico.';
+    archive.addEventListener('click', () => archiveClient(client));
+    actions.append(archive);
+
     card.append(actions);
     list.append(card);
   });
@@ -358,6 +457,7 @@ function availabilityForm(block) {
       setStatus('No puedes repetir la misma fecha dentro de un bloque.', true);
       return;
     }
+
     const duplicateTime = days.some((day) => new Set(day.times).size !== day.times.length);
     if (duplicateTime) {
       setStatus('Dentro de una misma fecha no puedes repetir una hora.', true);
@@ -433,6 +533,7 @@ function blockCard(block, openBlocks) {
 
 function renderBlocks(blocks) {
   const openBlocks = new Set([...blocksEl.querySelectorAll('details[open]')].map((item) => item.dataset.block));
+  blocksState = blocks;
   blockLabels = Object.fromEntries(blocks.map((block) => [block.block, block.label || block.block]));
   blocksEl.replaceChildren();
   blocks.forEach((block) => blocksEl.append(blockCard(block, openBlocks)));
@@ -472,12 +573,64 @@ async function loadDashboard() {
   limits = {
     maxDates: Number(data.limits?.maxDates || 8),
     maxTimesPerDate: Number(data.limits?.maxTimesPerDate || 8),
+    maxSasPerClient: Number(data.limits?.maxSasPerClient || 8),
   };
   showApp();
   renderSummary(data.summary);
   renderBlocks(data.blocks);
   renderAppointments(data.appointments);
 }
+
+clientForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  clientErrorEl.hidden = true;
+
+  const sas = editingClient
+    ? []
+    : clientSasEl.value.split(',').map((value) => value.trim()).filter(Boolean).slice(0, limits.maxSasPerClient);
+  const client = {
+    name: clientNameEl.value.trim(),
+    phone: clientPhoneEl.value.trim(),
+    address: clientAddressEl.value.trim(),
+    city: clientCityEl.value.trim(),
+    block: clientBlockEl.value,
+    sas,
+  };
+
+  const wasEditing = Boolean(editingClient);
+  const currentId = editingClient?.id || '';
+  saveClientEl.disabled = true;
+  saveClientEl.textContent = 'Guardando…';
+  try {
+    if (wasEditing) {
+      await callApi('updateClient', { clientId: currentId, client });
+      setStatus(`${client.name} actualizado.`);
+    } else {
+      await callApi('createClient', { client });
+      setStatus(`${client.name} añadido al bloque.`);
+    }
+    clientDialog.close();
+    editingClient = null;
+    await loadDashboard();
+  } catch (error) {
+    clientErrorEl.textContent = clientErrorMessage(error.message);
+    clientErrorEl.hidden = false;
+  } finally {
+    saveClientEl.disabled = false;
+    saveClientEl.textContent = wasEditing ? 'Guardar cambios' : 'Añadir cliente';
+  }
+});
+
+$('#cancelClient').addEventListener('click', () => {
+  editingClient = null;
+  clientDialog.close();
+});
+clientDialog.addEventListener('click', (event) => {
+  if (event.target === clientDialog) {
+    editingClient = null;
+    clientDialog.close();
+  }
+});
 
 formEl.addEventListener('submit', async (event) => {
   event.preventDefault();
