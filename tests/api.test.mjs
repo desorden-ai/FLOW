@@ -9,6 +9,13 @@ test('Apps Script source parses as JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(source));
 });
 
+test('Apps Script models one booking across duplicate service rows', () => {
+  const source = fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8');
+  assert.match(source, /function bookingUnitKey_/);
+  assert.match(source, /client\.rowNumbers\.forEach/);
+  assert.match(source, /totalClients: orderedKeys\.length/);
+});
+
 test('GET rejects missing/invalid token before upstream call', async () => {
   const originalFetch = globalThis.fetch;
   let called = false;
