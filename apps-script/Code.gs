@@ -1,6 +1,7 @@
 const CFG = {
   CLIENT_SHEET: 'cita',
   SLOT_SHEET: 'FRANJAS',
+  CONTROL_SHEET: 'CONTROL_CITAS',
   TZ: 'Europe/Madrid',
   PUBLIC_BASE_URL: 'https://cita.desorden.cat',
 };
@@ -19,6 +20,52 @@ const BOOKING_HEADERS = [
 const SLOT_HEADERS = [
   'ID', 'BLOQUE', 'FECHA', 'HORA', 'ESTADO', 'CLIENTE_ID', 'CONFIRMADO_EN',
 ];
+
+const CONTROL_HEADERS = [
+  'GENERAR', 'BLOQUE', 'POBLACION', 'VISITAS', 'SAs',
+  'FECHA 1', 'FECHA 2', 'HORA 1', 'HORA 2', 'HORA 3', 'HORA 4',
+  'FRANJAS', 'ESTADO',
+];
+
+const DEFAULT_SLOT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('DESORDEN CITA')
+    .addItem('Abrir / actualizar panel', 'refreshControlDashboard')
+    .addItem('Generar franjas seleccionadas', 'generateSelectedSlots')
+    .addSeparator()
+    .addItem('Sincronizar clientes', 'syncClientMetadata')
+    .addToUi();
+}
+
+/**
+ * One-time installer for standalone Apps Script projects. It makes the
+ * GENERAR checkbox actionable even when a custom menu cannot be injected.
+ */
+function installControlDashboard() {
+  const spreadsheet = getSpreadsheet_();
+  const triggerExists = ScriptApp.getProjectTriggers().some(function (trigger) {
+    return trigger.getHandlerFunction() === 'handleControlEdit';
+  });
+
+  if (!triggerExists) {
+    ScriptApp.newTrigger('handleControlEdit')
+      .forSpreadsheet(spreadsheet)
+      .onEdit()
+      .create();
+  }
+
+  const result = refreshControlDashboard();
+  return { triggerCreated: !triggerExists, blocks: result.blocks, slots: result.slots };
+}
+
+function handleControlEdit(e) {
+  if (!e || !e.range || String(e.value || '').toUpperCase() !== 'TRUE') return;
+  const range = e.range;
+  if (range.getSheet().getName() !== CFG.CONTROL_SHEET || range.getColumn() !== 1 || range.getRow() < 2) return;
+  generateSelectedSlots();
+}
 
 function doGet(e) {
   try {
@@ -264,6 +311,234 @@ function createBlockSlots(block, date1, date2, timesCsv) {
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, SLOT_HEADERS.length).setValues(rows);
   SpreadsheetApp.flush();
   return { block: normalizedBlock, slotsCreated: rows.length, dates: dates, times: times };
+}
+
+/**
+ * Builds the visual administration tab from the canonical client and slot data.
+ * Existing dates, times and selections are preserved by block.
+ */
+function refreshControlDashboard() {
+  syncClientMetadata();
+
+  const spreadsheet = getSpreadsheet_();
+  const clientSheet = spreadsheet.getSheetByName(CFG.CLIENT_SHEET);
+  const clientValues = clientSheet.getDataRange().getDisplayValues();
+  const clientHeaders = header_(clientValues[0]);
+  requireHeaders_(clientHeaders, [
+    'SA', 'CLIENTE', 'TELEFONO', 'DIRECCION', 'POBLACION', 'BLOQUE',
+  ]);
+
+  let controlSheet = spreadsheet.getSheetByName(CFG.CONTROL_SHEET);
+  if (!controlSheet) controlSheet = spreadsheet.insertSheet(CFG.CONTROL_SHEET, 0);
+
+  const preserved = readControlConfiguration_(controlSheet);
+  const blocks = {};
+
+  clientValues.slice(1).forEach(function (row) {
+    const block = value_(row, clientHeaders, 'BLOQUE');
+    if (!block || !value_(row, clientHeaders, 'CLIENTE')) return;
+
+    if (!blocks[block]) {
+      blocks[block] = { cities: {}, visits: {}, sas: {} };
+    }
+
+    const city = value_(row, clientHeaders, 'POBLACION');
+    const sa = value_(row, clientHeaders, 'SA');
+    if (city) blocks[block].cities[city] = true;
+    if (sa) blocks[block].sas[sa] = true;
+    blocks[block].visits[bookingUnitKey_(row, clientHeaders)] = true;
+  });
+
+  const slotCounts = {};
+  getSlots_().forEach(function (slot) {
+    slotCounts[slot.block] = (slotCounts[slot.block] || 0) + 1;
+  });
+
+  const rows = Object.keys(blocks).sort().map(function (block) {
+    const existing = preserved[block] || {};
+    const datesReady = Boolean(existing.date1 && existing.date2);
+    const slotCount = slotCounts[block] || 0;
+    const status = slotCount
+      ? 'GENERADO'
+      : (datesReady ? 'LISTO' : 'FALTAN FECHAS');
+
+    return [
+      slotCount ? false : Boolean(existing.selected),
+      block,
+      Object.keys(blocks[block].cities).sort().join(' / '),
+      Object.keys(blocks[block].visits).length,
+      Object.keys(blocks[block].sas).length,
+      existing.date1 || '',
+      existing.date2 || '',
+      existing.times && existing.times[0] || DEFAULT_SLOT_TIMES[0],
+      existing.times && existing.times[1] || DEFAULT_SLOT_TIMES[1],
+      existing.times && existing.times[2] || DEFAULT_SLOT_TIMES[2],
+      existing.times && existing.times[3] || DEFAULT_SLOT_TIMES[3],
+      slotCount,
+      status,
+    ];
+  });
+
+  controlSheet.clear();
+  controlSheet.getRange(1, 1, 1, CONTROL_HEADERS.length).setValues([CONTROL_HEADERS]);
+  if (rows.length) {
+    controlSheet.getRange(2, 1, rows.length, CONTROL_HEADERS.length).setValues(rows);
+    controlSheet.getRange(2, 1, rows.length, 1).insertCheckboxes();
+    controlSheet.getRange(2, 6, rows.length, 2)
+      .setDataValidation(SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build())
+      .setNumberFormat('yyyy-mm-dd');
+    controlSheet.getRange(2, 8, rows.length, 4).setNumberFormat('@');
+  }
+
+  formatControlDashboard_(controlSheet, rows.length);
+  spreadsheet.setActiveSheet(controlSheet);
+  SpreadsheetApp.flush();
+  return { blocks: rows.length, slots: Object.keys(slotCounts).length };
+}
+
+/**
+ * Generates 2 days x 4 times for every checked block in CONTROL_CITAS.
+ * Existing block slots are never overwritten or duplicated.
+ */
+function generateSelectedSlots() {
+  const spreadsheet = getSpreadsheet_();
+  const sheet = spreadsheet.getSheetByName(CFG.CONTROL_SHEET);
+  if (!sheet) throw new Error('Run refreshControlDashboard first');
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { created: 0, skipped: 0, errors: [] };
+
+  const existingBlocks = {};
+  getSlots_().forEach(function (slot) { existingBlocks[slot.block] = true; });
+
+  let created = 0;
+  let skipped = 0;
+  const errors = [];
+
+  values.slice(1).forEach(function (row, index) {
+    if (row[0] !== true) return;
+
+    const rowNumber = index + 2;
+    const block = String(row[1] || '').trim();
+    if (existingBlocks[block]) {
+      skipped += 1;
+      return;
+    }
+
+    try {
+      const date1 = normalizeDate_(row[5]);
+      const date2 = normalizeDate_(row[6]);
+      const times = row.slice(7, 11).map(normalizeTime_);
+      createBlockSlots(block, date1, date2, times.join(','));
+      existingBlocks[block] = true;
+      created += 1;
+    } catch (error) {
+      sheet.getRange(rowNumber, 1).setValue(false);
+      errors.push({
+        row: rowNumber,
+        block: block,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  refreshControlDashboard();
+  const message = errors.length
+    ? 'Generados: ' + created + ' · Omitidos: ' + skipped + ' · Errores: ' + errors.length
+    : 'Generados: ' + created + ' · Omitidos: ' + skipped;
+  spreadsheet.toast(message, 'DESORDEN CITA', 8);
+  return { created: created, skipped: skipped, errors: errors };
+}
+
+function readControlConfiguration_(sheet) {
+  const result = {};
+  if (sheet.getLastRow() < 2 || sheet.getLastColumn() < CONTROL_HEADERS.length) return result;
+
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, CONTROL_HEADERS.length)
+    .getValues()
+    .forEach(function (row) {
+      const block = String(row[1] || '').trim();
+      if (!block) return;
+      result[block] = {
+        selected: row[0] === true,
+        date1: row[5] || '',
+        date2: row[6] || '',
+        times: row.slice(7, 11).map(function (value) { return String(value || '').trim(); }),
+      };
+    });
+  return result;
+}
+
+function formatControlDashboard_(sheet, dataRowCount) {
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(2);
+  sheet.setHiddenGridlines(true);
+  sheet.setRowHeight(1, 42);
+  sheet.getRange(1, 1, 1, CONTROL_HEADERS.length)
+    .setFontWeight('bold')
+    .setFontColor('#ffffff')
+    .setBackground('#0c0c0c')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+
+  if (dataRowCount) {
+    const body = sheet.getRange(2, 1, dataRowCount, CONTROL_HEADERS.length);
+    body.setVerticalAlignment('middle').setBackground('#ffffff');
+    for (let row = 2; row <= dataRowCount + 1; row += 1) {
+      if (row % 2 === 1) sheet.getRange(row, 1, 1, CONTROL_HEADERS.length).setBackground('#f8fafc');
+      sheet.getRange(row, 1, 1, CONTROL_HEADERS.length).setBorder(
+        false, false, true, false, false, false, '#e5e7eb', SpreadsheetApp.BorderStyle.SOLID
+      );
+    }
+    sheet.setRowHeights(2, dataRowCount, 30);
+    sheet.getRange(2, 1, dataRowCount, 1)
+      .setHorizontalAlignment('center')
+      .setBackground('#eef4ff');
+    sheet.getRange(2, 4, dataRowCount, 2).setHorizontalAlignment('center');
+    sheet.getRange(2, 6, dataRowCount, 6)
+      .setHorizontalAlignment('center')
+      .setBackground('#fff8dc');
+    sheet.getRange(2, 12, dataRowCount, 1).setHorizontalAlignment('center');
+    sheet.getRange(2, 13, dataRowCount, 1).setFontWeight('bold');
+
+    const statusRange = sheet.getRange(2, 13, dataRowCount, 1);
+    const rules = [
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo('GENERADO').setBackground('#d9ead3').setFontColor('#176b2c')
+        .setRanges([statusRange]).build(),
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo('LISTO').setBackground('#fff2cc').setFontColor('#7f6000')
+        .setRanges([statusRange]).build(),
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo('FALTAN FECHAS').setBackground('#f3f4f6').setFontColor('#6b7280')
+        .setRanges([statusRange]).build(),
+    ];
+    sheet.setConditionalFormatRules(rules);
+  } else {
+    sheet.setConditionalFormatRules([]);
+  }
+
+  sheet.setColumnWidth(1, 76);
+  sheet.setColumnWidth(2, 205);
+  sheet.setColumnWidth(3, 165);
+  sheet.setColumnWidths(4, 2, 68);
+  sheet.setColumnWidths(6, 2, 96);
+  sheet.setColumnWidths(8, 4, 72);
+  sheet.setColumnWidth(12, 70);
+  sheet.setColumnWidth(13, 120);
+  sheet.getRange('A1').setNote(
+    'Completa las fechas y horas; después marca el bloque para generar sus 8 franjas.'
+  );
+}
+
+function normalizeTime_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, CFG.TZ, 'HH:mm');
+  }
+  const text = String(value || '').trim();
+  const match = /^(\d|[01]\d|2[0-3]):([0-5]\d)$/.exec(text);
+  if (!match) throw new Error('Invalid time: ' + text);
+  return ('0' + Number(match[1])).slice(-2) + ':' + match[2];
 }
 
 function availability_(token) {
