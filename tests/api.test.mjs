@@ -16,6 +16,19 @@ test('Apps Script models one booking across duplicate service rows', () => {
   assert.match(source, /totalClients: orderedKeys\.length/);
 });
 
+test('Apps Script provides a visual and idempotent slot dashboard', () => {
+  const source = fs.readFileSync(new URL('../apps-script/Code.gs', import.meta.url), 'utf8');
+  assert.match(source, /CONTROL_SHEET: 'CONTROL_CITAS'/);
+  assert.match(source, /function refreshControlDashboard\(\)/);
+  assert.match(source, /function generateSelectedSlots\(\)/);
+  assert.match(source, /function installControlDashboard\(\)/);
+  assert.match(source, /function handleControlEdit\(e\)/);
+  assert.match(source, /\.insertCheckboxes\(\)/);
+  assert.match(source, /existingBlocks\[block\]/);
+  assert.match(source, /createMenu\('DESORDEN CITA'\)/);
+  assert.match(source, /\^\(\\d\|\[01\]\\d\|2\[0-3\]\):\(\[0-5\]\\d\)\$/);
+});
+
 test('GET rejects missing/invalid token before upstream call', async () => {
   const originalFetch = globalThis.fetch;
   let called = false;
