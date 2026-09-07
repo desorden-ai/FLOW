@@ -26,11 +26,17 @@ function clearStatus() {
   statusEl.dataset.error = '0';
 }
 
+function greetingForNow() {
+  return new Date().getHours() < 14 ? 'Buenos días' : 'Buenas tardes';
+}
+
 function groupByDate(slots) {
-  return slots.reduce((groups, slot) => {
-    (groups[slot.date] ??= []).push(slot);
-    return groups;
-  }, {});
+  return [...slots]
+    .sort((a, b) => `${a.date}|${a.time}`.localeCompare(`${b.date}|${b.time}`))
+    .reduce((groups, slot) => {
+      (groups[slot.date] ??= []).push(slot);
+      return groups;
+    }, {});
 }
 
 function formatDate(value) {
@@ -45,6 +51,11 @@ function formatDate(value) {
 
 function formatAddress(data) {
   return [data?.address, data?.city].filter(Boolean).join(' · ');
+}
+
+function firstName(value) {
+  const name = String(value || '').trim();
+  return name ? name.split(/\s+/)[0] : '';
 }
 
 async function readApiResponse(response) {
@@ -86,14 +97,22 @@ async function confirmBooking(slotId) {
 function renderClient(data) {
   clientEl.replaceChildren();
 
-  const name = document.createElement('strong');
-  name.textContent = data.name || 'Cliente';
+  const title = document.createElement('h2');
+  const shortName = firstName(data?.name);
+  title.textContent = shortName ? `Hola, ${shortName}` : 'Hola';
 
-  const address = document.createElement('span');
-  address.textContent = formatAddress(data);
+  const intro = document.createElement('p');
+  intro.textContent = 'Selecciona una de las fechas disponibles para realizar el mantenimiento de tu equipo.';
 
-  clientEl.append(name);
-  if (address.textContent) clientEl.append(document.createElement('br'), address);
+  clientEl.append(title, intro);
+
+  const formattedAddress = formatAddress(data);
+  if (formattedAddress) {
+    const address = document.createElement('div');
+    address.className = 'client-address';
+    address.textContent = formattedAddress;
+    clientEl.append(address);
+  }
 }
 
 function showBooking(booking) {
@@ -109,16 +128,16 @@ function showLoadError(code) {
     INVALID_TOKEN: 'El enlace de reserva no es válido.',
     CLIENT_NOT_READY: 'Esta cita todavía no tiene horarios asignados.',
     BAD_REQUEST: 'El enlace de reserva no contiene datos válidos.',
-    SERVER_ERROR: 'El servicio de reservas ha devuelto un error (SERVER_ERROR).',
-    APPS_SCRIPT_URL_NOT_CONFIGURED: 'La conexión con la agenda no está configurada (APPS_SCRIPT_URL_NOT_CONFIGURED).',
-    UPSTREAM_HTTP_ERROR: 'La agenda no ha respondido correctamente (UPSTREAM_HTTP_ERROR).',
-    UPSTREAM_INVALID_JSON: 'La agenda ha devuelto una respuesta no válida (UPSTREAM_INVALID_JSON).',
-    HTTP_500: 'El servicio de reservas ha devuelto HTTP 500.',
-    HTTP_502: 'El servicio de reservas ha devuelto HTTP 502.',
-    NETWORK: 'No se ha podido conectar con el servicio de reservas (NETWORK).',
+    SERVER_ERROR: 'No se ha podido cargar la agenda. Vuelve a intentarlo más tarde.',
+    APPS_SCRIPT_URL_NOT_CONFIGURED: 'La agenda no está disponible en este momento.',
+    UPSTREAM_HTTP_ERROR: 'La agenda no ha respondido correctamente.',
+    UPSTREAM_INVALID_JSON: 'La agenda ha devuelto una respuesta no válida.',
+    HTTP_500: 'No se ha podido cargar la agenda.',
+    HTTP_502: 'No se ha podido conectar con la agenda.',
+    NETWORK: 'No se ha podido conectar con el servicio de reservas.',
   };
   const normalized = String(code || 'UNKNOWN');
-  setStatus(messages[normalized] || `No se ha podido cargar la disponibilidad. (${normalized})`, true);
+  setStatus(messages[normalized] || 'No se ha podido cargar la disponibilidad.', true);
 }
 
 async function load() {
@@ -241,7 +260,7 @@ noneFitEl.addEventListener('click', () => {
   }
 
   const phone = contactWhatsApp.replace(/\D/g, '');
-  const text = `Hola, soy ${client.name}. No puedo asistir en ninguna de las horas propuestas para el mantenimiento de ${client.address || 'mi domicilio'}. ¿Podemos buscar otra fecha?`;
+  const text = `${greetingForNow()}, soy ${client.name}. No puedo asistir en ninguna de las horas propuestas para el mantenimiento de ${client.address || 'mi domicilio'}. ¿Podemos buscar otra fecha?`;
   window.location.assign(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
 });
 
