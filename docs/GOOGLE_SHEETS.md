@@ -123,3 +123,35 @@ En todas las filas que pertenecen a la misma visita:
 - `CONFIRMADO_EN`
 
 No se debe modificar manualmente una reserva mientras el cliente está usando la web.
+
+## 8. Panel visual `CONTROL_CITAS`
+
+Ejecutar una vez desde Apps Script:
+
+```js
+installControlDashboard()
+```
+
+Esto crea o actualiza el panel y conecta el checkbox `GENERAR` con la creación automática de franjas. La instalación es idempotente: no duplica el activador.
+
+El panel crea una fila por bloque con:
+
+- población;
+- número de visitas físicas;
+- número de SAs;
+- dos fechas editables;
+- cuatro horas editables;
+- número de franjas existentes;
+- estado visual del bloque;
+- checkbox `GENERAR`.
+
+Las horas nuevas parten de `09:00`, `10:30`, `12:00` y `15:30`, pero se pueden editar.
+
+Para crear las ocho franjas:
+
+1. rellenar `FECHA 1` y `FECHA 2`;
+2. revisar las cuatro horas;
+3. marcar `GENERAR`;
+4. marcar `GENERAR`; las franjas se crean automáticamente.
+
+Actualizar el panel no borra las fechas ni horas introducidas. Un bloque que ya tiene franjas se marca como `GENERADO` y nunca se duplica. Como alternativa manual, se puede ejecutar `generateSelectedSlots()` desde Apps Script.
