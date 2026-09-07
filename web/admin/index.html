@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090b0e">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>DESORDEN CITA · Panel</title>
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+  <div id="login" class="login-shell">
+    <form id="loginForm" class="login-card">
+      <span class="brand">DESORDEN</span>
+      <h1>Panel de citas</h1>
+      <p>Acceso privado de administración.</p>
+      <label for="password">Clave de acceso</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+      <p id="loginError" class="error" hidden></p>
+    </form>
+  </div>
+
+  <main id="app" class="app" hidden>
+    <header class="topbar">
+      <div>
+        <span class="brand">DESORDEN</span>
+        <h1>Citas</h1>
+      </div>
+      <div class="top-actions">
+        <span id="updated" class="updated"></span>
+        <button id="refresh" class="ghost" type="button">Actualizar</button>
+        <button id="logout" class="ghost" type="button">Salir</button>
+      </div>
+    </header>
+
+    <section id="status" class="status" aria-live="polite" hidden></section>
+
+    <section class="kpis" aria-label="Resumen">
+      <article><span>Visitas</span><strong id="kpiVisits">—</strong></article>
+      <article><span>Confirmadas</span><strong id="kpiConfirmed">—</strong></article>
+      <article><span>Pendientes</span><strong id="kpiPending">—</strong></article>
+      <article><span>Horas libres</span><strong id="kpiFree">—</strong></article>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div>
+          <span class="section-kicker">PLANIFICACIÓN</span>
+          <h2>Disponibilidad</h2>
+        </div>
+        <p>Edita dos días y cuatro horas por zona.</p>
+      </div>
+      <div id="blocks" class="blocks"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div>
+          <span class="section-kicker">AGENDA</span>
+          <h2>Citas confirmadas</h2>
+        </div>
+        <p>Se actualizan cuando el cliente reserva.</p>
+      </div>
+      <div id="appointments" class="appointments"></div>
+    </section>
+  </main>
+
+  <script src="./admin.js" defer></script>
+</body>
+</html>
