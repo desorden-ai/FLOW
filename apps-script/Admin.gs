@@ -1,4 +1,5 @@
-const ADMIN_PASSWORD_SHA256 = 'f06be6f822432aaf9837dee1c733f9abf76874e89367d05d5a105ce93e451c5d';
+const ADMIN_DEFAULT_PASSWORD_SHA256 = 'f06be6f822432aaf9837dee1c733f9abf76874e89367d05d5a105ce93e451c5d';
+const ADMIN_PASSWORD_PROPERTY = 'ADMIN_PASSWORD_SHA256';
 const ADMIN_DEFAULT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
 
 function adminSnapshot_(adminKey) {
@@ -118,6 +119,10 @@ function adminSnapshot_(adminKey) {
 }
 
 function adminUpdateAvailability_(payload) {
+  if (payload && payload.mode === 'changePassword') {
+    return adminChangePassword_(payload);
+  }
+
   requireAdmin_(payload && payload.adminKey);
   const block = String((payload && payload.block) || '').trim();
   const date1 = adminNormalizeDate_((payload && payload.date1) || '');
@@ -194,9 +199,21 @@ function adminUpdateAvailability_(payload) {
   return adminSnapshot_(payload.adminKey);
 }
 
+function adminChangePassword_(payload) {
+  requireAdmin_(payload && payload.adminKey);
+  const newKey = String((payload && payload.newKey) || '').trim();
+  if (newKey.length < 12 || newKey.length > 128) throw new Error('INVALID_NEW_PASSWORD');
+  PropertiesService.getScriptProperties().setProperty(ADMIN_PASSWORD_PROPERTY, adminSha256_(newKey));
+  return { ok: true };
+}
+
 function requireAdmin_(key) {
   const hash = adminSha256_(String(key || ''));
-  if (hash !== ADMIN_PASSWORD_SHA256) throw new Error('UNAUTHORIZED');
+  if (hash !== adminPasswordHash_()) throw new Error('UNAUTHORIZED');
+}
+
+function adminPasswordHash_() {
+  return PropertiesService.getScriptProperties().getProperty(ADMIN_PASSWORD_PROPERTY) || ADMIN_DEFAULT_PASSWORD_SHA256;
 }
 
 function adminSha256_(value) {
