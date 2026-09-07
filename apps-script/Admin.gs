@@ -13,37 +13,54 @@ function adminSnapshot_(adminKey) {
 
   const clientValues = clientSheet.getDataRange().getDisplayValues();
   const headers = header_(clientValues[0]);
-  requireHeaders_(headers, ['SA','CLIENTE','DIRECCION','POBLACION','CLIENTE_ID','BLOQUE','ESTADO_CITA','CITA_FECHA','CITA_HORA']);
+  requireHeaders_(headers, [
+    'SA', 'CLIENTE', 'TELEFONO', 'DIRECCION', 'POBLACION', 'CLIENTE_ID', 'BLOQUE',
+    'ESTADO_CITA', 'CITA_FECHA', 'CITA_HORA', 'URL_CITA',
+  ]);
 
   const units = {};
   const blocks = {};
+
   clientValues.slice(1).forEach(function(row) {
     const id = value_(row, headers, 'CLIENTE_ID');
     if (!id) return;
+
     const block = value_(row, headers, 'BLOQUE');
     if (!units[id]) {
       units[id] = {
         id: id,
         block: block,
         name: value_(row, headers, 'CLIENTE'),
+        phone: value_(row, headers, 'TELEFONO'),
         address: value_(row, headers, 'DIRECCION'),
         city: value_(row, headers, 'POBLACION'),
+        bookingUrl: value_(row, headers, 'URL_CITA'),
         status: value_(row, headers, 'ESTADO_CITA') || 'PENDIENTE',
         date: value_(row, headers, 'CITA_FECHA'),
         time: value_(row, headers, 'CITA_HORA'),
         sas: {},
       };
     }
+
     const unit = units[id];
     const sa = value_(row, headers, 'SA');
     if (sa) unit.sas[sa] = true;
+    if (!unit.phone) unit.phone = value_(row, headers, 'TELEFONO');
+    if (!unit.bookingUrl) unit.bookingUrl = value_(row, headers, 'URL_CITA');
+
     if (value_(row, headers, 'ESTADO_CITA') === 'CONFIRMADO') {
       unit.status = 'CONFIRMADO';
       unit.date = value_(row, headers, 'CITA_FECHA') || unit.date;
       unit.time = value_(row, headers, 'CITA_HORA') || unit.time;
     }
+
     if (block) {
-      if (!blocks[block]) blocks[block] = { visits: {}, cities: {}, pending: 0, free: 0, reserved: 0, dates: {}, times: {} };
+      if (!blocks[block]) {
+        blocks[block] = {
+          visits: {}, cities: {}, pending: 0, free: 0, reserved: 0,
+          dates: {}, times: {}, slots: [], clients: [], conflicts: [],
+        };
+      }
       blocks[block].visits[id] = true;
       const city = value_(row, headers, 'POBLACION');
       if (city) blocks[block].cities[city] = true;
@@ -52,31 +69,102 @@ function adminSnapshot_(adminKey) {
 
   const unitList = Object.keys(units).map(function(id) { return units[id]; });
   const confirmed = unitList.filter(function(unit) { return unit.status === 'CONFIRMADO'; });
+
   unitList.forEach(function(unit) {
-    if (unit.block && unit.status !== 'CONFIRMADO' && blocks[unit.block]) blocks[unit.block].pending += 1;
+    if (!unit.block || !blocks[unit.block]) return;
+    if (unit.status !== 'CONFIRMADO') blocks[unit.block].pending += 1;
+    blocks[unit.block].clients.push({
+      id: unit.id,
+      name: unit.name,
+      phone: unit.phone,
+      address: unit.address,
+      city: unit.city,
+      status: unit.status || 'PENDIENTE',
+      date: unit.date,
+      time: unit.time,
+      sas: Object.keys(unit.sas).sort(),
+      bookingUrl: unit.bookingUrl,
+    });
   });
 
   const slotValues = slotSheet.getDataRange().getDisplayValues();
   const slotHeaders = header_(slotValues[0]);
   requireHeaders_(slotHeaders, SLOT_HEADERS);
+
+  const scheduleIndex = {};
   let freeSlots = 0;
   let reservedSlots = 0;
+
   slotValues.slice(1).forEach(function(row) {
     const block = value_(row, slotHeaders, 'BLOQUE');
     const status = value_(row, slotHeaders, 'ESTADO');
     const date = value_(row, slotHeaders, 'FECHA');
     const time = value_(row, slotHeaders, 'HORA');
-    if (!block || !blocks[block]) return;
-    if (date) blocks[block].dates[date] = true;
-    if (time) blocks[block].times[time] = true;
-    if (status === 'LIBRE') { blocks[block].free += 1; freeSlots += 1; }
-    if (status === 'CONFIRMADO') { blocks[block].reserved += 1; reservedSlots += 1; }
+    const clientId = value_(row, slotHeaders, 'CLIENTE_ID');
+    if (!block || !blocks[block] || !date || !time || !status) return;
+
+    blocks[block].dates[date] = true;
+    blocks[block].times[time] = true;
+    blocks[block].slots.push({
+      date: date,
+      time: time,
+      status: status,
+      clientId: clientId,
+    });
+
+    if (status === 'LIBRE') {
+      blocks[block].free += 1;
+      freeSlots += 1;
+    }
+    if (status === 'CONFIRMADO') {
+      blocks[block].reserved += 1;
+      reservedSlots += 1;
+    }
+
+    const key = date + '|' + time;
+    if (!scheduleIndex[key]) scheduleIndex[key] = [];
+    scheduleIndex[key].push({ block: block, status: status });
+  });
+
+  Object.keys(scheduleIndex).forEach(function(key) {
+    const entries = scheduleIndex[key];
+    const distinctBlocks = {};
+    entries.forEach(function(entry) { distinctBlocks[entry.block] = true; });
+    const names = Object.keys(distinctBlocks);
+    if (names.length < 2) return;
+
+    const parts = key.split('|');
+    names.forEach(function(block) {
+      if (!blocks[block]) return;
+      const others = names.filter(function(name) { return name !== block; });
+      const otherStatuses = {};
+      entries.forEach(function(entry) {
+        if (entry.block !== block) otherStatuses[entry.status] = true;
+      });
+      blocks[block].conflicts.push({
+        date: parts[0],
+        time: parts[1],
+        blocks: others,
+        hasConfirmed: Boolean(otherStatuses.CONFIRMADO),
+      });
+    });
   });
 
   const blockList = Object.keys(blocks).sort().map(function(block) {
     const item = blocks[block];
     const dates = Object.keys(item.dates).sort();
     const times = Object.keys(item.times).sort();
+
+    item.slots.sort(function(a, b) {
+      return (a.date + '|' + a.time).localeCompare(b.date + '|' + b.time);
+    });
+    item.clients.sort(function(a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+    });
+    item.conflicts.sort(function(a, b) {
+      return (a.date + '|' + a.time).localeCompare(b.date + '|' + b.time);
+    });
+
     return {
       block: block,
       label: adminBlockLabel_(block, Object.keys(item.cities).sort()),
@@ -87,6 +175,9 @@ function adminSnapshot_(adminKey) {
       date1: dates[0] || '',
       date2: dates[1] || '',
       times: times.length ? times.slice(0, 4) : ADMIN_DEFAULT_TIMES.slice(),
+      slots: item.slots,
+      clients: item.clients,
+      conflicts: item.conflicts,
     };
   });
 
@@ -95,9 +186,12 @@ function adminSnapshot_(adminKey) {
       date: unit.date,
       time: unit.time,
       name: unit.name,
+      phone: unit.phone,
       city: unit.city,
       address: unit.address,
       sas: Object.keys(unit.sas).sort(),
+      bookingUrl: unit.bookingUrl,
+      block: unit.block,
     };
   }).sort(function(a, b) {
     return (String(a.date) + '|' + String(a.time)).localeCompare(String(b.date) + '|' + String(b.time));
@@ -131,7 +225,10 @@ function adminUpdateAvailability_(payload) {
 
   if (!block) throw new Error('INVALID_BLOCK');
   if (!date1 || !date2 || date1 === date2) throw new Error('INVALID_DATES');
-  if (times.length !== 4 || Object.keys(times.reduce(function(map, time) { map[time] = true; return map; }, {})).length !== 4) {
+  if (times.length !== 4 || Object.keys(times.reduce(function(map, time) {
+    map[time] = true;
+    return map;
+  }, {})).length !== 4) {
     throw new Error('INVALID_TIMES');
   }
 
