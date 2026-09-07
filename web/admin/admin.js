@@ -3,6 +3,7 @@ const STORAGE_KEY='desorden_cita_admin_key';
 const $=(s)=>document.querySelector(s);
 const loginEl=$('#login'),appEl=$('#app'),formEl=$('#loginForm'),passwordEl=$('#password'),loginErrorEl=$('#loginError'),statusEl=$('#status');
 const blocksEl=$('#blocks'),appointmentsEl=$('#appointments');
+const passwordDialog=$('#passwordDialog'),passwordForm=$('#passwordForm'),newPasswordEl=$('#newPassword'),newPasswordConfirmEl=$('#newPasswordConfirm'),passwordErrorEl=$('#passwordError'),savePasswordEl=$('#savePassword');
 let adminKey=sessionStorage.getItem(STORAGE_KEY)||'';
 
 function setStatus(text,error=false){statusEl.hidden=!text;statusEl.textContent=text||'';statusEl.dataset.error=error?'1':'0'}
@@ -32,5 +33,10 @@ async function loadDashboard(){setStatus('');const data=await callApi('snapshot'
 formEl.addEventListener('submit',async e=>{e.preventDefault();adminKey=passwordEl.value.trim();loginErrorEl.hidden=true;try{await loadDashboard();sessionStorage.setItem(STORAGE_KEY,adminKey);passwordEl.value=''}catch(err){adminKey='';sessionStorage.removeItem(STORAGE_KEY);showLogin(err.message==='UNAUTHORIZED'?'Clave incorrecta.':'No se pudo cargar el panel.')}});
 $('#refresh').addEventListener('click',()=>loadDashboard().catch(err=>setStatus(`No se pudo actualizar: ${err.message}`,true)));
 $('#logout').addEventListener('click',()=>{adminKey='';sessionStorage.removeItem(STORAGE_KEY);showLogin()});
+
+$('#changePassword').addEventListener('click',()=>{passwordErrorEl.hidden=true;passwordErrorEl.textContent='';newPasswordEl.value='';newPasswordConfirmEl.value='';passwordDialog.showModal();newPasswordEl.focus()});
+$('#cancelPassword').addEventListener('click',()=>passwordDialog.close());
+passwordDialog.addEventListener('click',e=>{if(e.target===passwordDialog)passwordDialog.close()});
+passwordForm.addEventListener('submit',async e=>{e.preventDefault();passwordErrorEl.hidden=true;const next=newPasswordEl.value.trim();const confirm=newPasswordConfirmEl.value.trim();if(next.length<12){passwordErrorEl.textContent='Usa al menos 12 caracteres.';passwordErrorEl.hidden=false;return}if(next!==confirm){passwordErrorEl.textContent='Las contraseñas no coinciden.';passwordErrorEl.hidden=false;return}savePasswordEl.disabled=true;savePasswordEl.textContent='Guardando…';try{await callApi('changePassword',{newKey:next});adminKey=next;sessionStorage.setItem(STORAGE_KEY,adminKey);passwordDialog.close();setStatus('Contraseña actualizada correctamente.')}catch(err){passwordErrorEl.textContent=err.message==='UNAUTHORIZED'?'La sesión ha caducado.':`No se pudo cambiar la contraseña: ${err.message}`;passwordErrorEl.hidden=false;if(err.message==='UNAUTHORIZED'){adminKey='';sessionStorage.removeItem(STORAGE_KEY)}}finally{savePasswordEl.disabled=false;savePasswordEl.textContent='Guardar contraseña'}});
 
 if(adminKey){loadDashboard().catch(()=>{adminKey='';sessionStorage.removeItem(STORAGE_KEY);showLogin('Vuelve a introducir la clave.')})}else{showLogin()}
