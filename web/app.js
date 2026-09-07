@@ -47,13 +47,31 @@ function formatAddress(data) {
   return [data?.address, data?.city].filter(Boolean).join(' · ');
 }
 
+async function readApiResponse(response) {
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, error: `HTTP_${response.status || 'INVALID_JSON'}` };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: String(data?.error || `HTTP_${response.status}`),
+      booking: data?.booking || null,
+    };
+  }
+
+  return data;
+}
+
 async function getAvailability() {
   const url = new URL(API_URL, location.origin);
   url.searchParams.set('action', 'availability');
   url.searchParams.set('token', token);
   const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`HTTP_${response.status}`);
-  return response.json();
+  return readApiResponse(response);
 }
 
 async function confirmBooking(slotId) {
@@ -62,8 +80,7 @@ async function confirmBooking(slotId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'book', token, slotId }),
   });
-  if (!response.ok) throw new Error(`HTTP_${response.status}`);
-  return response.json();
+  return readApiResponse(response);
 }
 
 function renderClient(data) {
@@ -91,8 +108,17 @@ function showLoadError(code) {
   const messages = {
     INVALID_TOKEN: 'El enlace de reserva no es válido.',
     CLIENT_NOT_READY: 'Esta cita todavía no tiene horarios asignados.',
+    BAD_REQUEST: 'El enlace de reserva no contiene datos válidos.',
+    SERVER_ERROR: 'El servicio de reservas ha devuelto un error (SERVER_ERROR).',
+    APPS_SCRIPT_URL_NOT_CONFIGURED: 'La conexión con la agenda no está configurada (APPS_SCRIPT_URL_NOT_CONFIGURED).',
+    UPSTREAM_HTTP_ERROR: 'La agenda no ha respondido correctamente (UPSTREAM_HTTP_ERROR).',
+    UPSTREAM_INVALID_JSON: 'La agenda ha devuelto una respuesta no válida (UPSTREAM_INVALID_JSON).',
+    HTTP_500: 'El servicio de reservas ha devuelto HTTP 500.',
+    HTTP_502: 'El servicio de reservas ha devuelto HTTP 502.',
+    NETWORK: 'No se ha podido conectar con el servicio de reservas (NETWORK).',
   };
-  setStatus(messages[code] || 'No se ha podido cargar la disponibilidad.', true);
+  const normalized = String(code || 'UNKNOWN');
+  setStatus(messages[normalized] || `No se ha podido cargar la disponibilidad. (${normalized})`, true);
 }
 
 async function load() {
@@ -123,7 +149,8 @@ async function load() {
     renderSlots(data.slots || []);
     clearStatus();
     bookingEl.hidden = false;
-  } catch {
+  } catch (error) {
+    console.error(error);
     showLoadError('NETWORK');
   }
 }
@@ -198,7 +225,8 @@ async function book(slot, button) {
     }
 
     showBooking(data.booking);
-  } catch {
+  } catch (error) {
+    console.error(error);
     setStatus('No se ha podido confirmar. Vuelve a intentarlo.', true);
     buttons.forEach((item) => { item.disabled = false; });
     button.textContent = slot.time;
