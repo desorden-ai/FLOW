@@ -3,6 +3,12 @@
   "name": "flow",
   "main": "./src/worker.js",
   "compatibility_date": "2026-09-06",
+  "routes": [
+    {
+      "pattern": "cita.desorden.cat",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
