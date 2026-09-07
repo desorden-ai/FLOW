@@ -12,6 +12,6 @@
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
-    "run_worker_first": true
+    "run_worker_first": ["/api", "/api/*", "/contact"]
   }
 }
