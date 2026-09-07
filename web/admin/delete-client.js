@@ -4,10 +4,11 @@
 
   function relabelDeleteActions() {
     document.querySelectorAll('button.archive-action').forEach((button) => {
-      button.textContent = 'Eliminar';
-      button.title = button.disabled
+      if (button.textContent !== 'Eliminar') button.textContent = 'Eliminar';
+      const nextTitle = button.disabled
         ? 'Cancela primero la cita confirmada antes de eliminar el cliente.'
         : 'Eliminar este cliente del panel.';
+      if (button.title !== nextTitle) button.title = nextTitle;
     });
   }
 
