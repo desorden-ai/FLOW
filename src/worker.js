@@ -1,5 +1,3 @@
-const ADMIN_PASSWORD_SHA256 = 'f06be6f822432aaf9837dee1c733f9abf76874e89367d05d5a105ce93e451c5d';
-
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -44,6 +42,17 @@ function safeTimes(value) {
   if (!times.every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time))) return [];
   if (new Set(times).size !== 4) return [];
   return times;
+}
+
+function safeAdminPassword(value) {
+  const key = String(value || '').trim();
+  return key.length >= 12 && key.length <= 128 ? key : '';
+}
+
+function adminKeyFromRequest(request) {
+  const header = String(request.headers.get('Authorization') || '');
+  if (!header.startsWith('Bearer ')) return '';
+  return safeAdminPassword(header.slice(7));
 }
 
 async function readUpstream(response) {
@@ -144,20 +153,6 @@ function sanitizeAdminSnapshot(payload) {
   };
 }
 
-async function sha256Hex(value) {
-  const bytes = new TextEncoder().encode(String(value || ''));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function authorizedAdmin(request) {
-  const header = String(request.headers.get('Authorization') || '');
-  if (!header.startsWith('Bearer ')) return '';
-  const key = header.slice(7).trim();
-  if (!key || key.length > 256) return '';
-  return (await sha256Hex(key)) === ADMIN_PASSWORD_SHA256 ? key : '';
-}
-
 export async function handleApiGet(request, env) {
   try {
     const requestUrl = new URL(request.url);
@@ -225,7 +220,7 @@ export async function handleApiPost(request, env) {
 export async function handleAdminApi(request, env) {
   try {
     if (request.method !== 'POST') return jsonResponse({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
-    const adminKey = await authorizedAdmin(request);
+    const adminKey = adminKeyFromRequest(request);
     if (!adminKey) return jsonResponse({ ok: false, error: 'UNAUTHORIZED' }, 401);
 
     let payload;
@@ -247,6 +242,15 @@ export async function handleAdminApi(request, env) {
         return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
       }
       upstreamPayload = { action: 'adminUpdateAvailability', adminKey, block, date1, date2, times };
+    } else if (payload.action === 'changePassword') {
+      const newKey = safeAdminPassword(payload.newKey);
+      if (!newKey) return jsonResponse({ ok: false, error: 'INVALID_NEW_PASSWORD' }, 400);
+      upstreamPayload = {
+        action: 'adminUpdateAvailability',
+        mode: 'changePassword',
+        adminKey,
+        newKey,
+      };
     } else {
       return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
     }
@@ -263,6 +267,15 @@ export async function handleAdminApi(request, env) {
 
     const result = await readUpstream(upstream);
     if (!result.ok) return jsonResponse(result.payload, result.status);
+
+    if (payload.action === 'changePassword') {
+      if (!result.payload || result.payload.ok !== true) {
+        const error = String((result.payload && result.payload.error) || 'UPSTREAM_ERROR');
+        return jsonResponse({ ok: false, error }, error === 'UNAUTHORIZED' ? 401 : 400);
+      }
+      return jsonResponse({ ok: true });
+    }
+
     const clean = sanitizeAdminSnapshot(result.payload);
     if (!clean.ok && clean.error === 'UNAUTHORIZED') return jsonResponse(clean, 401);
     if (!clean.ok) return jsonResponse(clean, 502);
