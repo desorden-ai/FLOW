@@ -8,6 +8,7 @@
   <title>DESORDEN CITA · Panel</title>
   <link rel="stylesheet" href="./admin.css">
   <link rel="stylesheet" href="./schedule.css">
+  <link rel="stylesheet" href="./clients.css">
 </head>
 <body>
   <div id="login" class="login-shell">
@@ -81,6 +82,48 @@
       <div class="dialog-actions">
         <button id="cancelPassword" class="ghost" type="button">Cancelar</button>
         <button id="savePassword" class="save-password" type="submit">Guardar contraseña</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="clientDialog" class="client-dialog">
+    <form id="clientForm" class="client-card">
+      <span class="brand">CLIENTE</span>
+      <h2 id="clientDialogTitle">Añadir cliente</h2>
+      <p>Gestiona los datos de la visita sin entrar en Google Sheets.</p>
+
+      <div class="client-form-grid">
+        <label class="client-field client-field-wide" for="clientName">
+          <span>Nombre</span>
+          <input id="clientName" type="text" maxlength="160" required>
+        </label>
+        <label class="client-field" for="clientPhone">
+          <span>Teléfono</span>
+          <input id="clientPhone" type="tel" maxlength="40">
+        </label>
+        <label class="client-field" for="clientCity">
+          <span>Población</span>
+          <input id="clientCity" type="text" maxlength="120" required>
+        </label>
+        <label class="client-field client-field-wide" for="clientAddress">
+          <span>Dirección</span>
+          <input id="clientAddress" type="text" maxlength="220" required>
+        </label>
+        <label class="client-field" for="clientBlock">
+          <span>Bloque</span>
+          <select id="clientBlock" required></select>
+        </label>
+        <label class="client-field client-field-wide" for="clientSas">
+          <span>SA(s)</span>
+          <input id="clientSas" type="text" maxlength="320" placeholder="SA-12345, SA-67890">
+          <small id="clientSasHelp"></small>
+        </label>
+      </div>
+
+      <p id="clientError" class="error" hidden></p>
+      <div class="dialog-actions client-dialog-actions">
+        <button id="cancelClient" class="ghost" type="button">Cancelar</button>
+        <button id="saveClient" class="save-password" type="submit">Añadir cliente</button>
       </div>
     </form>
   </dialog>
