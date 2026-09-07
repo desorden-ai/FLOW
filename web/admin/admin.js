@@ -1,5 +1,6 @@
 const API_URL = '/api/admin';
 const STORAGE_KEY = 'desorden_cita_admin_key';
+const DEFAULT_TIMES = ['09:00', '10:30', '12:00', '15:30'];
 const $ = (selector) => document.querySelector(selector);
 
 const loginEl = $('#login');
@@ -19,6 +20,7 @@ const savePasswordEl = $('#savePassword');
 
 let adminKey = sessionStorage.getItem(STORAGE_KEY) || '';
 let blockLabels = {};
+let limits = { maxDates: 8, maxTimesPerDate: 8 };
 
 function setStatus(text, error = false) {
   statusEl.hidden = !text;
@@ -37,6 +39,22 @@ function fmtDate(value, long = false) {
 
 function digits(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+function addText(parent, tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  el.textContent = text;
+  parent.append(el);
+  return el;
+}
+
+function button(text, className = '', type = 'button') {
+  const el = document.createElement('button');
+  el.type = type;
+  el.className = className;
+  el.textContent = text;
+  return el;
 }
 
 async function callApi(action, payload = {}) {
@@ -80,14 +98,6 @@ function renderSummary(summary) {
   }).format(new Date())}`;
 }
 
-function addText(parent, tag, className, text) {
-  const el = document.createElement(tag);
-  if (className) el.className = className;
-  el.textContent = text;
-  parent.append(el);
-  return el;
-}
-
 function renderAvailabilityDetail(block, parent) {
   const section = document.createElement('section');
   section.className = 'block-detail-section';
@@ -101,13 +111,10 @@ function renderAvailabilityDetail(block, parent) {
 
   const clientById = Object.fromEntries((block.clients || []).map((client) => [client.id, client]));
   const groups = {};
-  block.slots.forEach((slot) => {
-    (groups[slot.date] ||= []).push(slot);
-  });
+  block.slots.forEach((slot) => { (groups[slot.date] ||= []).push(slot); });
 
   const days = document.createElement('div');
   days.className = 'slot-days';
-
   Object.entries(groups).forEach(([date, slots]) => {
     const day = document.createElement('article');
     day.className = 'slot-day';
@@ -155,21 +162,18 @@ function renderConflicts(block, parent) {
 }
 
 function copyButton(url) {
-  const button = document.createElement('button');
-  button.className = 'mini-action';
-  button.type = 'button';
-  button.textContent = 'Copiar enlace';
-  button.disabled = !url;
-  button.addEventListener('click', async () => {
+  const copy = button('Copiar enlace', 'mini-action');
+  copy.disabled = !url;
+  copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(url);
-      button.textContent = 'Copiado ✓';
-      setTimeout(() => { button.textContent = 'Copiar enlace'; }, 1500);
+      copy.textContent = 'Copiado ✓';
+      setTimeout(() => { copy.textContent = 'Copiar enlace'; }, 1500);
     } catch {
       setStatus('No se ha podido copiar el enlace.', true);
     }
   });
-  return button;
+  return copy;
 }
 
 function renderClients(block, parent) {
@@ -183,7 +187,6 @@ function renderClients(block, parent) {
 
   const list = document.createElement('div');
   list.className = 'client-list';
-
   (block.clients || []).forEach((client) => {
     const card = document.createElement('article');
     card.className = 'admin-client';
@@ -194,6 +197,7 @@ function renderClients(block, parent) {
     addText(identity, 'strong', '', client.name || 'Cliente');
     addText(identity, 'span', 'client-address', [client.address, client.city].filter(Boolean).join(' · '));
     const state = addText(top, 'span', `client-state ${client.status === 'CONFIRMADO' ? 'confirmed' : ''}`, client.status === 'CONFIRMADO' ? 'CONFIRMADO' : 'PENDIENTE');
+    state.setAttribute('aria-label', `Estado ${state.textContent}`);
     top.prepend(identity);
     card.append(top);
 
@@ -237,59 +241,134 @@ function availabilityForm(block) {
   const wrap = document.createElement('section');
   wrap.className = 'block-detail-section edit-section';
   addText(wrap, 'h4', '', 'Editar disponibilidad');
+  addText(wrap, 'p', 'schedule-help', `Puedes configurar hasta ${limits.maxDates} fechas y hasta ${limits.maxTimesPerDate} horas distintas en cada fecha.`);
 
   const form = document.createElement('form');
-  form.className = 'availability-form';
+  form.className = 'availability-form schedule-form';
   form.dataset.block = block.block;
 
-  const dateField = (label, value) => {
-    const field = document.createElement('label');
-    field.className = 'field';
-    addText(field, 'span', '', label);
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.value = value || '';
-    field.append(input);
-    return field;
-  };
+  const editor = document.createElement('div');
+  editor.className = 'schedule-editor';
+  form.append(editor);
 
-  form.append(dateField('Fecha 1', block.date1), dateField('Fecha 2', block.date2));
+  const addDate = button('+ Añadir fecha', 'schedule-add-date');
+  const save = button('Guardar disponibilidad', 'save', 'submit');
+  const footer = document.createElement('div');
+  footer.className = 'schedule-footer';
+  footer.append(addDate, save);
+  form.append(footer);
 
-  const times = document.createElement('div');
-  times.className = 'times';
-  (block.times || ['09:00', '10:30', '12:00', '15:30']).forEach((time, index) => {
-    const field = document.createElement('label');
-    field.className = 'field';
-    addText(field, 'span', '', `Hora ${index + 1}`);
+  function refreshControls() {
+    const dayEls = [...editor.querySelectorAll('.schedule-day-editor')];
+    dayEls.forEach((dayEl, index) => {
+      dayEl.querySelector('.schedule-day-number').textContent = `Fecha ${index + 1}`;
+      const removeDate = dayEl.querySelector('.remove-date');
+      removeDate.disabled = dayEls.length <= 1;
+      const timeRows = [...dayEl.querySelectorAll('.schedule-time')];
+      dayEl.querySelector('.add-time').disabled = timeRows.length >= limits.maxTimesPerDate;
+      timeRows.forEach((row) => { row.querySelector('.remove-time').disabled = timeRows.length <= 1; });
+    });
+    addDate.disabled = dayEls.length >= limits.maxDates;
+  }
+
+  function addTime(dayEl, value = '') {
+    const times = dayEl.querySelector('.schedule-times-editor');
+    if (times.querySelectorAll('.schedule-time').length >= limits.maxTimesPerDate) return;
+
+    const row = document.createElement('div');
+    row.className = 'schedule-time';
     const input = document.createElement('input');
     input.type = 'time';
     input.step = '300';
-    input.value = time || '';
-    field.append(input);
-    times.append(field);
-  });
-  form.append(times);
+    input.required = true;
+    input.value = value;
+    input.setAttribute('aria-label', 'Hora disponible');
+    const remove = button('×', 'schedule-icon remove-time');
+    remove.title = 'Eliminar hora';
+    remove.addEventListener('click', () => {
+      row.remove();
+      refreshControls();
+    });
+    row.append(input, remove);
+    times.append(row);
+    refreshControls();
+  }
 
-  const save = document.createElement('button');
-  save.className = 'save';
-  save.type = 'submit';
-  save.textContent = 'Guardar disponibilidad';
-  form.append(save);
+  function addDay(data = {}) {
+    if (editor.querySelectorAll('.schedule-day-editor').length >= limits.maxDates) return;
+
+    const day = document.createElement('article');
+    day.className = 'schedule-day-editor';
+
+    const head = document.createElement('div');
+    head.className = 'schedule-day-head';
+    const title = addText(head, 'strong', 'schedule-day-number', 'Fecha');
+    title.setAttribute('aria-hidden', 'true');
+    const removeDate = button('Eliminar fecha', 'schedule-remove-date remove-date');
+    removeDate.addEventListener('click', () => {
+      day.remove();
+      refreshControls();
+    });
+    head.append(removeDate);
+    day.append(head);
+
+    const dateField = document.createElement('label');
+    dateField.className = 'schedule-date-field';
+    addText(dateField, 'span', '', 'Día');
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.required = true;
+    dateInput.value = data.date || '';
+    dateField.append(dateInput);
+    day.append(dateField);
+
+    const timesHeading = document.createElement('div');
+    timesHeading.className = 'schedule-times-head';
+    addText(timesHeading, 'span', '', 'Horas disponibles para esta fecha');
+    const addHour = button('+ hora', 'add-time');
+    addHour.addEventListener('click', () => addTime(day, ''));
+    timesHeading.append(addHour);
+    day.append(timesHeading);
+
+    const times = document.createElement('div');
+    times.className = 'schedule-times-editor';
+    day.append(times);
+
+    editor.append(day);
+    const initialTimes = Array.isArray(data.times) && data.times.length ? data.times : DEFAULT_TIMES;
+    initialTimes.slice(0, limits.maxTimesPerDate).forEach((time) => addTime(day, time));
+    refreshControls();
+  }
+
+  const initialSchedule = Array.isArray(block.schedule) && block.schedule.length
+    ? block.schedule
+    : [{ date: '', times: DEFAULT_TIMES }];
+  initialSchedule.slice(0, limits.maxDates).forEach((day) => addDay(day));
+  addDate.addEventListener('click', () => addDay({ date: '', times: DEFAULT_TIMES }));
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const inputs = [...form.querySelectorAll('input')];
-    const [date1, date2, ...timeInputs] = inputs;
+    const dayEls = [...editor.querySelectorAll('.schedule-day-editor')];
+    const days = dayEls.map((dayEl) => ({
+      date: dayEl.querySelector('input[type="date"]').value,
+      times: [...dayEl.querySelectorAll('.schedule-time input')].map((input) => input.value),
+    }));
+
+    if (new Set(days.map((day) => day.date)).size !== days.length) {
+      setStatus('No puedes repetir la misma fecha dentro de un bloque.', true);
+      return;
+    }
+    const duplicateTime = days.some((day) => new Set(day.times).size !== day.times.length);
+    if (duplicateTime) {
+      setStatus('Dentro de una misma fecha no puedes repetir una hora.', true);
+      return;
+    }
+
     save.disabled = true;
     save.textContent = 'Guardando…';
     setStatus('');
     try {
-      await callApi('updateAvailability', {
-        block: block.block,
-        date1: date1.value,
-        date2: date2.value,
-        times: timeInputs.map((input) => input.value),
-      });
+      await callApi('updateAvailability', { block: block.block, days });
       setStatus(`Disponibilidad de ${block.label || block.block} actualizada.`);
       await loadDashboard();
     } catch (error) {
@@ -322,12 +401,20 @@ function blockCard(block, openBlocks) {
   left.className = 'block-main';
   addText(left, 'h3', '', block.label || block.block);
   addText(left, 'div', 'block-meta', `${block.visits} visita${block.visits === 1 ? '' : 's'} · ${block.pending} pendiente${block.pending === 1 ? '' : 's'} · ${block.free} libre${block.free === 1 ? '' : 's'} · ${block.reserved} reservada${block.reserved === 1 ? '' : 's'}`);
-  if (block.date1 && block.date2) addText(left, 'div', 'block-dates', `${fmtDate(block.date1)} · ${fmtDate(block.date2)}`);
+
+  const schedule = block.schedule || [];
+  if (schedule.length) {
+    const visible = schedule.slice(0, 3).map((day) => fmtDate(day.date)).join(' · ');
+    const extra = schedule.length > 3 ? ` · +${schedule.length - 3}` : '';
+    const total = schedule.reduce((sum, day) => sum + (day.times?.length || 0), 0);
+    addText(left, 'div', 'block-dates', `${visible}${extra} · ${total} hora${total === 1 ? '' : 's'}`);
+  }
 
   const right = document.createElement('div');
   right.className = 'block-summary-right';
   if (block.conflicts?.length) addText(right, 'span', 'warning-badge', `${block.conflicts.length} solapamiento${block.conflicts.length === 1 ? '' : 's'}`);
-  const badge = addText(right, 'span', `badge${block.date1 && block.date2 ? '' : ' off'}`, block.date1 && block.date2 ? 'ACTIVO' : 'SIN CONFIGURAR');
+  const active = schedule.length > 0;
+  const badge = addText(right, 'span', `badge${active ? '' : ' off'}`, active ? 'ACTIVO' : 'SIN CONFIGURAR');
   badge.setAttribute('aria-hidden', 'true');
   addText(right, 'span', 'chevron', '⌄');
 
@@ -341,7 +428,6 @@ function blockCard(block, openBlocks) {
   renderClients(block, body);
   body.append(availabilityForm(block));
   details.append(body);
-
   return details;
 }
 
@@ -383,6 +469,10 @@ function renderAppointments(items) {
 async function loadDashboard() {
   setStatus('');
   const data = await callApi('snapshot');
+  limits = {
+    maxDates: Number(data.limits?.maxDates || 8),
+    maxTimesPerDate: Number(data.limits?.maxTimesPerDate || 8),
+  };
   showApp();
   renderSummary(data.summary);
   renderBlocks(data.blocks);
