@@ -62,6 +62,43 @@ function safeAdminPassword(value) {
   return key.length >= 12 && key.length <= 128 ? key : '';
 }
 
+function safeText(value, maxLength, required = false) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ');
+  if (required && !text) return '';
+  if (text.length > maxLength) return '';
+  return text;
+}
+
+function safeClientId(value) {
+  const id = String(value || '').trim();
+  return /^CLI-[A-Za-z0-9_-]{4,80}$/.test(id) ? id : '';
+}
+
+function safeClientPayload(value, includeSas) {
+  const source = value || {};
+  const name = safeText(source.name, 160, true);
+  const phone = safeText(source.phone, 40, false);
+  const address = safeText(source.address, 220, true);
+  const city = safeText(source.city, 120, true);
+  const block = safeBlock(source.block);
+  if (!name || !address || !city || !block) return null;
+
+  let sas = [];
+  if (includeSas) {
+    if (!Array.isArray(source.sas) || source.sas.length > 8) return null;
+    const seen = new Set();
+    for (const raw of source.sas) {
+      const sa = safeText(raw, 40, false);
+      if (!sa) continue;
+      if (seen.has(sa)) continue;
+      seen.add(sa);
+      sas.push(sa);
+    }
+  }
+
+  return { name, phone, address, city, block, sas };
+}
+
 function adminKeyFromRequest(request) {
   const header = String(request.headers.get('Authorization') || '');
   if (!header.startsWith('Bearer ')) return '';
@@ -148,6 +185,7 @@ function sanitizeAdminSnapshot(payload) {
     limits: {
       maxDates: Math.min(Math.max(Number(limits.maxDates || 8), 1), 8),
       maxTimesPerDate: Math.min(Math.max(Number(limits.maxTimesPerDate || 8), 1), 8),
+      maxSasPerClient: Math.min(Math.max(Number(limits.maxSasPerClient || 8), 1), 8),
     },
     blocks: blocks.map((block) => ({
       block: String(block.block || ''),
@@ -282,9 +320,7 @@ export async function handleAdminApi(request, env) {
     } else if (payload.action === 'updateAvailability') {
       const block = safeBlock(payload.block);
       const days = safeSchedule(payload.days);
-      if (!block || !days.length) {
-        return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
-      }
+      if (!block || !days.length) return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
       upstreamPayload = { action: 'adminUpdateAvailability', adminKey, block, days };
     } else if (payload.action === 'changePassword') {
       const newKey = safeAdminPassword(payload.newKey);
@@ -294,6 +330,35 @@ export async function handleAdminApi(request, env) {
         mode: 'changePassword',
         adminKey,
         newKey,
+      };
+    } else if (payload.action === 'createClient') {
+      const client = safeClientPayload(payload.client, true);
+      if (!client) return jsonResponse({ ok: false, error: 'INVALID_CLIENT' }, 400);
+      upstreamPayload = {
+        action: 'adminUpdateAvailability',
+        mode: 'createClient',
+        adminKey,
+        client,
+      };
+    } else if (payload.action === 'updateClient') {
+      const clientId = safeClientId(payload.clientId);
+      const client = safeClientPayload(payload.client, false);
+      if (!clientId || !client) return jsonResponse({ ok: false, error: 'INVALID_CLIENT' }, 400);
+      upstreamPayload = {
+        action: 'adminUpdateAvailability',
+        mode: 'updateClient',
+        adminKey,
+        clientId,
+        client,
+      };
+    } else if (payload.action === 'archiveClient') {
+      const clientId = safeClientId(payload.clientId);
+      if (!clientId) return jsonResponse({ ok: false, error: 'INVALID_CLIENT' }, 400);
+      upstreamPayload = {
+        action: 'adminUpdateAvailability',
+        mode: 'archiveClient',
+        adminKey,
+        clientId,
       };
     } else {
       return jsonResponse({ ok: false, error: 'BAD_REQUEST' }, 400);
@@ -321,8 +386,18 @@ export async function handleAdminApi(request, env) {
     }
 
     const clean = sanitizeAdminSnapshot(result.payload);
-    if (!clean.ok && clean.error === 'UNAUTHORIZED') return jsonResponse(clean, 401);
-    if (!clean.ok) return jsonResponse(clean, 502);
+    if (!clean.ok) {
+      if (clean.error === 'UNAUTHORIZED') return jsonResponse(clean, 401);
+      const conflictErrors = new Set([
+        'CLIENT_ALREADY_EXISTS',
+        'CLIENT_CONFIRMED_BLOCK_LOCKED',
+        'CLIENT_CONFIRMED_CANNOT_ARCHIVE',
+      ]);
+      const notFoundErrors = new Set(['CLIENT_NOT_FOUND', 'UNKNOWN_BLOCK']);
+      if (conflictErrors.has(clean.error)) return jsonResponse(clean, 409);
+      if (notFoundErrors.has(clean.error)) return jsonResponse(clean, 404);
+      return jsonResponse(clean, 400);
+    }
     return jsonResponse(clean);
   } catch (error) {
     const code = error instanceof Error ? error.message : 'PROXY_ERROR';
