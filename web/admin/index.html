@@ -30,6 +30,7 @@
       <div class="top-actions">
         <span id="updated" class="updated"></span>
         <button id="refresh" class="ghost" type="button">Actualizar</button>
+        <button id="changePassword" class="ghost" type="button">Cambiar contraseña</button>
         <button id="logout" class="ghost" type="button">Salir</button>
       </div>
     </header>
@@ -65,6 +66,23 @@
       <div id="appointments" class="appointments"></div>
     </section>
   </main>
+
+  <dialog id="passwordDialog" class="password-dialog">
+    <form id="passwordForm" class="password-card">
+      <span class="brand">SEGURIDAD</span>
+      <h2>Cambiar contraseña</h2>
+      <p>Usa al menos 12 caracteres. La contraseña anterior dejará de funcionar inmediatamente.</p>
+      <label for="newPassword">Nueva contraseña</label>
+      <input id="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+      <label for="newPasswordConfirm">Repetir contraseña</label>
+      <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+      <p id="passwordError" class="error" hidden></p>
+      <div class="dialog-actions">
+        <button id="cancelPassword" class="ghost" type="button">Cancelar</button>
+        <button id="savePassword" class="save-password" type="submit">Guardar contraseña</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="./admin.js" defer></script>
 </body>
