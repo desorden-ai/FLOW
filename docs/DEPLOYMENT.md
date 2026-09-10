@@ -14,7 +14,7 @@ Repositorio:
 
 Rama de producción:
 
-`Cita`
+`main`
 
 El repositorio contiene `wrangler.jsonc`, por lo que Cloudflare Workers puede desplegar el Worker y los Static Assets como una sola unidad.
 

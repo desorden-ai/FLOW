@@ -53,7 +53,7 @@ Despliegue manual alternativo:
 npm run deploy
 ```
 
-En producción se usa la integración Git de Cloudflare Workers con la rama `Cita`.
+En producción se usa la integración Git de Cloudflare Workers con la rama canónica `main`.
 
 ## Independencia
 
