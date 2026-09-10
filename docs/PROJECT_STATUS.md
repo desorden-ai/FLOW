@@ -3,7 +3,8 @@
 ## Implementado
 
 - Repositorio: `desorden-ai/FLOW`.
-- Rama de trabajo/despliegue: `Cita`.
+- Rama canónica de trabajo/despliegue: `main`.
+- Rama `Cita` consolidada en `main` y conservada como referencia temporal.
 - Frontend HTML/CSS/JS sin framework.
 - Cloudflare Workers + Static Assets.
 - Worker API en `src/worker.js`.
@@ -26,12 +27,18 @@
 
 ## Pendiente
 
-- Confirmar que Cloudflare Workers Builds despliega la rama `Cita` con `wrangler.jsonc`.
+- Confirmar que Cloudflare Workers Builds despliega la rama `main` con `wrangler.jsonc`.
 - Probar el subdominio `workers.dev` real.
 - Cargar clientes reales.
 - Crear bloques y franjas reales.
 - Ejecutar QA concurrente real.
 - Asociar posteriormente `cita.desorden.cat`.
+- Revisar y rescatar, si procede, los cambios locales no commitados del Codespace `fantastic-space-spork-5455vr7j4jfj6r` antes de eliminarlo.
+
+## Salvaguardas
+
+- Estado anterior a CITA: `archive/pre-citas`.
+- Estado de `main` previo a la consolidación: `archive/pre-main-cita-sync-2026-09-10`.
 
 ## Fuera de V1
 
